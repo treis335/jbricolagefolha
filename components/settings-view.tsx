@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,16 +18,15 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Euro, Users, Trash2, Plus, X, HardHat, Info, Download, CheckCircle2 } from "lucide-react"
+import { Euro, Users, Trash2, Plus, X, HardHat, Info, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 
-// Componente de Instalação PWA - SEMPRE visível, com fallback para dev/localhost
+// Componente de Instalação PWA (mantido igual)
 function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
 
   useEffect(() => {
-    // Deteta imediatamente se já está em modo standalone (PWA instalada)
     const checkStandalone = () => {
       if (window.matchMedia("(display-mode: standalone)").matches) {
         setIsInstalled(true)
@@ -35,14 +34,12 @@ function InstallPWAButton() {
     }
     checkStandalone()
 
-    // Ouve o evento beforeinstallprompt (para produção)
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       setDeferredPrompt(e)
     }
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
 
-    // Re-verifica quando a janela ganha foco (ex: volta do home screen)
     window.addEventListener("focus", checkStandalone)
 
     return () => {
@@ -53,7 +50,6 @@ function InstallPWAButton() {
 
   const handleInstallClick = async () => {
     if (deferredPrompt) {
-      // Mostra o prompt nativo se disponível
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
       if (outcome === "accepted") {
@@ -61,7 +57,6 @@ function InstallPWAButton() {
       }
       setDeferredPrompt(null)
     } else {
-      // Fallback para localhost/dev ou browsers que não disparam o evento
       alert(
         "Em ambiente de desenvolvimento (localhost), o prompt automático pode não aparecer.\n\n" +
         "Para instalar manualmente:\n" +
@@ -111,6 +106,11 @@ function InstallPWAButton() {
 export function SettingsView() {
   const { data, updateSettings, clearAllData } = useWorkTracker()
   const [newTeamMember, setNewTeamMember] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
+
+  const STORAGE_KEY = "trabalhoDiario"
 
   const handleTaxaChange = (value: string) => {
     const num = Number(value)
@@ -132,6 +132,55 @@ export function SettingsView() {
     updateSettings({
       equipaComum: data.settings.equipaComum.filter((m) => m !== member),
     })
+  }
+
+  const exportarDados = () => {
+    const conteudo = localStorage.getItem(STORAGE_KEY)
+    if (!conteudo) {
+      setSyncMessage("Não existem dados para exportar.")
+      setSyncSuccess(false)
+      return
+    }
+
+    const blob = new Blob([conteudo], { type: "application/json" })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = `jbricolage-horas-${new Date().toISOString().split("T")[0]}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+
+    setSyncMessage("Backup criado com sucesso! Transfere o ficheiro para o outro dispositivo.")
+    setSyncSuccess(true)
+  }
+
+  const importarDados = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const texto = ev.target?.result as string
+        const parsed = JSON.parse(texto)
+
+        // Validação mínima
+        if (!parsed || typeof parsed !== "object" || 
+            (!("entries" in parsed) && !("payments" in parsed) && !("settings" in parsed))) {
+          throw new Error("Formato inválido")
+        }
+
+        localStorage.setItem(STORAGE_KEY, texto)
+        setSyncMessage("Dados importados! A página vai recarregar automaticamente...")
+        setSyncSuccess(true)
+
+        setTimeout(() => window.location.reload(), 2500)
+      } catch (err) {
+        setSyncMessage("Erro ao importar: o ficheiro não é válido ou está corrompido.")
+        setSyncSuccess(false)
+      }
+    }
+    reader.readAsText(file)
   }
 
   const totalHoras = data.entries.reduce((sum, e) => sum + e.totalHoras, 0)
@@ -251,7 +300,66 @@ export function SettingsView() {
           </CardContent>
         </Card>
 
-        {/* Secção Instalar PWA - sempre visível */}
+        {/* Nova secção: Backup & Sincronização */}
+        <Card className="border-amber-500/30">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Download className="h-4 w-4" />
+              Backup & Sincronização
+            </CardTitle>
+            <CardDescription>
+              Transfere os dados entre telemóvel e PC sem precisar de servidor
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Button 
+                variant="outline" 
+                onClick={exportarDados}
+                className="h-12"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Dados (JSON)
+              </Button>
+
+              <input
+                type="file"
+                accept=".json"
+                ref={fileInputRef}
+                onChange={importarDados}
+                className="hidden"
+              />
+              <Button 
+                onClick={() => fileInputRef.current?.click()}
+                className="h-12"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Importar Dados
+              </Button>
+            </div>
+
+            {syncMessage && (
+              <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${
+                syncSuccess 
+                  ? "bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800" 
+                  : "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800"
+              }`}>
+                {syncSuccess ? (
+                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                ) : (
+                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                )}
+                <span>{syncMessage}</span>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground">
+              Usa email, WhatsApp, USB ou qualquer método para transferir o ficheiro.
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Secção Instalar PWA */}
         <InstallPWAButton />
 
         {/* Danger Zone */}
