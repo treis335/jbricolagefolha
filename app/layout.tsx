@@ -3,7 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
-import { Header } from '@/components/header'  // ← Importa o novo componente Header
+import { Header } from '@/components/header' // ← Importa o novo componente Header
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -20,6 +20,7 @@ export const metadata: Metadata = {
   title: 'JBricolage - Horas ',
   description: 'App para registo de horas, equipa e materiais',
   generator: 'v1',
+  manifest: '/manifest.json',  // ← Adicione esta linha! Link para o manifest
   icons: {
     icon: [
       {
@@ -47,13 +48,11 @@ export default function RootLayout({
   return (
     <html lang="pt-PT">
       <body className={`font-sans antialiased`}>
-        <Header />  {/* ← Barra fixa no topo com logotipo */}
-
+        <Header /> {/* ← Barra fixa no topo com logotipo */}
         {/* Conteúdo principal com padding para não sobrepor o header */}
         <div className="pt-16">
           {children}
         </div>
-
         <Analytics />
       </body>
     </html>
