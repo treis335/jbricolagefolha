@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,8 +18,95 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Euro, Users, Trash2, Plus, X, HardHat, Info } from "lucide-react"
+import { Euro, Users, Trash2, Plus, X, HardHat, Info, Download, CheckCircle2 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
+
+// Componente de Instalação PWA - SEMPRE visível, com fallback para dev/localhost
+function InstallPWAButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
+  const [isInstalled, setIsInstalled] = useState(false)
+
+  useEffect(() => {
+    // Deteta imediatamente se já está em modo standalone (PWA instalada)
+    const checkStandalone = () => {
+      if (window.matchMedia("(display-mode: standalone)").matches) {
+        setIsInstalled(true)
+      }
+    }
+    checkStandalone()
+
+    // Ouve o evento beforeinstallprompt (para produção)
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e)
+    }
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+
+    // Re-verifica quando a janela ganha foco (ex: volta do home screen)
+    window.addEventListener("focus", checkStandalone)
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener("focus", checkStandalone)
+    }
+  }, [])
+
+  const handleInstallClick = async () => {
+    if (deferredPrompt) {
+      // Mostra o prompt nativo se disponível
+      deferredPrompt.prompt()
+      const { outcome } = await deferredPrompt.userChoice
+      if (outcome === "accepted") {
+        setIsInstalled(true)
+      }
+      setDeferredPrompt(null)
+    } else {
+      // Fallback para localhost/dev ou browsers que não disparam o evento
+      alert(
+        "Em ambiente de desenvolvimento (localhost), o prompt automático pode não aparecer.\n\n" +
+        "Para instalar manualmente:\n" +
+        "1. No Chrome Android → menu ⋮ → 'Adicionar à tela inicial'\n" +
+        "2. No iOS Safari → menu Compartilhar → 'Adicionar à Tela de Início'\n\n" +
+        "Em produção (URL HTTPS), clica aqui para o prompt automático."
+      )
+    }
+  }
+
+  return (
+    <Card className="border-primary/30">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          {isInstalled ? (
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+          ) : (
+            <Download className="h-4 w-4" />
+          )}
+          {isInstalled ? "App Já Instalada" : "Instalar Aplicação"}
+        </CardTitle>
+        <CardDescription>
+          {isInstalled
+            ? "A aplicação já está instalada na tua tela inicial. Para remover, faz long-press no ícone e seleciona 'Remover' ou vai às definições do telemóvel."
+            : "Instala a app no teu telemóvel para usar offline, ter ícone próprio e acesso rápido."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {!isInstalled ? (
+          <Button
+            onClick={handleInstallClick}
+            className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <Download className="h-5 w-5 mr-2" />
+            Instalar agora
+          </Button>
+        ) : (
+          <div className="text-center py-2 text-sm text-green-600 font-medium">
+            Instalada com sucesso! Abre diretamente da tela inicial 🚀
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export function SettingsView() {
   const { data, updateSettings, clearAllData } = useWorkTracker()
@@ -51,7 +138,7 @@ export function SettingsView() {
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 pb-24 space-y-4">
+      <div className="p-4 pb-24 space-y-6">
         {/* App Header */}
         <div className="text-center py-6">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
@@ -163,6 +250,9 @@ export function SettingsView() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Secção Instalar PWA - sempre visível */}
+        <InstallPWAButton />
 
         {/* Danger Zone */}
         <Card className="border-destructive/30">
