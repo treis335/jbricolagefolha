@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,7 +19,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { Euro, Users, Trash2, Plus, X, HardHat, Info, Download, Upload, CheckCircle2, AlertCircle } from "lucide-react"
+import { 
+  Euro, Users, Trash2, Plus, X, HardHat, Info, 
+  Download, Upload, CheckCircle2, AlertCircle, Share 
+} from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 
 // Componente de Instalação PWA (mantido igual)
@@ -109,6 +113,7 @@ export function SettingsView() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
+  const [textoColado, setTextoColado] = useState("")
 
   const STORAGE_KEY = "trabalhoDiario"
 
@@ -134,7 +139,7 @@ export function SettingsView() {
     })
   }
 
-  const exportarDados = () => {
+  const exportarDados = async () => {
     const conteudo = localStorage.getItem(STORAGE_KEY)
     if (!conteudo) {
       setSyncMessage("Não existem dados para exportar.")
@@ -143,18 +148,63 @@ export function SettingsView() {
     }
 
     const blob = new Blob([conteudo], { type: "application/json" })
+    const file = new File(
+      [blob],
+      `jbricolage-horas-backup-${new Date().toISOString().split("T")[0]}.json`,
+      { type: "application/json" }
+    )
+
+    // Tentativa principal: Web Share API
+    const shareData = {
+      files: [file],
+      title: "Backup das Minhas Horas JBricolage",
+      text: "Guarda este ficheiro para importar no teu outro telemóvel ou computador.",
+    }
+
+    if (navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData)
+        setSyncMessage(
+          "Partilhado! Envia para ti mesmo via WhatsApp, Telegram, Email...\n" +
+          "Depois importa no outro dispositivo nas Definições."
+        )
+        setSyncSuccess(true)
+        return
+      } catch (err: any) {
+        if (err.name !== "AbortError") {
+          console.error("Erro ao partilhar:", err)
+        }
+      }
+    }
+
+    // Fallback 1: Copiar para clipboard
+    try {
+      await navigator.clipboard.writeText(conteudo)
+      setSyncMessage(
+        "Copiado para a área de transferência!\n\n" +
+        "Agora:\n" +
+        "1. Cola num chat (WhatsApp/Telegram/Email) e envia para ti mesmo\n" +
+        "2. No outro dispositivo: abre a app → Definições → cola no campo abaixo → Importar Texto Colado"
+      )
+      setSyncSuccess(true)
+      return
+    } catch (err) {
+      console.error("Erro ao copiar texto:", err)
+    }
+
+    // Fallback 2: Download normal
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.download = `jbricolage-horas-${new Date().toISOString().split("T")[0]}.json`
+    link.download = file.name
     link.click()
     URL.revokeObjectURL(url)
 
-    setSyncMessage("Backup criado com sucesso! Transfere o ficheiro para o outro dispositivo.")
+    setSyncMessage("Ficheiro de backup descarregado! Procura na pasta Downloads.")
     setSyncSuccess(true)
   }
 
-  const importarDados = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const importarDeArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -164,23 +214,47 @@ export function SettingsView() {
         const texto = ev.target?.result as string
         const parsed = JSON.parse(texto)
 
-        // Validação mínima
-        if (!parsed || typeof parsed !== "object" || 
+        if (!parsed || typeof parsed !== "object" ||
             (!("entries" in parsed) && !("payments" in parsed) && !("settings" in parsed))) {
           throw new Error("Formato inválido")
         }
 
         localStorage.setItem(STORAGE_KEY, texto)
-        setSyncMessage("Dados importados! A página vai recarregar automaticamente...")
+        setSyncMessage("Dados importados com sucesso!\nA página vai recarregar em breve...")
         setSyncSuccess(true)
-
-        setTimeout(() => window.location.reload(), 2500)
-      } catch (err) {
-        setSyncMessage("Erro ao importar: o ficheiro não é válido ou está corrompido.")
+        setTimeout(() => window.location.reload(), 2200)
+      } catch {
+        setSyncMessage("Erro: o ficheiro não é um backup válido ou está corrompido.")
         setSyncSuccess(false)
       }
     }
     reader.readAsText(file)
+  }
+
+  const importarTextoColado = () => {
+    if (!textoColado.trim()) {
+      setSyncMessage("Por favor cola o texto JSON primeiro.")
+      setSyncSuccess(false)
+      return
+    }
+
+    try {
+      const parsed = JSON.parse(textoColado.trim())
+
+      if (!parsed || typeof parsed !== "object" ||
+          (!("entries" in parsed) && !("payments" in parsed) && !("settings" in parsed))) {
+        throw new Error("Formato inválido")
+      }
+
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+      setSyncMessage("Dados importados do texto com sucesso!\nRecarregando a aplicação...")
+      setSyncSuccess(true)
+      setTextoColado("") // limpa o campo após sucesso
+      setTimeout(() => window.location.reload(), 2200)
+    } catch (err) {
+      setSyncMessage("Erro: o texto colado não é um JSON válido.\nVerifica se copiaste tudo corretamente.")
+      setSyncSuccess(false)
+    }
   }
 
   const totalHoras = data.entries.reduce((sum, e) => sum + e.totalHoras, 0)
@@ -300,7 +374,7 @@ export function SettingsView() {
           </CardContent>
         </Card>
 
-        {/* Nova secção: Backup & Sincronização */}
+        {/* Backup & Sincronização - ATUALIZADO */}
         <Card className="border-amber-500/30">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -308,53 +382,72 @@ export function SettingsView() {
               Backup & Sincronização
             </CardTitle>
             <CardDescription>
-              Transfere os dados entre telemóvel e PC sem precisar de servidor
+              Transfere os teus dados entre telemóvel e computador sem servidor
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button 
-                variant="outline" 
+              <Button
                 onClick={exportarDados}
                 className="h-12"
               >
-                <Download className="h-4 w-4 mr-2" />
-                Exportar Dados (JSON)
+                <Share className="h-4 w-4 mr-2" />
+                Exportar para Mim Mesmo
               </Button>
 
               <input
                 type="file"
                 accept=".json"
                 ref={fileInputRef}
-                onChange={importarDados}
+                onChange={importarDeArquivo}
                 className="hidden"
               />
-              <Button 
+              <Button
+                variant="outline"
                 onClick={() => fileInputRef.current?.click()}
                 className="h-12"
               >
                 <Upload className="h-4 w-4 mr-2" />
-                Importar Dados
+                Importar de Ficheiro
+              </Button>
+            </div>
+
+            {/* Importar via texto colado */}
+            <div className="space-y-3 pt-4 border-t">
+              <Label htmlFor="json-colado">Ou cola aqui o backup recebido:</Label>
+              <Textarea
+                id="json-colado"
+                value={textoColado}
+                onChange={(e) => setTextoColado(e.target.value)}
+                placeholder='Cole o JSON completo aqui (ex: {"entries":[...],"payments":[...],"settings":{...}})'
+                className="min-h-[140px] font-mono text-sm resize-y"
+              />
+              <Button
+                onClick={importarTextoColado}
+                disabled={!textoColado.trim()}
+                className="w-full sm:w-auto"
+              >
+                Importar Texto Colado
               </Button>
             </div>
 
             {syncMessage && (
-              <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${
-                syncSuccess 
-                  ? "bg-green-50 dark:bg-green-950/30 text-green-800 dark:text-green-300 border border-green-200 dark:border-green-800" 
-                  : "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border border-red-200 dark:border-red-800"
+              <div className={`flex items-start gap-3 p-4 rounded-lg text-sm border ${
+                syncSuccess
+                  ? "bg-green-50 dark:bg-green-950/40 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800"
+                  : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
               }`}>
                 {syncSuccess ? (
-                  <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                  <CheckCircle2 className="h-5 w-5 mt-0.5 flex-shrink-0" />
                 ) : (
-                  <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                  <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
                 )}
-                <span>{syncMessage}</span>
+                <span className="whitespace-pre-wrap leading-relaxed">{syncMessage}</span>
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              Usa email, WhatsApp, USB ou qualquer método para transferir o ficheiro.
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Funciona offline. Envia o backup para ti mesmo por WhatsApp, Telegram, Email ou cabo USB.
             </p>
           </CardContent>
         </Card>
