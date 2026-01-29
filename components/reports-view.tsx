@@ -380,7 +380,7 @@ export function ReportsView() {
 
               <Button onClick={exportPDF} className="w-full h-12 text-base" size="lg">
                 <FileDown className="h-5 w-5 mr-3" />
-                Exportar PDF Completo (Paisagem)
+                Exportar PDF
               </Button>
             </>
           )}
