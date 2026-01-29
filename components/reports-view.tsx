@@ -6,14 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Clock, ChevronLeft, ChevronRight, FileDown } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import type { DayEntry } from "@/lib/types"
@@ -105,7 +97,6 @@ export function ReportsView() {
         weekday: "short",
         day: "2-digit",
         month: "2-digit",
-        year: "numeric",
       })
     }
     return date.toLocaleDateString("pt-PT", {
@@ -127,15 +118,12 @@ export function ReportsView() {
     })
 
     const pageWidth = doc.internal.pageSize.getWidth()
-    const pageHeight = doc.internal.pageSize.getHeight()
     const marginLeft = 10
     const marginRight = 16
     const marginTop = 12
 
     const periodLabel = period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
     const reportType = `Relatório ${periodLabel}`
-
-    const placeholder = "{totalPages}"
 
     const drawHeader = () => {
       doc.addImage("/icon-192.png", "PNG", marginLeft, marginTop - 1, 20, 20)
@@ -149,8 +137,6 @@ export function ReportsView() {
       doc.text(rangeLabel, pageWidth / 2, marginTop + 12, { align: "center" })
     }
 
-
-    // Desenha a tabela (com placeholder no rodapé)
     autoTable(doc, {
       startY: 38,
       head: [["Data", "Descrição", "Equipa", "Materiais", "Total Horas"]],
@@ -184,14 +170,9 @@ export function ReportsView() {
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { top: 38, left: marginLeft, right: marginRight },
 
-      didDrawPage: () => {
-        const currentPage = (doc as any).internal.getCurrentPageInfo().pageNumber
-        drawHeader()
-      
-      },
+      didDrawPage: drawHeader,
     })
 
-    // Adiciona o resumo (apenas na última página)
     const finalY = (doc as any).lastAutoTable?.finalY + 10 || 110
 
     doc.setFontSize(12)
@@ -206,13 +187,11 @@ export function ReportsView() {
       finalY + 8
     )
 
-    // Atualiza o rodapé em TODAS as páginas com o total real
     const totalPages = (doc as any).internal.getNumberOfPages()
 
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i)
       drawHeader()
-     
     }
 
     const filename = `relatorio-${period}-${startDate}.pdf`
@@ -220,34 +199,95 @@ export function ReportsView() {
   }, [filteredEntries, totals, period, rangeLabel, startDate])
 
   return (
-    <div className="flex flex-col h-full pb-20">
-      <div className="px-4 pt-4">
-        <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-          <TabsList className="w-full">
-            <TabsTrigger value="daily" className="flex-1">Diário</TabsTrigger>
-            <TabsTrigger value="weekly" className="flex-1">Semanal</TabsTrigger>
-            <TabsTrigger value="monthly" className="flex-1">Mensal</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+    <div className="flex flex-col min-h-screen bg-background">
+      {/* Cabeçalho fixo */}
+      <div className="sticky top-0 z-10 bg-background border-b">
+        <div className="px-4 pt-4 pb-2">
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <TabsList className="w-full grid grid-cols-3 h-10">
+              <TabsTrigger value="daily" className="text-sm">Diário</TabsTrigger>
+              <TabsTrigger value="weekly" className="text-sm">Semanal</TabsTrigger>
+              <TabsTrigger value="monthly" className="text-sm">Mensal</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
 
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <h3 className="text-base font-medium capitalize text-center">{rangeLabel}</h3>
-        <Button variant="ghost" size="icon" onClick={() => navigate("next")}>
-          <ChevronRight className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center justify-between px-4 py-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+          <h3 className="text-base font-medium text-center flex-1 px-2">
+            {rangeLabel}
+          </h3>
+          <Button variant="ghost" size="icon" onClick={() => navigate("next")}>
+            <ChevronRight className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-4">
+        <div className="p-4 space-y-6 pb-12">
+          {/* Vista DIÁRIA */}
           {period === "daily" && filteredEntries.length > 0 && (
-            <Card>
-              <CardContent className="p-5 space-y-4">
-                {filteredEntries.map((entry) => (
-                  <div key={entry.date} className="border-b last:border-0 pb-4 last:pb-0">
+            <div className="mx-auto max-w-3xl">
+              <Card>
+                <CardContent className="p-5 space-y-5">
+                  {filteredEntries.map((entry) => (
+                    <div key={entry.date} className="border-b last:border-0 pb-5 last:pb-0">
+                      <div className="flex justify-between items-start mb-3">
+                        <div>
+                          <p className="text-xl font-semibold">{formatDateWithWeekday(entry.date, false)}</p>
+                          <p className="text-sm text-muted-foreground">{entry.totalHoras}h trabalhadas</p>
+                        </div>
+                        <Badge className="text-base px-4 py-1">
+                          {formatCurrency(entry.totalHoras * data.settings.taxaHoraria)}
+                        </Badge>
+                      </div>
+
+                      {entry.descricao && (
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground">Descrição</p>
+                          <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
+                        </div>
+                      )}
+
+                      {entry.equipa && (
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground">Equipa</p>
+                          <p className="text-sm">{entry.equipa}</p>
+                        </div>
+                      )}
+
+                      {entry.materiais.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs text-muted-foreground">Materiais</p>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {entry.materiais.map((m, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {m}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="mt-4 text-sm">
+                        <p className="text-muted-foreground">Total de Horas</p>
+                        <p className="font-medium">{entry.totalHoras}h</p>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Vista SEMANAL / MENSAL — agora em lista de cards, igual ao diário */}
+          {(period === "weekly" || period === "monthly") && filteredEntries.length > 0 && (
+            <div className="mx-auto max-w-3xl space-y-4">
+              {filteredEntries.map((entry) => (
+                <Card key={entry.date} className="overflow-hidden">
+                  <CardContent className="p-5 space-y-4">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <p className="text-xl font-semibold">{formatDateWithWeekday(entry.date, false)}</p>
@@ -261,7 +301,7 @@ export function ReportsView() {
                     {entry.descricao && (
                       <div className="mt-2">
                         <p className="text-xs text-muted-foreground">Descrição</p>
-                        <p className="text-sm">{entry.descricao}</p>
+                        <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
                       </div>
                     )}
 
@@ -289,100 +329,70 @@ export function ReportsView() {
                       <p className="text-muted-foreground">Total de Horas</p>
                       <p className="font-medium">{entry.totalHoras}h</p>
                     </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {(period === "weekly" || period === "monthly") && filteredEntries.length > 0 && (
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Descrição</TableHead>
-                      <TableHead>Equipa</TableHead>
-                      <TableHead>Materiais</TableHead>
-                      <TableHead className="text-right">Total Horas</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredEntries.map((entry) => (
-                      <TableRow key={entry.date}>
-                        <TableCell className="font-medium">
-                          {formatDateWithWeekday(entry.date, true)}
-                        </TableCell>
-                        <TableCell>{entry.descricao || "-"}</TableCell>
-                        <TableCell>{entry.equipa || "-"}</TableCell>
-                        <TableCell>{entry.materiais.length > 0 ? entry.materiais.join(", ") : "-"}</TableCell>
-                        <TableCell className="text-right font-medium">{entry.totalHoras}h</TableCell>
-                      </TableRow>
-                    ))}
-
-                    <TableRow className="bg-muted/60 font-semibold">
-                      <TableCell colSpan={4} className="text-right">TOTAL</TableCell>
-                      <TableCell className="text-right">{totals.totalHoras}h</TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
-          {filteredEntries.length === 0 && (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                Nenhum registo encontrado neste período
-              </CardContent>
-            </Card>
-          )}
-
-          {filteredEntries.length > 0 && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-muted-foreground text-sm mb-1">
-                      <Clock className="h-4 w-4" />
-                      Horas Normais
-                    </div>
-                    <p className="text-3xl font-bold">{totals.totalNormais}h</p>
                   </CardContent>
                 </Card>
-                <Card className="border-destructive/30">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 text-destructive text-sm mb-1">
-                      <Clock className="h-4 w-4" />
-                      Horas Extras
-                    </div>
-                    <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
-                  </CardContent>
-                </Card>
-              </div>
+              ))}
 
-              <Card className="bg-primary/5 border-primary/30">
-                <CardContent className="p-5">
-                  <div className="flex justify-between items-end">
-                    <div>
+              {/* Resumo no final da lista */}
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <Card>
+                    <CardContent className="p-5 text-center">
+                      <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-1">
+                        <Clock className="h-4 w-4" />
+                        Horas Normais
+                      </div>
+                      <p className="text-3xl font-bold">{totals.totalNormais}h</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-destructive/30">
+                    <CardContent className="p-5 text-center">
+                      <div className="flex items-center justify-center gap-2 text-destructive text-sm mb-1">
+                        <Clock className="h-4 w-4" />
+                        Horas Extras
+                      </div>
+                      <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex justify-center">
+                  <Card className="w-full max-w-md bg-primary/5 border-primary/30">
+                    <CardContent className="p-6 text-center">
                       <p className="text-primary text-sm mb-1">Valor Total do Período</p>
                       <p className="text-4xl font-bold text-primary">
                         {formatCurrency(totals.valorTotal)}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-sm text-muted-foreground mt-2">
                         {totals.totalHoras}h × {formatCurrency(data.settings.taxaHoraria)}/h
                       </p>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex justify-center">
+                  <Button 
+                    onClick={exportPDF} 
+                    className="w-full max-w-md h-12 text-base" 
+                    size="lg"
+                  >
+                    <FileDown className="h-5 w-5 mr-3" />
+                    Exportar PDF
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {filteredEntries.length === 0 && (
+            <div className="mx-auto max-w-md">
+              <Card>
+                <CardContent className="py-12 text-center text-muted-foreground">
+                  Nenhum registo encontrado neste período
                 </CardContent>
               </Card>
-
-              <Button onClick={exportPDF} className="w-full h-12 text-base" size="lg">
-                <FileDown className="h-5 w-5 mr-3" />
-                Exportar PDF
-              </Button>
-            </>
+            </div>
           )}
         </div>
       </ScrollArea>
