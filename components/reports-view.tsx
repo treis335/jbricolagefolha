@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Clock, Euro, ChevronLeft, ChevronRight, FileDown } from "lucide-react"
+import { Clock, ChevronLeft, ChevronRight, FileDown } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import type { DayEntry } from "@/lib/types"
 
@@ -25,7 +25,6 @@ export function ReportsView() {
   const [period, setPeriod] = useState<Period>("weekly")
   const [currentDate, setCurrentDate] = useState(new Date())
 
-  // Calculate date range based on period
   const { startDate, endDate, rangeLabel } = useMemo(() => {
     const today = new Date(currentDate)
     let start: Date
@@ -40,6 +39,7 @@ export function ReportsView() {
           weekday: "long",
           day: "numeric",
           month: "long",
+          year: "numeric",
         })
         break
       case "weekly": {
@@ -49,7 +49,7 @@ export function ReportsView() {
         start.setDate(today.getDate() + diffToMonday)
         end = new Date(start)
         end.setDate(start.getDate() + 6)
-        label = `${start.toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} - ${end.toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}`
+        label = `${start.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })} - ${end.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`
         break
       }
       case "monthly":
@@ -66,172 +66,176 @@ export function ReportsView() {
     }
   }, [period, currentDate])
 
-  // Filter entries for current period
   const filteredEntries = useMemo(() => {
     return data.entries
-      .filter((entry) => {
-        return entry.date >= startDate && entry.date <= endDate
-      })
+      .filter((entry) => entry.date >= startDate && entry.date <= endDate)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [data.entries, startDate, endDate])
 
-  // Calculate totals with single rate
   const totals = useMemo(() => {
     const totalNormais = filteredEntries.reduce((sum, e) => sum + e.normalHoras, 0)
     const totalExtras = filteredEntries.reduce((sum, e) => sum + e.extraHoras, 0)
     const totalHoras = filteredEntries.reduce((sum, e) => sum + e.totalHoras, 0)
     const valorTotal = totalHoras * data.settings.taxaHoraria
 
-    return {
-      totalNormais,
-      totalExtras,
-      totalHoras,
-      valorTotal,
-    }
+    return { totalNormais, totalExtras, totalHoras, valorTotal }
   }, [filteredEntries, data.settings.taxaHoraria])
 
   const navigate = (direction: "prev" | "next") => {
     setCurrentDate((prev) => {
       const newDate = new Date(prev)
-      switch (period) {
-        case "daily":
-          newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
-          break
-        case "weekly":
-          newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7))
-          break
-        case "monthly":
-          newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1))
-          break
+      if (period === "daily") {
+        newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
+      } else if (period === "weekly") {
+        newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7))
+      } else {
+        newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1))
       }
       return newDate
     })
   }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-PT", {
-      style: "currency",
-      currency: "EUR",
-    }).format(value)
-  }
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(value)
 
-  const formatDateShort = (dateStr: string) => {
+  const formatDateWithWeekday = (dateStr: string, short: boolean = true) => {
     const date = new Date(dateStr)
-    return date.toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })
+    if (short) {
+      return date.toLocaleDateString("pt-PT", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      })
+    }
+    return date.toLocaleDateString("pt-PT", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    })
   }
 
-  // PDF Export using jsPDF
   const exportPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf")
-    const doc = new jsPDF()
+    const autoTable = (await import("jspdf-autotable")).default
 
-    const periodLabel =
-      period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
-
-    // Title
-    doc.setFontSize(18)
-    doc.text(`Relatório ${periodLabel}`, 14, 20)
-
-    doc.setFontSize(12)
-    doc.text(rangeLabel, 14, 30)
-
-    // Table headers
-    const headers = ["Data", "Descrição", "Equipa", "Materiais", "Normal", "Extra", "Total", "Valor"]
-    const colWidths = [25, 35, 25, 30, 15, 15, 15, 20]
-    let y = 45
-
-    doc.setFontSize(10)
-    doc.setFont("helvetica", "bold")
-    let x = 14
-    headers.forEach((header, i) => {
-      doc.text(header, x, y)
-      x += colWidths[i]
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
     })
 
-    // Table rows
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(9)
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const pageHeight = doc.internal.pageSize.getHeight()
+    const marginLeft = 10
+    const marginRight = 16
+    const marginTop = 12
 
-    filteredEntries.forEach((entry) => {
-      y += 8
-      if (y > 270) {
-        doc.addPage()
-        y = 20
-      }
+    const periodLabel = period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
+    const reportType = `Relatório ${periodLabel}`
 
-      x = 14
-      const row = [
-        new Date(entry.date).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }),
-        (entry.descricao || "-").substring(0, 20),
-        (entry.equipa || "-").substring(0, 15),
-        entry.materiais.length > 0 ? entry.materiais.join(", ").substring(0, 18) : "-",
-        `${entry.normalHoras}h`,
-        `${entry.extraHoras}h`,
-        `${entry.totalHoras}h`,
-        formatCurrency(entry.totalHoras * data.settings.taxaHoraria),
-      ]
+    const placeholder = "{totalPages}"
 
-      row.forEach((cell, i) => {
-        doc.text(cell, x, y)
-        x += colWidths[i]
-      })
-    })
+    const drawHeader = () => {
+      doc.addImage("/icon-192.png", "PNG", marginLeft, marginTop - 1, 20, 20)
 
-    // Totals
-    y += 15
-    if (y > 260) {
-      doc.addPage()
-      y = 20
+      doc.setFontSize(14)
+      doc.setFont("helvetica", "bold")
+      doc.text(reportType, pageWidth / 2, marginTop + 5, { align: "center" })
+
+      doc.setFontSize(9)
+      doc.setFont("helvetica", "normal")
+      doc.text(rangeLabel, pageWidth / 2, marginTop + 12, { align: "center" })
     }
 
-    doc.setFont("helvetica", "bold")
-    doc.setFontSize(11)
-    doc.text("TOTAIS:", 14, y)
-    y += 8
-    doc.setFont("helvetica", "normal")
-    doc.text(`Horas Normais: ${totals.totalNormais}h`, 14, y)
-    y += 6
-    doc.text(`Horas Extras: ${totals.totalExtras}h`, 14, y)
-    y += 6
-    doc.text(`Total Horas: ${totals.totalHoras}h`, 14, y)
-    y += 8
-    doc.setFont("helvetica", "bold")
-    doc.text(`Valor Total: ${formatCurrency(totals.valorTotal)}`, 14, y)
-    y += 6
-    doc.setFont("helvetica", "normal")
-    doc.setFontSize(9)
-    doc.text(`(Taxa: ${formatCurrency(data.settings.taxaHoraria)}/h)`, 14, y)
 
-    // Save PDF
+    // Desenha a tabela (com placeholder no rodapé)
+    autoTable(doc, {
+      startY: 38,
+      head: [["Data", "Descrição", "Equipa", "Materiais", "Total Horas"]],
+      body: filteredEntries.map((entry) => [
+        formatDateWithWeekday(entry.date, true),
+        entry.descricao || "-",
+        entry.equipa || "-",
+        entry.materiais.length > 0 ? entry.materiais.join(", ") : "-",
+        `${entry.totalHoras}h`,
+      ]),
+      theme: "grid",
+      styles: {
+        fontSize: 9.5,
+        cellPadding: 4,
+        lineWidth: 0.1,
+        overflow: "linebreak",
+      },
+      headStyles: {
+        fillColor: [41, 128, 185],
+        textColor: 255,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      columnStyles: {
+        0: { cellWidth: 38, halign: "left" },
+        1: { cellWidth: 85, halign: "left" },
+        2: { cellWidth: 45, halign: "left" },
+        3: { cellWidth: 60, halign: "left" },
+        4: { cellWidth: 40, halign: "center" },
+      },
+      alternateRowStyles: { fillColor: [248, 248, 248] },
+      margin: { top: 38, left: marginLeft, right: marginRight },
+
+      didDrawPage: () => {
+        const currentPage = (doc as any).internal.getCurrentPageInfo().pageNumber
+        drawHeader()
+      
+      },
+    })
+
+    // Adiciona o resumo (apenas na última página)
+    const finalY = (doc as any).lastAutoTable?.finalY + 10 || 110
+
+    doc.setFontSize(12)
+    doc.setFont("helvetica", "bold")
+    doc.text("RESUMO DO PERÍODO", marginLeft, finalY)
+
+    doc.setFontSize(9.5)
+    doc.setFont("helvetica", "normal")
+    doc.text(
+      `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
+      marginLeft,
+      finalY + 8
+    )
+
+    // Atualiza o rodapé em TODAS as páginas com o total real
+    const totalPages = (doc as any).internal.getNumberOfPages()
+
+    for (let i = 1; i <= totalPages; i++) {
+      doc.setPage(i)
+      drawHeader()
+     
+    }
+
     const filename = `relatorio-${period}-${startDate}.pdf`
     doc.save(filename)
-  }, [filteredEntries, totals, period, rangeLabel, startDate, data.settings.taxaHoraria])
+  }, [filteredEntries, totals, period, rangeLabel, startDate])
 
   return (
     <div className="flex flex-col h-full pb-20">
-      {/* Period Tabs */}
       <div className="px-4 pt-4">
         <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <TabsList className="w-full">
-            <TabsTrigger value="daily" className="flex-1">
-              Diário
-            </TabsTrigger>
-            <TabsTrigger value="weekly" className="flex-1">
-              Semanal
-            </TabsTrigger>
-            <TabsTrigger value="monthly" className="flex-1">
-              Mensal
-            </TabsTrigger>
+            <TabsTrigger value="daily" className="flex-1">Diário</TabsTrigger>
+            <TabsTrigger value="weekly" className="flex-1">Semanal</TabsTrigger>
+            <TabsTrigger value="monthly" className="flex-1">Mensal</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Date Range Navigation */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h3 className="text-base font-medium capitalize">{rangeLabel}</h3>
+        <h3 className="text-base font-medium capitalize text-center">{rangeLabel}</h3>
         <Button variant="ghost" size="icon" onClick={() => navigate("next")}>
           <ChevronRight className="h-5 w-5" />
         </Button>
@@ -239,45 +243,51 @@ export function ReportsView() {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-4">
-          {/* Daily View - Detailed Card */}
           {period === "daily" && filteredEntries.length > 0 && (
             <Card>
-              <CardContent className="p-4 space-y-3">
+              <CardContent className="p-5 space-y-4">
                 {filteredEntries.map((entry) => (
-                  <div key={entry.date} className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-semibold">{entry.totalHoras}h trabalhadas</span>
-                      <Badge className="bg-primary text-primary-foreground">
+                  <div key={entry.date} className="border-b last:border-0 pb-4 last:pb-0">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className="text-xl font-semibold">{formatDateWithWeekday(entry.date, false)}</p>
+                        <p className="text-sm text-muted-foreground">{entry.totalHoras}h trabalhadas</p>
+                      </div>
+                      <Badge className="text-base px-4 py-1">
                         {formatCurrency(entry.totalHoras * data.settings.taxaHoraria)}
                       </Badge>
                     </div>
+
                     {entry.descricao && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Descrição</p>
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">Descrição</p>
                         <p className="text-sm">{entry.descricao}</p>
                       </div>
                     )}
+
                     {entry.equipa && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Equipa</p>
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">Equipa</p>
                         <p className="text-sm">{entry.equipa}</p>
                       </div>
                     )}
+
                     {entry.materiais.length > 0 && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Materiais</p>
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">Materiais</p>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {entry.materiais.map((m, i) => (
-                            <Badge key={i} variant="secondary">
+                            <Badge key={i} variant="outline" className="text-xs">
                               {m}
                             </Badge>
                           ))}
                         </div>
                       </div>
                     )}
-                    <div className="flex gap-4 pt-2 border-t border-border text-sm">
-                      <span>Normal: {entry.normalHoras}h</span>
-                      <span className="text-destructive">Extra: {entry.extraHoras}h</span>
+
+                    <div className="mt-4 text-sm">
+                      <p className="text-muted-foreground">Total de Horas</p>
+                      <p className="font-medium">{entry.totalHoras}h</p>
                     </div>
                   </div>
                 ))}
@@ -285,52 +295,35 @@ export function ReportsView() {
             </Card>
           )}
 
-          {/* Weekly/Monthly View - Table */}
           {(period === "weekly" || period === "monthly") && filteredEntries.length > 0 && (
             <Card>
               <CardContent className="p-0">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-[80px]">Data</TableHead>
+                      <TableHead>Data</TableHead>
                       <TableHead>Descrição</TableHead>
-                      <TableHead className="text-right w-[50px]">N</TableHead>
-                      <TableHead className="text-right w-[50px]">E</TableHead>
-                      <TableHead className="text-right w-[60px]">Total</TableHead>
-                      <TableHead className="text-right w-[70px]">Valor</TableHead>
+                      <TableHead>Equipa</TableHead>
+                      <TableHead>Materiais</TableHead>
+                      <TableHead className="text-right">Total Horas</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredEntries.map((entry) => (
                       <TableRow key={entry.date}>
-                        <TableCell className="font-medium text-xs">
-                          {new Date(entry.date).toLocaleDateString("pt-PT", {
-                            day: "2-digit",
-                            month: "2-digit",
-                          })}
+                        <TableCell className="font-medium">
+                          {formatDateWithWeekday(entry.date, true)}
                         </TableCell>
-                        <TableCell className="text-xs truncate max-w-[100px]">
-                          {entry.descricao || "-"}
-                        </TableCell>
-                        <TableCell className="text-right text-xs">{entry.normalHoras}</TableCell>
-                        <TableCell className="text-right text-xs text-destructive">
-                          {entry.extraHoras}
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-medium">
-                          {entry.totalHoras}h
-                        </TableCell>
-                        <TableCell className="text-right text-xs font-medium">
-                          {formatCurrency(entry.totalHoras * data.settings.taxaHoraria)}
-                        </TableCell>
+                        <TableCell>{entry.descricao || "-"}</TableCell>
+                        <TableCell>{entry.equipa || "-"}</TableCell>
+                        <TableCell>{entry.materiais.length > 0 ? entry.materiais.join(", ") : "-"}</TableCell>
+                        <TableCell className="text-right font-medium">{entry.totalHoras}h</TableCell>
                       </TableRow>
                     ))}
-                    {/* Totals Row */}
-                    <TableRow className="bg-muted/50 font-bold">
-                      <TableCell colSpan={2}>TOTAL</TableCell>
-                      <TableCell className="text-right">{totals.totalNormais}</TableCell>
-                      <TableCell className="text-right text-destructive">{totals.totalExtras}</TableCell>
+
+                    <TableRow className="bg-muted/60 font-semibold">
+                      <TableCell colSpan={4} className="text-right">TOTAL</TableCell>
                       <TableCell className="text-right">{totals.totalHoras}h</TableCell>
-                      <TableCell className="text-right">{formatCurrency(totals.valorTotal)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -338,16 +331,14 @@ export function ReportsView() {
             </Card>
           )}
 
-          {/* Empty State */}
           {filteredEntries.length === 0 && (
             <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                Nenhum registo neste período
+              <CardContent className="py-12 text-center text-muted-foreground">
+                Nenhum registo encontrado neste período
               </CardContent>
             </Card>
           )}
 
-          {/* Summary Cards */}
           {filteredEntries.length > 0 && (
             <>
               <div className="grid grid-cols-2 gap-3">
@@ -357,7 +348,7 @@ export function ReportsView() {
                       <Clock className="h-4 w-4" />
                       Horas Normais
                     </div>
-                    <p className="text-2xl font-bold">{totals.totalNormais}h</p>
+                    <p className="text-3xl font-bold">{totals.totalNormais}h</p>
                   </CardContent>
                 </Card>
                 <Card className="border-destructive/30">
@@ -366,20 +357,17 @@ export function ReportsView() {
                       <Clock className="h-4 w-4" />
                       Horas Extras
                     </div>
-                    <p className="text-2xl font-bold text-destructive">{totals.totalExtras}h</p>
+                    <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
                   </CardContent>
                 </Card>
               </div>
 
-              <Card className="bg-primary/5 border-primary/20">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center">
+              <Card className="bg-primary/5 border-primary/30">
+                <CardContent className="p-5">
+                  <div className="flex justify-between items-end">
                     <div>
-                      <div className="flex items-center gap-2 text-primary text-sm mb-1">
-                        <Euro className="h-4 w-4" />
-                        Valor Total
-                      </div>
-                      <p className="text-3xl font-bold text-primary">
+                      <p className="text-primary text-sm mb-1">Valor Total do Período</p>
+                      <p className="text-4xl font-bold text-primary">
                         {formatCurrency(totals.valorTotal)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -390,13 +378,9 @@ export function ReportsView() {
                 </CardContent>
               </Card>
 
-              {/* Export PDF Button */}
-              <Button
-                onClick={exportPDF}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-              >
-                <FileDown className="h-4 w-4 mr-2" />
-                Exportar PDF
+              <Button onClick={exportPDF} className="w-full h-12 text-base" size="lg">
+                <FileDown className="h-5 w-5 mr-3" />
+                Exportar PDF Completo (Paisagem)
               </Button>
             </>
           )}
