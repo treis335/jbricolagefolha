@@ -198,13 +198,15 @@ export function ReportsView() {
     doc.save(filename)
   }, [filteredEntries, totals, period, rangeLabel, startDate])
 
+  const hasEntries = filteredEntries.length > 0
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {/* Cabeçalho fixo */}
       <div className="sticky top-0 z-10 bg-background border-b">
         <div className="px-4 pt-4 pb-2">
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <TabsList className="w-full grid grid-cols-3 h-10">
+            <TabsList className="w-full grid grid-cols-3 h-10 rounded-md">
               <TabsTrigger value="daily" className="text-sm">Diário</TabsTrigger>
               <TabsTrigger value="weekly" className="text-sm">Semanal</TabsTrigger>
               <TabsTrigger value="monthly" className="text-sm">Mensal</TabsTrigger>
@@ -212,7 +214,7 @@ export function ReportsView() {
           </Tabs>
         </div>
 
-        <div className="flex items-center justify-between px-4 py-3">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm">
           <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
@@ -226,11 +228,11 @@ export function ReportsView() {
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6 pb-12">
+        <div className="p-4 space-y-6 pb-28 md:pb-12">
           {/* Vista DIÁRIA */}
-          {period === "daily" && filteredEntries.length > 0 && (
+          {period === "daily" && hasEntries && (
             <div className="mx-auto max-w-3xl">
-              <Card>
+              <Card className="overflow-hidden">
                 <CardContent className="p-5 space-y-5">
                   {filteredEntries.map((entry) => (
                     <div key={entry.date} className="border-b last:border-0 pb-5 last:pb-0">
@@ -282,8 +284,8 @@ export function ReportsView() {
             </div>
           )}
 
-          {/* Vista SEMANAL / MENSAL — agora em lista de cards, igual ao diário */}
-          {(period === "weekly" || period === "monthly") && filteredEntries.length > 0 && (
+          {/* Vista SEMANAL / MENSAL — lista de cards */}
+          {(period === "weekly" || period === "monthly") && hasEntries && (
             <div className="mx-auto max-w-3xl space-y-4">
               {filteredEntries.map((entry) => (
                 <Card key={entry.date} className="overflow-hidden">
@@ -333,7 +335,7 @@ export function ReportsView() {
                 </Card>
               ))}
 
-              {/* Resumo no final da lista */}
+              {/* Resumo */}
               <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                   <Card>
@@ -371,16 +373,8 @@ export function ReportsView() {
                   </Card>
                 </div>
 
-                <div className="flex justify-center">
-                  <Button 
-                    onClick={exportPDF} 
-                    className="w-full max-w-md h-12 text-base" 
-                    size="lg"
-                  >
-                    <FileDown className="h-5 w-5 mr-3" />
-                    Exportar PDF
-                  </Button>
-                </div>
+                {/* Espaço para o botão fixo */}
+                <div className="h-24 md:h-0" />
               </div>
             </div>
           )}
@@ -396,6 +390,20 @@ export function ReportsView() {
           )}
         </div>
       </ScrollArea>
+
+      {/* Botão Exportar PDF FIXO no fundo */}
+      {hasEntries && (
+        <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-5 pt-4 bg-gradient-to-t from-background via-background/95 to-transparent md:static md:bg-none md:p-0 md:mt-6 md:max-w-3xl md:mx-auto">
+          <Button
+            onClick={exportPDF}
+            className="w-full h-12 text-base shadow-lg"
+            size="lg"
+          >
+            <FileDown className="h-5 w-5 mr-2" />
+            Exportar PDF
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
