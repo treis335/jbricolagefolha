@@ -126,7 +126,7 @@ export function ReportsView() {
     const reportType = `Relatório ${periodLabel}`
 
     const drawHeader = () => {
-      doc.addImage("/icon-192.png", "PNG", marginLeft, marginTop - 1, 20, 20)
+      doc.addImage("/apple-icon.png", "PNG", marginLeft, marginTop - 1, 20, 20)
 
       doc.setFontSize(14)
       doc.setFont("helvetica", "bold")
@@ -153,6 +153,8 @@ export function ReportsView() {
         cellPadding: 4,
         lineWidth: 0.1,
         overflow: "linebreak",
+        textColor: [0, 0, 0],          // ← TEXTO PRETO NORMAL em todo o corpo
+        fontStyle: "normal",           // opcional, mas reforça
       },
       headStyles: {
         fillColor: [41, 128, 185],
@@ -181,6 +183,7 @@ export function ReportsView() {
 
     doc.setFontSize(9.5)
     doc.setFont("helvetica", "normal")
+    doc.setTextColor(0, 0, 0)  // garante preto aqui também
     doc.text(
       `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
       marginLeft,
@@ -228,7 +231,7 @@ export function ReportsView() {
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6 pb-28 md:pb-12">
+        <div className="p-4 space-y-6 pb-32 md:pb-12">
           {/* Vista DIÁRIA */}
           {period === "daily" && hasEntries && (
             <div className="mx-auto max-w-3xl">
@@ -284,7 +287,7 @@ export function ReportsView() {
             </div>
           )}
 
-          {/* Vista SEMANAL / MENSAL — lista de cards */}
+          {/* Vista SEMANAL / MENSAL */}
           {(period === "weekly" || period === "monthly") && hasEntries && (
             <div className="mx-auto max-w-3xl space-y-4">
               {filteredEntries.map((entry) => (
@@ -334,47 +337,57 @@ export function ReportsView() {
                   </CardContent>
                 </Card>
               ))}
+            </div>
+          )}
 
-              {/* Resumo */}
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <Card>
-                    <CardContent className="p-5 text-center">
-                      <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-1">
-                        <Clock className="h-4 w-4" />
-                        Horas Normais
-                      </div>
-                      <p className="text-3xl font-bold">{totals.totalNormais}h</p>
-                    </CardContent>
-                  </Card>
+          {/* Resumo + Botão Exportar PDF — aparece em TODAS as vistas quando há entradas */}
+          {hasEntries && (
+            <div className="space-y-6 mx-auto max-w-3xl">
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="p-5 text-center">
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-1">
+                      <Clock className="h-4 w-4" />
+                      Horas Normais
+                    </div>
+                    <p className="text-3xl font-bold">{totals.totalNormais}h</p>
+                  </CardContent>
+                </Card>
 
-                  <Card className="border-destructive/30">
-                    <CardContent className="p-5 text-center">
-                      <div className="flex items-center justify-center gap-2 text-destructive text-sm mb-1">
-                        <Clock className="h-4 w-4" />
-                        Horas Extras
-                      </div>
-                      <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
-                    </CardContent>
-                  </Card>
-                </div>
+                <Card className="border-destructive/30">
+                  <CardContent className="p-5 text-center">
+                    <div className="flex items-center justify-center gap-2 text-destructive text-sm mb-1">
+                      <Clock className="h-4 w-4" />
+                      Horas Extras
+                    </div>
+                    <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
+                  </CardContent>
+                </Card>
+              </div>
 
-                <div className="flex justify-center">
-                  <Card className="w-full max-w-md bg-primary/5 border-primary/30">
-                    <CardContent className="p-6 text-center">
-                      <p className="text-primary text-sm mb-1">Valor Total do Período</p>
-                      <p className="text-4xl font-bold text-primary">
-                        {formatCurrency(totals.valorTotal)}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        {totals.totalHoras}h × {formatCurrency(data.settings.taxaHoraria)}/h
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
+              <div className="flex justify-center">
+                <Card className="w-full max-w-md bg-primary/5 border-primary/30">
+                  <CardContent className="p-6 text-center">
+                    <p className="text-primary text-sm mb-1">Valor Total do Período</p>
+                    <p className="text-4xl font-bold text-primary">
+                      {formatCurrency(totals.valorTotal)}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {totals.totalHoras}h × {formatCurrency(data.settings.taxaHoraria)}/h
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
 
-                {/* Espaço para o botão fixo */}
-                <div className="h-24 md:h-0" />
+              <div className="flex justify-center mt-8">
+                <Button
+                  onClick={exportPDF}
+                  className="w-full max-w-md h-12 text-base"
+                  size="lg"
+                >
+                  <FileDown className="h-5 w-5 mr-2" />
+                  Exportar PDF
+                </Button>
               </div>
             </div>
           )}
@@ -390,20 +403,6 @@ export function ReportsView() {
           )}
         </div>
       </ScrollArea>
-
-      {/* Botão Exportar PDF FIXO no fundo */}
-      {hasEntries && (
-        <div className="fixed inset-x-0 bottom-0 z-50 px-4 pb-5 pt-4 bg-gradient-to-t from-background via-background/95 to-transparent md:static md:bg-none md:p-0 md:mt-6 md:max-w-3xl md:mx-auto">
-          <Button
-            onClick={exportPDF}
-            className="w-full h-12 text-base shadow-lg"
-            size="lg"
-          >
-            <FileDown className="h-5 w-5 mr-2" />
-            Exportar PDF
-          </Button>
-        </div>
-      )}
     </div>
   )
 }
