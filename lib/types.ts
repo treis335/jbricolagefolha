@@ -1,11 +1,11 @@
 export interface DayEntry {
-  date: string // YYYY-MM-DD
-  totalHoras: number
-  normalHoras: number // Auto-calculated based on weekday (for display)
-  extraHoras: number // Auto-calculated based on weekday (for display)
-  descricao: string
-  equipa: string
-  materiais: string[]
+  date: string;
+  totalHoras: number;
+  normalHoras: number;
+  extraHoras: number;
+  descricao: string;
+  equipa: string[];           //  ← Muda aqui de string → string[]
+  materiais: string[];
 }
 
 // Calculate normal and extra hours based on weekday rules:

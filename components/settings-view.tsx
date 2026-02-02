@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { MigrateLegacyDataButton } from "@/components/MigrateLegacyDataButton"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,11 +22,14 @@ import {
 } from "@/components/ui/alert-dialog"
 import { 
   Euro, Users, Trash2, Plus, X, HardHat, Info, 
-  Download, Upload, CheckCircle2, AlertCircle, Share 
+  Download, Upload, CheckCircle2, AlertCircle, Share, User 
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 
-// Componente de Instalação PWA (mantido igual)
+// Importa a função para validar o PIN
+import { getColaboradorByPin } from "@/lib/colaboradores"
+
+// Componente de Instalação PWA (mantido exatamente igual)
 function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
@@ -115,6 +119,48 @@ export function SettingsView() {
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
   const [textoColado, setTextoColado] = useState("")
 
+  // === NOVO: Quem sou eu? (PIN) ===
+  const [pinInput, setPinInput] = useState("")
+  const [meuNome, setMeuNome] = useState<string | null>(null)
+  const [pinError, setPinError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const nomeGuardado = localStorage.getItem("meuNome")
+    if (nomeGuardado) {
+      setMeuNome(nomeGuardado)
+    }
+  }, [])
+
+  const handleDefinirPin = () => {
+    const pin = pinInput.trim()
+    if (!pin) {
+      setPinError("Insere o teu PIN")
+      return
+    }
+
+    const colaborador = getColaboradorByPin(pin)
+    if (colaborador) {
+      localStorage.setItem("meuPin", pin)
+      localStorage.setItem("meuNome", colaborador.nome)
+      setMeuNome(colaborador.nome)
+      setPinInput("")
+      setPinError(null)
+      // Mensagem de sucesso (podes trocar por toast mais tarde)
+      alert(`Bem-vindo, ${colaborador.nome}! Agora a app sabe quem és.`)
+    } else {
+      setPinError("PIN inválido. Verifica e tenta novamente.")
+    }
+  }
+
+  const handleTrocarUtilizador = () => {
+    localStorage.removeItem("meuPin")
+    localStorage.removeItem("meuNome")
+    setMeuNome(null)
+    setPinInput("")
+    setPinError(null)
+    alert("Utilizador removido. Podes inserir um novo PIN quando quiseres.")
+  }
+
   const STORAGE_KEY = "trabalhoDiario"
 
   const handleTaxaChange = (value: string) => {
@@ -154,7 +200,6 @@ export function SettingsView() {
       { type: "application/json" }
     )
 
-    // Tentativa principal: Web Share API
     const shareData = {
       files: [file],
       title: "Backup das Minhas Horas JBricolage",
@@ -177,7 +222,6 @@ export function SettingsView() {
       }
     }
 
-    // Fallback 1: Copiar para clipboard
     try {
       await navigator.clipboard.writeText(conteudo)
       setSyncMessage(
@@ -192,7 +236,6 @@ export function SettingsView() {
       console.error("Erro ao copiar texto:", err)
     }
 
-    // Fallback 2: Download normal
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
@@ -249,7 +292,7 @@ export function SettingsView() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
       setSyncMessage("Dados importados do texto com sucesso!\nRecarregando a aplicação...")
       setSyncSuccess(true)
-      setTextoColado("") // limpa o campo após sucesso
+      setTextoColado("")
       setTimeout(() => window.location.reload(), 2200)
     } catch (err) {
       setSyncMessage("Erro: o texto colado não é um JSON válido.\nVerifica se copiaste tudo corretamente.")
@@ -270,6 +313,66 @@ export function SettingsView() {
           <h1 className="text-xl font-bold">JBricolage - Horas</h1>
           <p className="text-sm text-muted-foreground">Versão 1.0</p>
         </div>
+
+        {/* === NOVA SECÇÃO: QUEM SOU EU === */}
+        <Card className="border-primary/30">
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Quem sou eu?
+            </CardTitle>
+            <CardDescription>
+              Insere o teu PIN (fornecido pelo patrão) para a app saber automaticamente quem és
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {meuNome ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
+                  <p className="text-sm text-muted-foreground mb-1">Utilizador atual</p>
+                  <p className="text-xl font-medium">{meuNome}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleTrocarUtilizador}
+                  className="w-full"
+                >
+                  Trocar de utilizador / Sair
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <Label htmlFor="pin">O teu PIN</Label>
+                  <Input
+                    id="pin"
+                    type="password"
+                    inputMode="numeric"
+                    value={pinInput}
+                    onChange={(e) => {
+                      setPinInput(e.target.value)
+                      setPinError(null)
+                    }}
+                    placeholder="Pedir á Empresa"
+                    className="h-12 text-lg"
+                    maxLength={6}
+                    onKeyDown={(e) => e.key === "Enter" && handleDefinirPin()}
+                  />
+                  {pinError && (
+                    <p className="text-sm text-destructive">{pinError}</p>
+                  )}
+                </div>
+                <Button
+                  onClick={handleDefinirPin}
+                  disabled={!pinInput.trim()}
+                  className="w-full h-12"
+                >
+                  Confirmar meu PIN
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Hourly Rate */}
         <Card>
@@ -374,7 +477,7 @@ export function SettingsView() {
           </CardContent>
         </Card>
 
-        {/* Backup & Sincronização - ATUALIZADO */}
+        {/* Backup & Sincronização */}
         <Card className="border-amber-500/30">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -412,7 +515,6 @@ export function SettingsView() {
               </Button>
             </div>
 
-            {/* Importar via texto colado */}
             <div className="space-y-3 pt-4 border-t">
               <Label htmlFor="json-colado">Ou cola aqui o backup recebido:</Label>
               <Textarea
@@ -454,6 +556,8 @@ export function SettingsView() {
 
         {/* Secção Instalar PWA */}
         <InstallPWAButton />
+
+        <MigrateLegacyDataButton />
 
         {/* Danger Zone */}
         <Card className="border-destructive/30">

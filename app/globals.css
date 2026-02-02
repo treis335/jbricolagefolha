@@ -131,3 +131,8 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+[data-hide-close-button] [data-dialog-close] {
+  display: none !important;
+}

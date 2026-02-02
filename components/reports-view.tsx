@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Clock, ChevronLeft, ChevronRight, FileDown } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import type { DayEntry } from "@/lib/types"
+import { getNomesColaboradores } from "@/lib/colaboradores"
 
 type Period = "daily" | "weekly" | "monthly"
 
@@ -65,13 +66,36 @@ export function ReportsView() {
   }, [data.entries, startDate, endDate])
 
   const totals = useMemo(() => {
-    const totalNormais = filteredEntries.reduce((sum, e) => sum + e.normalHoras, 0)
-    const totalExtras = filteredEntries.reduce((sum, e) => sum + e.extraHoras, 0)
-    const totalHoras = filteredEntries.reduce((sum, e) => sum + e.totalHoras, 0)
-    const valorTotal = totalHoras * data.settings.taxaHoraria
+    const totalNormais = filteredEntries.reduce((sum, e) => sum + (e.normalHoras ?? 0), 0)
+    const totalExtras = filteredEntries.reduce((sum, e) => sum + (e.extraHoras ?? 0), 0)
+    const totalHoras = filteredEntries.reduce((sum, e) => sum + (e.totalHoras ?? 0), 0)
+    const valorTotal = totalHoras * (data.settings.taxaHoraria ?? 0)
 
     return { totalNormais, totalExtras, totalHoras, valorTotal }
   }, [filteredEntries, data.settings.taxaHoraria])
+
+  const horasPorColaborador = useMemo(() => {
+    const nomesOficiais = new Set(getNomesColaboradores())
+    const horas: Record<string, number> = {}
+
+    filteredEntries.forEach((entry) => {
+      // Assumimos que equipa é sempre string[]
+      const nomesLimpos = entry.equipa
+        .map((nome) => nome.trim())
+        .filter((nome) => nome.length > 0)
+
+      nomesLimpos.forEach((nomeLimpo) => {
+        if (nomesOficiais.has(nomeLimpo)) {
+          horas[nomeLimpo] = (horas[nomeLimpo] || 0) + (entry.totalHoras ?? 0)
+        }
+      })
+    })
+
+    return Object.entries(horas)
+      .filter(([, h]) => h > 0)
+      .map(([nome, horas]) => ({ nome, horas }))
+      .sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [filteredEntries])
 
   const navigate = (direction: "prev" | "next") => {
     setCurrentDate((prev) => {
@@ -140,21 +164,28 @@ export function ReportsView() {
     autoTable(doc, {
       startY: 38,
       head: [["Data", "Descrição", "Equipa", "Materiais", "Total Horas"]],
-      body: filteredEntries.map((entry) => [
-        formatDateWithWeekday(entry.date, true),
-        entry.descricao || "-",
-        entry.equipa || "-",
-        entry.materiais.length > 0 ? entry.materiais.join(", ") : "-",
-        `${entry.totalHoras}h`,
-      ]),
+      body: filteredEntries.map((entry) => {
+        const equipaDisplay =
+          entry.equipa.length > 0
+            ? entry.equipa.map(n => n.trim()).filter(Boolean).join(", ")
+            : "Nenhum"
+
+        return [
+          formatDateWithWeekday(entry.date, true),
+          entry.descricao || "-",
+          equipaDisplay,
+          entry.materiais.length > 0 ? entry.materiais.join(", ") : "-",
+          `${entry.totalHoras}h`,
+        ]
+      }),
       theme: "grid",
       styles: {
         fontSize: 9.5,
         cellPadding: 4,
         lineWidth: 0.1,
         overflow: "linebreak",
-        textColor: [0, 0, 0],          // ← TEXTO PRETO NORMAL em todo o corpo
-        fontStyle: "normal",           // opcional, mas reforça
+        textColor: [0, 0, 0],
+        fontStyle: "normal",
       },
       headStyles: {
         fillColor: [41, 128, 185],
@@ -183,12 +214,37 @@ export function ReportsView() {
 
     doc.setFontSize(9.5)
     doc.setFont("helvetica", "normal")
-    doc.setTextColor(0, 0, 0)  // garante preto aqui também
+    doc.setTextColor(0, 0, 0)
     doc.text(
       `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
       marginLeft,
       finalY + 8
     )
+
+    if (horasPorColaborador.length > 0) {
+      doc.addPage()
+      drawHeader()
+
+      autoTable(doc, {
+        startY: 38,
+        head: [["Colaborador", "Total de Horas"]],
+        body: horasPorColaborador.map(({ nome, horas }) => [nome, `${horas}h`]),
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 5, textColor: [0, 0, 0] },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "left" },
+        columnStyles: {
+          0: { cellWidth: 120, halign: "left" },
+          1: { cellWidth: 60, halign: "center" },
+        },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        margin: { top: 38, left: marginLeft, right: marginRight },
+      })
+    } else {
+      doc.addPage()
+      drawHeader()
+      doc.setFontSize(12)
+      doc.text("Nenhum colaborador registado neste período", marginLeft, 50)
+    }
 
     const totalPages = (doc as any).internal.getNumberOfPages()
 
@@ -199,13 +255,12 @@ export function ReportsView() {
 
     const filename = `relatorio-${period}-${startDate}.pdf`
     doc.save(filename)
-  }, [filteredEntries, totals, period, rangeLabel, startDate])
+  }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
 
   const hasEntries = filteredEntries.length > 0
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      {/* Cabeçalho fixo */}
       <div className="sticky top-0 z-10 bg-background border-b">
         <div className="px-4 pt-4 pb-2">
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
@@ -232,7 +287,6 @@ export function ReportsView() {
 
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6 pb-32 md:pb-12">
-          {/* Vista DIÁRIA */}
           {period === "daily" && hasEntries && (
             <div className="mx-auto max-w-3xl">
               <Card className="overflow-hidden">
@@ -256,12 +310,14 @@ export function ReportsView() {
                         </div>
                       )}
 
-                      {entry.equipa && (
-                        <div className="mt-2">
-                          <p className="text-xs text-muted-foreground">Equipa</p>
-                          <p className="text-sm">{entry.equipa}</p>
-                        </div>
-                      )}
+                      <div className="mt-2">
+                        <p className="text-xs text-muted-foreground">Equipa</p>
+                        <p className="text-sm">
+                          {entry.equipa.length > 0
+                            ? entry.equipa.map(n => n.trim()).filter(Boolean).join(", ")
+                            : "Nenhum"}
+                        </p>
+                      </div>
 
                       {entry.materiais.length > 0 && (
                         <div className="mt-2">
@@ -287,7 +343,6 @@ export function ReportsView() {
             </div>
           )}
 
-          {/* Vista SEMANAL / MENSAL */}
           {(period === "weekly" || period === "monthly") && hasEntries && (
             <div className="mx-auto max-w-3xl space-y-4">
               {filteredEntries.map((entry) => (
@@ -310,12 +365,14 @@ export function ReportsView() {
                       </div>
                     )}
 
-                    {entry.equipa && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">Equipa</p>
-                        <p className="text-sm">{entry.equipa}</p>
-                      </div>
-                    )}
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground">Equipa</p>
+                      <p className="text-sm">
+                        {entry.equipa.length > 0
+                          ? entry.equipa.map(n => n.trim()).filter(Boolean).join(", ")
+                          : "Nenhum"}
+                      </p>
+                    </div>
 
                     {entry.materiais.length > 0 && (
                       <div className="mt-2">
@@ -340,7 +397,6 @@ export function ReportsView() {
             </div>
           )}
 
-          {/* Resumo + Botão Exportar PDF — aparece em TODAS as vistas quando há entradas */}
           {hasEntries && (
             <div className="space-y-6 mx-auto max-w-3xl">
               <div className="grid grid-cols-2 gap-4">
@@ -392,7 +448,7 @@ export function ReportsView() {
             </div>
           )}
 
-          {filteredEntries.length === 0 && (
+          {!hasEntries && (
             <div className="mx-auto max-w-md">
               <Card>
                 <CardContent className="py-12 text-center text-muted-foreground">
