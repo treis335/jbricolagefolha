@@ -7,15 +7,19 @@ export interface Colaborador {
 }
 
 export const COLABORADORES: Colaborador[] = [
-  { nome: "Agostinho", pin: "1001" },
-  { nome: "Filipe",    pin: "1010" },
-  { nome: "Frederico", pin: "1020" },
-  { nome: "Joel",      pin: "1030" },
-  { nome: "Leonardo",  pin: "1040" },
-  { nome: "Rafael",    pin: "1050" },
-  { nome: "Sibul",     pin: "1060" },
-  { nome: "Tiago",     pin: "1070" },
-  { nome: "Zé Vermelha", pin: "1080" },
+  { nome: "Agostinho",    pin: "1001" },
+  { nome: "Filipe",       pin: "1010" },
+  { nome: "Frederico",    pin: "1020" },
+  { nome: "Joel",         pin: "1030" },
+  { nome: "Leonardo",     pin: "1040" },
+  { nome: "Rafael",       pin: "1050" },
+  { nome: "Sibul",        pin: "1060" },
+  { nome: "Tiago",        pin: "1070" },
+  { nome: "Zé Vermelha",  pin: "1080" },
+  { nome: "Dario",        pin: "1090" }, 
+  { nome: "Guilherme",    pin: "1100" }, 
+  { nome: "Silvio",       pin: "1110" }, 
+
 ]
 
 // Funções auxiliares

@@ -60,15 +60,23 @@ export function ReportsView() {
   }, [period, currentDate])
 
   const filteredEntries = useMemo(() => {
-    return data.entries
-      .filter((entry) => entry.date >= startDate && entry.date <= endDate)
+    const entries = Array.isArray(data.entries) ? data.entries : []
+    return entries
+      .filter((entry) => entry && entry.date && entry.date >= startDate && entry.date <= endDate)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [data.entries, startDate, endDate])
 
   const totals = useMemo(() => {
-    const totalNormais = filteredEntries.reduce((sum, e) => sum + (e.normalHoras ?? 0), 0)
-    const totalExtras = filteredEntries.reduce((sum, e) => sum + (e.extraHoras ?? 0), 0)
-    const totalHoras = filteredEntries.reduce((sum, e) => sum + (e.totalHoras ?? 0), 0)
+    let totalNormais = 0
+    let totalExtras = 0
+    let totalHoras = 0
+
+    filteredEntries.forEach((entry) => {
+      totalHoras += entry.totalHoras ?? 0
+      totalNormais += entry.normalHoras ?? 0
+      totalExtras += entry.extraHoras ?? 0
+    })
+
     const valorTotal = totalHoras * (data.settings.taxaHoraria ?? 0)
 
     return { totalNormais, totalExtras, totalHoras, valorTotal }
@@ -79,14 +87,29 @@ export function ReportsView() {
     const horas: Record<string, number> = {}
 
     filteredEntries.forEach((entry) => {
-      // Assumimos que equipa é sempre string[]
-      const nomesLimpos = entry.equipa
-        .map((nome) => nome.trim())
-        .filter((nome) => nome.length > 0)
+      const nomesUnicosDoDia = new Set<string>()
 
-      nomesLimpos.forEach((nomeLimpo) => {
+      const equipaDia = entry.equipa ?? []
+      equipaDia.forEach((nome) => {
+        if (nome && typeof nome === "string") {
+          nomesUnicosDoDia.add(nome.trim())
+        }
+      })
+
+      const servicesDia = entry.services ?? []
+      servicesDia.forEach((s) => {
+        const equipaServico = s.equipa ?? []
+        equipaServico.forEach((nome) => {
+          if (nome && typeof nome === "string") {
+            nomesUnicosDoDia.add(nome.trim())
+          }
+        })
+      })
+
+      const horasDia = entry.totalHoras ?? 0
+      nomesUnicosDoDia.forEach((nomeLimpo) => {
         if (nomesOficiais.has(nomeLimpo)) {
-          horas[nomeLimpo] = (horas[nomeLimpo] || 0) + (entry.totalHoras ?? 0)
+          horas[nomeLimpo] = (horas[nomeLimpo] || 0) + horasDia
         }
       })
     })
@@ -131,132 +154,156 @@ export function ReportsView() {
     })
   }
 
-  const exportPDF = useCallback(async () => {
-    const { jsPDF } = await import("jspdf")
-    const autoTable = (await import("jspdf-autotable")).default
+const exportPDF = useCallback(async () => {
+  const { jsPDF } = await import("jspdf")
+  const autoTable = (await import("jspdf-autotable")).default
 
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    })
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: "a4",
+  })
 
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const marginLeft = 10
-    const marginRight = 16
-    const marginTop = 12
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const marginLeft = 10
+  const marginRight = 16
+  const marginTop = 12
 
-    const periodLabel = period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
-    const reportType = `Relatório ${periodLabel}`
+  const periodLabel = period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
+  const reportType = `Relatório ${periodLabel}`
 
-    const drawHeader = () => {
-      doc.addImage("/apple-icon.png", "PNG", marginLeft, marginTop - 1, 20, 20)
+  const drawHeader = () => {
+    doc.addImage("/apple-icon.png", "PNG", marginLeft, marginTop - 1, 20, 20)
 
-      doc.setFontSize(14)
-      doc.setFont("helvetica", "bold")
-      doc.text(reportType, pageWidth / 2, marginTop + 5, { align: "center" })
+    doc.setFontSize(14)
+    doc.setFont("helvetica", "bold")
+    doc.text(reportType, pageWidth / 2, marginTop + 5, { align: "center" })
 
-      doc.setFontSize(9)
-      doc.setFont("helvetica", "normal")
-      doc.text(rangeLabel, pageWidth / 2, marginTop + 12, { align: "center" })
+    doc.setFontSize(9)
+    doc.setFont("helvetica", "normal")
+    doc.text(rangeLabel, pageWidth / 2, marginTop + 12, { align: "center" })
+  }
+
+  const tableBody: string[][] = []
+
+  filteredEntries.forEach((entry) => {
+    const totalHoras = entry.totalHoras ?? 0
+    const dataComHoras = `${formatDateWithWeekday(entry.date, true)} – ${totalHoras}h`
+
+    if (entry.services && entry.services.length === 1) {
+      // Apenas 1 serviço → usa só os dados do serviço único (sem duplicar linha principal)
+      const s = entry.services[0]
+      tableBody.push([
+        dataComHoras,
+        `${s.obraNome ? s.obraNome + " - " : ""}${s.descricao || "-"}`,
+        (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Nenhum",
+        (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-",
+        `${totalHoras}h`
+      ])
+    } else {
+      // 0 serviços (dados antigos) ou múltiplos serviços → linha principal do dia
+      tableBody.push([
+        dataComHoras,
+        entry.descricao || "-",
+        (entry.equipa ?? []).length > 0 ? (entry.equipa ?? []).join(", ") : "Nenhum",
+        (entry.materiais ?? []).length > 0 ? (entry.materiais ?? []).join(", ") : "-",
+        `${totalHoras}h`
+      ])
+
+      // Se houver múltiplos serviços, adiciona sublinhas
+      if (entry.services && entry.services.length > 0) {
+        entry.services.forEach((s) => {
+          tableBody.push([
+            "",
+            `${s.obraNome ? s.obraNome + " - " : ""}${s.descricao || "-"}`,
+            (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Nenhum",
+            (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-",
+            "-"
+          ])
+        })
+      }
     }
+  })
+
+  autoTable(doc, {
+    startY: 38,
+    head: [["Data", "Obra / Descrição", "Equipa", "Materiais"]],
+    body: tableBody,
+    theme: "grid",
+    styles: {
+      fontSize: 9.5,
+      cellPadding: 4,
+      lineWidth: 0.1,
+      overflow: "linebreak",
+    },
+    headStyles: {
+      fillColor: [41, 128, 185],
+      textColor: 255,
+      fontStyle: "bold",
+      halign: "center",
+    },
+    columnStyles: {
+      0: { cellWidth: 50, halign: "left" },
+      1: { cellWidth: 100, halign: "left" },
+      2: { cellWidth: 55, halign: "left" },
+      3: { cellWidth: 60, halign: "left" },
+      4: { cellWidth: 35, halign: "center", fontStyle: "bold" },
+    },
+    alternateRowStyles: { fillColor: [248, 248, 248] },
+    margin: { top: 38, left: marginLeft, right: marginRight },
+    didParseCell: (data) => {
+      if (data.section === "body" && data.column.index === 0 && data.cell.text && data.cell.text[0] !== "") {
+        data.cell.styles.fillColor = [220, 230, 241] // azul bebé em todas as células da linha
+        data.cell.styles.fontStyle = "bold" // negrito na data + horas
+      }
+    },
+    didDrawPage: drawHeader,
+  })
+
+  const finalY = (doc as any).lastAutoTable?.finalY + 15 || 110
+
+  doc.setFontSize(12)
+  doc.setFont("helvetica", "bold")
+  doc.text("RESUMO DO PERÍODO", marginLeft, finalY)
+
+  doc.setFontSize(9.5)
+  doc.setFont("helvetica", "normal")
+  doc.text(
+    `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
+    marginLeft,
+    finalY + 8
+  )
+
+  if (horasPorColaborador.length > 0) {
+    doc.addPage()
+    drawHeader()
 
     autoTable(doc, {
       startY: 38,
-      head: [["Data", "Descrição", "Equipa", "Materiais", "Total Horas"]],
-      body: filteredEntries.map((entry) => {
-        const equipaDisplay =
-          entry.equipa.length > 0
-            ? entry.equipa.map(n => n.trim()).filter(Boolean).join(", ")
-            : "Nenhum"
-
-        return [
-          formatDateWithWeekday(entry.date, true),
-          entry.descricao || "-",
-          equipaDisplay,
-          entry.materiais.length > 0 ? entry.materiais.join(", ") : "-",
-          `${entry.totalHoras}h`,
-        ]
-      }),
+      head: [["Colaborador", "Total de Horas"]],
+      body: horasPorColaborador.map(({ nome, horas }) => [nome, `${horas}h`]),
       theme: "grid",
-      styles: {
-        fontSize: 9.5,
-        cellPadding: 4,
-        lineWidth: 0.1,
-        overflow: "linebreak",
-        textColor: [0, 0, 0],
-        fontStyle: "normal",
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: "bold",
-        halign: "center",
-      },
+      styles: { fontSize: 10, cellPadding: 5 },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "left" },
       columnStyles: {
-        0: { cellWidth: 38, halign: "left" },
-        1: { cellWidth: 85, halign: "left" },
-        2: { cellWidth: 45, halign: "left" },
-        3: { cellWidth: 60, halign: "left" },
-        4: { cellWidth: 40, halign: "center" },
+        0: { cellWidth: 120, halign: "left" },
+        1: { cellWidth: 60, halign: "center" },
       },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { top: 38, left: marginLeft, right: marginRight },
-
-      didDrawPage: drawHeader,
     })
+  }
 
-    const finalY = (doc as any).lastAutoTable?.finalY + 10 || 110
+  const totalPages = (doc as any).internal.getNumberOfPages()
 
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "bold")
-    doc.text("RESUMO DO PERÍODO", marginLeft, finalY)
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    drawHeader()
+  }
 
-    doc.setFontSize(9.5)
-    doc.setFont("helvetica", "normal")
-    doc.setTextColor(0, 0, 0)
-    doc.text(
-      `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
-      marginLeft,
-      finalY + 8
-    )
-
-    if (horasPorColaborador.length > 0) {
-      doc.addPage()
-      drawHeader()
-
-      autoTable(doc, {
-        startY: 38,
-        head: [["Colaborador", "Total de Horas"]],
-        body: horasPorColaborador.map(({ nome, horas }) => [nome, `${horas}h`]),
-        theme: "grid",
-        styles: { fontSize: 10, cellPadding: 5, textColor: [0, 0, 0] },
-        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "left" },
-        columnStyles: {
-          0: { cellWidth: 120, halign: "left" },
-          1: { cellWidth: 60, halign: "center" },
-        },
-        alternateRowStyles: { fillColor: [248, 248, 248] },
-        margin: { top: 38, left: marginLeft, right: marginRight },
-      })
-    } else {
-      doc.addPage()
-      drawHeader()
-      doc.setFontSize(12)
-      doc.text("Nenhum colaborador registado neste período", marginLeft, 50)
-    }
-
-    const totalPages = (doc as any).internal.getNumberOfPages()
-
-    for (let i = 1; i <= totalPages; i++) {
-      doc.setPage(i)
-      drawHeader()
-    }
-
-    const filename = `relatorio-${period}-${startDate}.pdf`
-    doc.save(filename)
-  }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
-
+  const filename = `relatorio-${period}-${startDate}.pdf`
+  doc.save(filename)
+}, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
   const hasEntries = filteredEntries.length > 0
 
   return (
@@ -288,108 +335,159 @@ export function ReportsView() {
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6 pb-32 md:pb-12">
           {period === "daily" && hasEntries && (
-            <div className="mx-auto max-w-3xl">
-              <Card className="overflow-hidden">
-                <CardContent className="p-5 space-y-5">
-                  {filteredEntries.map((entry) => (
-                    <div key={entry.date} className="border-b last:border-0 pb-5 last:pb-0">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <p className="text-xl font-semibold">{formatDateWithWeekday(entry.date, false)}</p>
-                          <p className="text-sm text-muted-foreground">{entry.totalHoras}h trabalhadas</p>
-                        </div>
-                        <Badge className="text-base px-4 py-1">
-                          {formatCurrency(entry.totalHoras * data.settings.taxaHoraria)}
-                        </Badge>
-                      </div>
-
-                      {entry.descricao && (
-                        <div className="mt-2">
-                          <p className="text-xs text-muted-foreground">Descrição</p>
-                          <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
-                        </div>
-                      )}
-
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">Equipa</p>
-                        <p className="text-sm">
-                          {entry.equipa.length > 0
-                            ? entry.equipa.map(n => n.trim()).filter(Boolean).join(", ")
-                            : "Nenhum"}
+            <div className="mx-auto max-w-3xl space-y-6">
+              {filteredEntries.map((entry) => (
+                <Card key={entry.date} className="overflow-hidden shadow-md">
+                  <CardContent className="p-6 space-y-5">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-2xl font-bold">{formatDateWithWeekday(entry.date, false)}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {entry.totalHoras ?? 0}h trabalhadas
                         </p>
                       </div>
-
-                      {entry.materiais.length > 0 && (
-                        <div className="mt-2">
-                          <p className="text-xs text-muted-foreground">Materiais</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {entry.materiais.map((m, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {m}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="mt-4 text-sm">
-                        <p className="text-muted-foreground">Total de Horas</p>
-                        <p className="font-medium">{entry.totalHoras}h</p>
-                      </div>
+                      <Badge variant="secondary" className="text-lg px-5 py-2">
+                        {formatCurrency((entry.totalHoras ?? 0) * data.settings.taxaHoraria)}
+                      </Badge>
                     </div>
-                  ))}
-                </CardContent>
-              </Card>
+
+                    {entry.services && entry.services.length > 0 ? (
+                      <div className="space-y-6">
+                        {entry.services.map((s, idx) => (
+                          <div key={s.id || idx} className="border-t pt-5 first:border-t-0 first:pt-0">
+                            <p className="text-lg font-semibold mb-2">
+                              {s.obraNome || `Serviço ${idx + 1}`}
+                            </p>
+                            {s.descricao && (
+                              <p className="text-sm whitespace-pre-line mb-3">{s.descricao}</p>
+                            )}
+                            <div className="flex flex-wrap gap-6 text-sm">
+                              <div>
+                                <span className="text-muted-foreground">Equipa: </span>
+                                {(s.equipa ?? []).join(", ") || "Nenhum"}
+                              </div>
+                              {(s.materiais ?? []).length > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground">Materiais: </span>
+                                  {(s.materiais ?? []).join(", ")}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        {entry.descricao && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground">Descrição</p>
+                            <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
+                          </div>
+                        )}
+
+                        <div className="mt-3">
+                          <p className="text-xs text-muted-foreground">Equipa</p>
+                          <p className="text-sm">
+                            {(entry.equipa ?? []).join(", ") || "Nenhum"}
+                          </p>
+                        </div>
+
+                        {(entry.materiais ?? []).length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-xs text-muted-foreground">Materiais</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(entry.materiais ?? []).map((m, i) => (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {m}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                    
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
 
           {(period === "weekly" || period === "monthly") && hasEntries && (
-            <div className="mx-auto max-w-3xl space-y-4">
+            <div className="mx-auto max-w-3xl space-y-6">
               {filteredEntries.map((entry) => (
-                <Card key={entry.date} className="overflow-hidden">
-                  <CardContent className="p-5 space-y-4">
-                    <div className="flex justify-between items-start mb-3">
+                <Card key={entry.date} className="overflow-hidden shadow-md">
+                  <CardContent className="p-6 space-y-5">
+                    <div className="flex justify-between items-start mb-4">
                       <div>
-                        <p className="text-xl font-semibold">{formatDateWithWeekday(entry.date, false)}</p>
-                        <p className="text-sm text-muted-foreground">{entry.totalHoras}h trabalhadas</p>
+                        <p className="text-xl font-bold">{formatDateWithWeekday(entry.date, false)}</p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {entry.totalHoras ?? 0}h trabalhadas
+                        </p>
                       </div>
-                      <Badge className="text-base px-4 py-1">
-                        {formatCurrency(entry.totalHoras * data.settings.taxaHoraria)}
+                      <Badge variant="secondary" className="text-lg px-5 py-2">
+                        {formatCurrency((entry.totalHoras ?? 0) * data.settings.taxaHoraria)}
                       </Badge>
                     </div>
 
-                    {entry.descricao && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">Descrição</p>
-                        <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
+                    {entry.services && entry.services.length > 0 ? (
+                      <div className="space-y-5">
+                        {entry.services.map((s, idx) => (
+                          <div key={s.id || idx} className="border-t pt-4 first:border-t-0 first:pt-0">
+                            <p className="text-base font-semibold mb-2">
+                              {s.obraNome || `Serviço ${idx + 1}`}
+                            </p>
+                            {s.descricao && (
+                              <p className="text-sm whitespace-pre-line mb-3">{s.descricao}</p>
+                            )}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-muted-foreground font-medium">Equipa: </span>
+                                {(s.equipa ?? []).join(", ") || "Nenhum"}
+                              </div>
+                              {(s.materiais ?? []).length > 0 && (
+                                <div>
+                                  <span className="text-muted-foreground font-medium">Materiais: </span>
+                                  {(s.materiais ?? []).join(", ")}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
+                    ) : (
+                      <>
+                        {entry.descricao && (
+                          <div className="mt-2">
+                            <p className="text-sm text-muted-foreground">Descrição</p>
+                            <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
+                          </div>
+                        )}
 
-                    <div className="mt-2">
-                      <p className="text-xs text-muted-foreground">Equipa</p>
-                      <p className="text-sm">
-                        {entry.equipa.length > 0
-                          ? entry.equipa.map(n => n.trim()).filter(Boolean).join(", ")
-                          : "Nenhum"}
-                      </p>
-                    </div>
-
-                    {entry.materiais.length > 0 && (
-                      <div className="mt-2">
-                        <p className="text-xs text-muted-foreground">Materiais</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {entry.materiais.map((m, i) => (
-                            <Badge key={i} variant="outline" className="text-xs">
-                              {m}
-                            </Badge>
-                          ))}
+                        <div className="mt-3">
+                          <p className="text-sm text-muted-foreground">Equipa</p>
+                          <p className="text-sm">
+                            {(entry.equipa ?? []).join(", ") || "Nenhum"}
+                          </p>
                         </div>
-                      </div>
+
+                        {(entry.materiais ?? []).length > 0 && (
+                          <div className="mt-3">
+                            <p className="text-sm text-muted-foreground">Materiais</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {(entry.materiais ?? []).map((m, i) => (
+                                <Badge key={i} variant="outline" className="text-xs">
+                                  {m}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
-                    <div className="mt-4 text-sm">
-                      <p className="text-muted-foreground">Total de Horas</p>
-                      <p className="font-medium">{entry.totalHoras}h</p>
+                    <div className="mt-5 pt-4 border-t text-sm font-medium">
+                      Total do dia: {entry.totalHoras ?? 0}h
                     </div>
                   </CardContent>
                 </Card>

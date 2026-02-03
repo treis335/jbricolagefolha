@@ -45,13 +45,18 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
         const parsed = JSON.parse(stored) as AppData
-        // Handle migration from old format
+        // Handle migration from old format (caso haja campos antigos ou novos)
         const settings = {
           taxaHoraria: parsed.settings?.taxaHoraria ?? parsed.settings?.taxaNormal ?? 10,
           equipaComum: parsed.settings?.equipaComum || [],
         }
+        // Garante que entries tenham services como array vazio se não existir (segurança)
+        const entries = (parsed.entries || []).map(entry => ({
+          ...entry,
+          services: entry.services || undefined, // mantém se existir, senão undefined
+        }))
         setData({
-          entries: parsed.entries || [],
+          entries,
           payments: (parsed.payments || []).map((p: Payment) => ({
             ...p,
             metodo: p.metodo || "Dinheiro",
