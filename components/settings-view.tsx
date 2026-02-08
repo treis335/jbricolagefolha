@@ -405,56 +405,7 @@ export function SettingsView() {
               </p>
             </div>
           </CardContent>
-        </Card>
-
-        {/* Team Members */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Equipa Frequente
-            </CardTitle>
-            <CardDescription>Adicione nomes para sugestões rápidas</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex gap-2">
-              <Input
-                value={newTeamMember}
-                onChange={(e) => setNewTeamMember(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTeamMember())}
-                placeholder="Nome do membro..."
-                className="h-12"
-              />
-              <Button onClick={addTeamMember} className="h-12 px-4">
-                <Plus className="h-5 w-5" />
-              </Button>
-            </div>
-            {data.settings.equipaComum.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {data.settings.equipaComum.map((member) => (
-                  <Badge
-                    key={member}
-                    variant="secondary"
-                    className="text-sm py-1.5 px-3 flex items-center gap-1"
-                  >
-                    {member}
-                    <button
-                      type="button"
-                      onClick={() => removeTeamMember(member)}
-                      className="ml-1 hover:text-destructive"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Nenhum membro adicionado
-              </p>
-            )}
-          </CardContent>
-        </Card>
+        </Card>        
 
         {/* Statistics */}
         <Card>
