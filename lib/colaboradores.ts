@@ -1,30 +1,34 @@
 // lib/colaboradores.ts
-
-// lib/colaboradores.ts
 export interface Colaborador {
   nome: string
-  pin: string          // PIN secreto (4 dígitos ou string)
+  // pin: string          ← REMOVIDO completamente
+  // uid?: string         ← podemos adicionar depois, quando chegarmos à parte de conectar com users reais
+  // email?: string       ← idem, para futura ligação
 }
 
 export const COLABORADORES: Colaborador[] = [
-  { nome: "Agostinho",    pin: "1001" },
-  { nome: "Filipe",       pin: "1010" },
-  { nome: "Frederico",    pin: "1020" },
-  { nome: "Joel",         pin: "1030" },
-  { nome: "Leonardo",     pin: "1040" },
-  { nome: "Rafael",       pin: "1050" },
-  { nome: "Sibul",        pin: "1060" },
-  { nome: "Tiago",        pin: "1070" },
-  { nome: "Zé Vermelha",  pin: "1080" },
-  { nome: "Dario",        pin: "1090" }, 
-  { nome: "Guilherme",    pin: "1100" }, 
-  { nome: "Silvio",       pin: "1110" }, 
-
+  { nome: "Agostinho"    },
+  { nome: "Filipe"       },
+  { nome: "Frederico"    },
+  { nome: "Joel"         },
+  { nome: "Leonardo"     },
+  { nome: "Rafael"       },
+  { nome: "Sibul"        },
+  { nome: "Tiago"        },
+  { nome: "Zé Vermelha"  },
+  { nome: "Dario"        }, 
+  { nome: "Guilherme"    }, 
+  { nome: "Silvio"       }, 
 ]
 
-// Funções auxiliares
-export const getNomesColaboradores = () => COLABORADORES.map(c => c.nome).sort()
+// Funções auxiliares – atualizadas e limpas
+export const getNomesColaboradores = () => 
+  COLABORADORES.map(c => c.nome).sort()
 
-export const getColaboradorByPin = (pin: string): Colaborador | undefined => {
-  return COLABORADORES.find(c => c.pin === pin)
+// Removida completamente a função que usava PIN
+// export const getColaboradorByPin = ... → já não existe
+
+// Se quiseres adicionar funções futuras (ex: por nome, por UID), fica fácil
+export const getColaboradorByNome = (nome: string): Colaborador | undefined => {
+  return COLABORADORES.find(c => c.nome.toLowerCase() === nome.toLowerCase())
 }

@@ -30,31 +30,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        // Cria ou garante que o user existe no Firestore
-        const userRef = doc(db, "users", firebaseUser.uid)
-        const snap = await getDoc(userRef)
+ useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    if (firebaseUser) {
+      const userRef = doc(db, "users", firebaseUser.uid)
+      const snap = await getDoc(userRef)
 
-        if (!snap.exists()) {
-          await setDoc(userRef, {
-            name: firebaseUser.displayName ?? "",
-            email: firebaseUser.email ?? "",
-            role: "worker",
-            createdAt: serverTimestamp(),
-            // ✅ Marca como não migrado para novo user
-            migrated: false,
-          })
-        }
+      if (!snap.exists()) {
+        // CONTA NOVA: cria documento com username inicial
+        const suggestedUsername =
+          firebaseUser.displayName?.trim() ||
+          (firebaseUser.email ? firebaseUser.email.split('@')[0].trim() : "utilizador");
+
+        await setDoc(userRef, {
+          name: firebaseUser.displayName ?? "",
+          username: suggestedUsername,          // ← novo campo que vamos usar na app
+          email: firebaseUser.email ?? "",
+          role: "worker",
+          createdAt: serverTimestamp(),
+          migrated: false,
+        })
+
+        console.log(`[Auth] Nova conta criada → username definido: ${suggestedUsername}`)
+      } 
+      else if (!snap.data()?.username) {
+        // CONTA ANTIGA sem username: adiciona automaticamente (retroativo)
+        const suggestedUsername =
+          firebaseUser.displayName?.trim() ||
+          (firebaseUser.email ? firebaseUser.email.split('@')[0].trim() : "utilizador");
+
+        await setDoc(userRef, {
+          username: suggestedUsername
+        }, { merge: true })
+
+        console.log(`[Auth] Conta antiga atualizada → username adicionado: ${suggestedUsername}`)
       }
+      // Se já tem username → não faz nada, preserva o valor atual
+    }
 
-      setUser(firebaseUser)
-      setIsAuthLoading(false)
-    })
+    setUser(firebaseUser)
+    setIsAuthLoading(false)
+  })
 
-    return () => unsubscribe()
-  }, [])
+  return () => unsubscribe()
+}, [])
 
   // Proteção simples de rotas
   useEffect(() => {

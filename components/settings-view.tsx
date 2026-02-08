@@ -3,46 +3,20 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import {
-  Euro,
-  Users,
-  Trash2,
-  HardHat,
-  Info,
-  Download,
-  Upload,
-  CheckCircle2,
-  AlertCircle,
-  Share,
-  User,
-} from "lucide-react"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-
+import { Euro, Users, Trash2, HardHat, Info, Download, Upload, CheckCircle2, AlertCircle, Share, User, } from "lucide-react"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
 import { MigrateLegacyDataButton } from "@/components/MigrateLegacyDataButton"
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
 
 // PWA install button
 function InstallPWAButton() {
@@ -121,13 +95,67 @@ function InstallPWAButton() {
   )
 }
 
+
+
 export function SettingsView() {
   const { data, updateSettings, clearAllData, importData } = useWorkTracker()
   const { user, logout } = useAuth()
+  const [username, setUsername] = useState<string>("");
+  const [loadingUsername, setLoadingUsername] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [textoColado, setTextoColado] = useState("")
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
+
+  // Carrega o username do Firestore quando o user estiver disponível
+  useEffect(() => {
+    if (!user?.uid) {
+      setLoadingUsername(false);
+      return;
+    }
+
+    const fetchUsername = async () => {
+      try {
+        const userRef = doc(db, "users", user.uid);
+        const snap = await getDoc(userRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          // Usa o campo 'username' que criaste no AuthProvider
+          setUsername(data?.username || "");
+        }
+      } catch (err) {
+        console.error("Erro ao carregar username:", err);
+      } finally {
+        setLoadingUsername(false);
+      }
+    };
+
+    fetchUsername();
+  }, [user?.uid]);
+
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editedUsername, setEditedUsername] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
+
+  const handleSaveUsername = async () => {
+    if (!user?.uid || !editedUsername.trim()) return;
+
+    setSavingUsername(true);
+    try {
+      const userRef = doc(db, "users", user.uid);
+      await setDoc(userRef, { username: editedUsername.trim() }, { merge: true });
+
+      setUsername(editedUsername.trim());
+      setIsEditingUsername(false);
+      alert("Nome atualizado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao guardar username:", err);
+      alert("Erro ao guardar o nome. Tenta novamente.");
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
 
   // ✅ REMOVIDO: STORAGE_KEY já não é necessário
 
@@ -286,17 +314,116 @@ export function SettingsView() {
               Informação da tua conta atual
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {user ? (
-              <div className="space-y-4">
-                <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <p className="text-sm text-muted-foreground mb-1">
-                    Utilizador atual
-                  </p>
-                  <p className="text-xl font-medium">
-                    {user.displayName || user.email}
-                  </p>
+              <div className="space-y-6">
+                <div className="p-5 bg-primary/5 rounded-lg border border-primary/20 space-y-5 text-sm">
+                  {/* Nome / Utilizador - com edição */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-muted-foreground font-medium">Nome / Utilizador</p>
+                      {!isEditingUsername && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => {
+                            setIsEditingUsername(true);
+                            setEditedUsername(username || user.displayName || user.email?.split('@')[0] || "");
+                          }}
+                        >
+                          Editar
+                        </Button>
+                      )}
+                    </div>
+
+                    {isEditingUsername ? (
+                      <div className="space-y-3">
+                        <Input
+                          value={editedUsername}
+                          onChange={(e) => setEditedUsername(e.target.value)}
+                          placeholder="Nome visível na app"
+                          className="bg-background"
+                          autoFocus
+                          disabled={savingUsername}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            className="flex-1"
+                            onClick={handleSaveUsername}
+                            disabled={savingUsername || !editedUsername.trim()}
+                          >
+                            {savingUsername ? "A guardar..." : "Guardar"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setIsEditingUsername(false);
+                              setEditedUsername("");
+                            }}
+                            disabled={savingUsername}
+                          >
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-lg font-semibold">
+                        {loadingUsername
+                          ? "A carregar..."
+                          : username || user.displayName || user.email?.split('@')[0] || "Utilizador"}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <p className="text-muted-foreground mb-1 font-medium">Email da conta</p>
+                    <p className="font-medium break-all">
+                      {user.email || "—"}
+                    </p>
+                  </div>
+
+                  {/* UID abreviado */}
+                  <div className="pt-2 border-t border-border/30">
+                    <p className="text-xs text-muted-foreground mb-1 font-medium">ID da conta (UID)</p>
+                    <div className="flex items-center gap-3">
+                      <code className="text-sm font-mono bg-background/60 px-3 py-1.5 rounded border border-border/40 break-all flex-1">
+                        {user.uid.slice(0, 4)}....{user.uid.slice(-2)}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(user.uid);
+                          alert("UID completo copiado!");
+                        }}
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="lucide lucide-copy"
+                        >
+                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+                        </svg>
+                      </Button>
+                    </div>
+                  </div>
                 </div>
+
                 <Button
                   variant="outline"
                   onClick={handleLogout}
@@ -306,7 +433,7 @@ export function SettingsView() {
                 </Button>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground text-center py-4">
                 Não estás autenticado.
               </p>
             )}
@@ -345,30 +472,7 @@ export function SettingsView() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Estatísticas */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Estatísticas</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">Total de registos</span>
-              <span className="font-semibold">{data.entries.length}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">Total de pagamentos</span>
-              <span className="font-semibold">{data.payments.length}</span>
-            </div>
-            <div className="flex justify-between py-2">
-              <span className="text-muted-foreground">
-                Horas totais registadas
-              </span>
-              <span className="font-semibold">{totalHoras}h</span>
-            </div>
-          </CardContent>
-        </Card>
-
+     
         {/* Backup & Import */}
         <Card className="border-amber-500/30">
           <CardHeader>
@@ -426,11 +530,10 @@ export function SettingsView() {
 
             {syncMessage && (
               <div
-                className={`flex items-start gap-3 p-4 rounded-lg text-sm border ${
-                  syncSuccess
-                    ? "bg-green-50 dark:bg-green-950/40 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800"
-                    : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
-                }`}
+                className={`flex items-start gap-3 p-4 rounded-lg text-sm border ${syncSuccess
+                  ? "bg-green-50 dark:bg-green-950/40 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800"
+                  : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
+                  }`}
               >
                 {syncSuccess ? (
                   <CheckCircle2 className="h-5 w-5 mt-0.5 flex-shrink-0" />
