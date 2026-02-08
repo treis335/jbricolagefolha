@@ -186,8 +186,8 @@ export function FinanceiroView() {
               {isDevendo
                 ? formatCurrency(saldoEfetivoPeriodo)
                 : isAdiantado
-                ? `+${formatCurrency(Math.abs(saldoEfetivoPeriodo))}`
-                : "0,00 €"}
+                  ? `+${formatCurrency(Math.abs(saldoEfetivoPeriodo))}`
+                  : "0,00 €"}
             </div>
 
             <div className="mt-3 text-lg font-medium text-center">
@@ -244,13 +244,14 @@ export function FinanceiroView() {
         </Card>
 
         {/* Filtro */}
-        <div className="flex flex-wrap justify-center gap-6 px-2 py-2">
-          <div className="min-w-[150px] space-y-1.5">
-            <Label htmlFor="filtro-mes" className="text-xs text-muted-foreground text-center block">
+        {/* Filtro */}
+        <div className="grid grid-cols-2 gap-3 px-3 py-3 max-w-md mx-auto">
+          <div className="space-y-1">
+            <Label htmlFor="filtro-mes" className="text-xs text-muted-foreground block">
               Mês
             </Label>
             <Select value={filtroMes} onValueChange={setFiltroMes}>
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Selecionar mês" />
               </SelectTrigger>
               <SelectContent>
@@ -264,12 +265,12 @@ export function FinanceiroView() {
             </Select>
           </div>
 
-          <div className="min-w-[150px] space-y-1.5">
-            <Label htmlFor="filtro-ano" className="text-xs text-muted-foreground text-center block">
+          <div className="space-y-1">
+            <Label htmlFor="filtro-ano" className="text-xs text-muted-foreground  block">
               Ano
             </Label>
             <Select value={filtroAno} onValueChange={setFiltroAno}>
-              <SelectTrigger className="h-10">
+              <SelectTrigger className="h-9 text-sm">
                 <SelectValue placeholder="Selecionar ano" />
               </SelectTrigger>
               <SelectContent>
