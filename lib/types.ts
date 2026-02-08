@@ -9,6 +9,7 @@ export interface Service {
   descricao: string;
   equipa: string[];
   materiais: string[];
+  totalHoras?: number;            // Novo campo opcional: horas deste serviço (ex: tempo a cobrar/faturar)
   // Pode adicionar mais campos no futuro sem quebrar nada:
   // totalHorasPorServico?: number;
   // notas?: string;

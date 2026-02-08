@@ -51,6 +51,7 @@ interface Service {
   descricao: string
   equipa: string[]
   materiais: string[]
+  totalHoras?: number  // Novo campo opcional: horas deste serviço
 }
 
 export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
@@ -144,6 +145,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
           descricao: existingEntry.descricao ?? "",
           equipa: normalizeEquipa(existingEntry.equipa ?? []),
           materiais: existingEntry.materiais ?? [],
+          totalHoras: undefined, // Dados antigos não têm este campo
         }
         setServices([oldService])
         setActiveServiceId(oldService.id)
@@ -155,6 +157,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         descricao: "",
         equipa: meuNome ? [meuNome] : [],
         materiais: [],
+        totalHoras: undefined, // Novo serviço começa sem valor
       }
       setServices([newService])
       setActiveServiceId(newService.id)
@@ -177,6 +180,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       descricao: "",
       equipa: meuNome ? [meuNome] : [],
       materiais: [],
+      totalHoras: undefined, // Novo serviço sem valor pré-definido
     }
     setServices(prev => [...prev, newService])
     setActiveServiceId(newService.id)
@@ -205,11 +209,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       return
     }
 
-    const totalHorasSomados = totalHoras
-
     const entry: DayEntry = {
       date: dateStr,
-      totalHoras: totalHorasSomados,
+      totalHoras,
       normalHoras,
       extraHoras,
       services,
@@ -313,7 +315,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-12">
-              {/* Total de Horas */}
+              {/* Total de Horas do Dia (mantido manual) */}
               <div className="space-y-2">
                 <Label className="text-base font-medium">Total de Horas do Dia</Label>
                 <div className="flex items-center gap-3">
@@ -381,6 +383,50 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                             placeholder="Descreva o que foi feito neste serviço..."
                             className="min-h-24 text-base resize-y"
                           />
+                        </div>
+
+                        {/* Novo input opcional: Horas deste serviço */}
+                        <div className="space-y-2">
+                          <Label className="text-base font-medium">Horas deste serviço (opcional)</Label>
+                          <div className="flex items-center gap-3">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-12 w-12"
+                              onClick={() => {
+                                const current = service.totalHoras ?? 0
+                                updateActiveService({ totalHoras: Math.max(0, current - 1) })
+                              }}
+                            >
+                              <Minus className="h-5 w-5" />
+                            </Button>
+                            <Input
+                              type="number"
+                              value={service.totalHoras ?? ""}
+                              onChange={(e) => {
+                                const val = e.target.value === "" ? undefined : Number(e.target.value)
+                                updateActiveService({ totalHoras: val })
+                              }}
+                              placeholder="ex: 3.5"
+                              className="h-12 text-center text-xl font-bold flex-1"
+                              min={0}
+                              step={0.5}
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-12 w-12"
+                              onClick={() => {
+                                const current = service.totalHoras ?? 0
+                                updateActiveService({ totalHoras: current + 1 })
+                              }}
+                            >
+                              <Plus className="h-5 w-5" />
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground text-center">
+                            Tempo a cobrar/faturar neste serviço (deixa vazio se não quiseres especificar)
+                          </p>
                         </div>
 
                         <div className="space-y-3">

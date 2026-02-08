@@ -190,38 +190,31 @@ const exportPDF = useCallback(async () => {
     const totalHoras = entry.totalHoras ?? 0
     const dataComHoras = `${formatDateWithWeekday(entry.date, true)} – ${totalHoras}h`
 
-    if (entry.services && entry.services.length === 1) {
-      // Apenas 1 serviço → usa só os dados do serviço único (sem duplicar linha principal)
-      const s = entry.services[0]
-      tableBody.push([
-        dataComHoras,
-        `${s.obraNome ? s.obraNome + " - " : ""}${s.descricao || "-"}`,
-        (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Nenhum",
-        (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-",
-        `${totalHoras}h`
-      ])
+    if (entry.services && entry.services.length > 0) {
+      entry.services.forEach((s, index) => {
+        const isFirst = index === 0
+
+        // Adiciona (Xh) - só se o serviço tiver totalHoras > 0
+        let descricaoFormatada = s.descricao || "-"
+        if (s.totalHoras !== undefined && s.totalHoras > 0) {
+          descricaoFormatada = `(${s.totalHoras}h) - ${descricaoFormatada}`
+        }
+
+        tableBody.push([
+          isFirst ? dataComHoras : "", // data + total horas só na primeira linha do dia
+          `${s.obraNome ? s.obraNome + " - " : ""}${descricaoFormatada}`,
+          (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Nenhum",
+          (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-"
+        ])
+      })
     } else {
-      // 0 serviços (dados antigos) ou múltiplos serviços → linha principal do dia
+      // Dados antigos sem services
       tableBody.push([
         dataComHoras,
         entry.descricao || "-",
         (entry.equipa ?? []).length > 0 ? (entry.equipa ?? []).join(", ") : "Nenhum",
-        (entry.materiais ?? []).length > 0 ? (entry.materiais ?? []).join(", ") : "-",
-        `${totalHoras}h`
+        (entry.materiais ?? []).length > 0 ? (entry.materiais ?? []).join(", ") : "-"
       ])
-
-      // Se houver múltiplos serviços, adiciona sublinhas
-      if (entry.services && entry.services.length > 0) {
-        entry.services.forEach((s) => {
-          tableBody.push([
-            "",
-            `${s.obraNome ? s.obraNome + " - " : ""}${s.descricao || "-"}`,
-            (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Nenhum",
-            (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-",
-            "-"
-          ])
-        })
-      }
     }
   })
 
@@ -244,17 +237,22 @@ const exportPDF = useCallback(async () => {
     },
     columnStyles: {
       0: { cellWidth: 50, halign: "left" },
-      1: { cellWidth: 100, halign: "left" },
+      1: { cellWidth: 110, halign: "left" },
       2: { cellWidth: 55, halign: "left" },
       3: { cellWidth: 60, halign: "left" },
-      4: { cellWidth: 35, halign: "center", fontStyle: "bold" },
     },
     alternateRowStyles: { fillColor: [248, 248, 248] },
     margin: { top: 38, left: marginLeft, right: marginRight },
     didParseCell: (data) => {
-      if (data.section === "body" && data.column.index === 0 && data.cell.text && data.cell.text[0] !== "") {
-        data.cell.styles.fillColor = [220, 230, 241] // azul bebé em todas as células da linha
-        data.cell.styles.fontStyle = "bold" // negrito na data + horas
+      // Fundo azul bebé + negrito só nas linhas com data (primeira de cada dia)
+      if (
+        data.section === "body" &&
+        data.column.index === 0 &&
+        data.cell.text &&
+        data.cell.text[0] !== ""
+      ) {
+        data.cell.styles.fillColor = [220, 230, 241]
+        data.cell.styles.fontStyle = "bold"
       }
     },
     didDrawPage: drawHeader,
@@ -304,6 +302,8 @@ const exportPDF = useCallback(async () => {
   const filename = `relatorio-${period}-${startDate}.pdf`
   doc.save(filename)
 }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
+
+
   const hasEntries = filteredEntries.length > 0
 
   return (
