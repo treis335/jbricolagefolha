@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { WorkTrackerProvider, useWorkTracker } from "@/lib/work-tracker-context"
+import { useWorkTracker } from "@/lib/work-tracker-context"
+
 import { CalendarView } from "@/components/calendar-view"
 import { DayEntryForm } from "@/components/day-entry-form"
 import { ReportsView } from "@/components/reports-view"
@@ -14,6 +15,7 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<TabType>("calendar")
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+
   const { isLoading } = useWorkTracker()
 
   const handleSelectDate = (date: Date) => {
@@ -44,29 +46,29 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Main Content */}
       <main className="flex-1 pb-16">
         {activeTab === "calendar" && (
-          <CalendarView onSelectDate={handleSelectDate} onAddToday={handleAddToday} />
+          <CalendarView
+            onSelectDate={handleSelectDate}
+            onAddToday={handleAddToday}
+          />
         )}
         {activeTab === "reports" && <ReportsView />}
         {activeTab === "financeiro" && <FinanceiroView />}
         {activeTab === "settings" && <SettingsView />}
       </main>
 
-      {/* Bottom Navigation */}
       <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
 
-      {/* Day Entry Form Sheet */}
-      <DayEntryForm date={selectedDate} open={formOpen} onClose={handleCloseForm} />
+      <DayEntryForm
+        date={selectedDate}
+        open={formOpen}
+        onClose={handleCloseForm}
+      />
     </div>
   )
 }
 
 export default function Page() {
-  return (
-    <WorkTrackerProvider>
-      <AppContent />
-    </WorkTrackerProvider>
-  )
+  return <AppContent />
 }

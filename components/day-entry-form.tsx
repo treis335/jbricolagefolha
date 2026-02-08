@@ -13,14 +13,6 @@ import {
   SheetTitle,
   SheetFooter,
 } from "@/components/ui/sheet"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Plus, Minus, X, Trash2, Users, Check } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
@@ -36,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { getNomesColaboradores, getColaboradorByPin } from "@/lib/colaboradores"
+import { getNomesColaboradores } from "@/lib/colaboradores"
 import { v4 as uuidv4 } from "uuid"
 
 interface DayEntryFormProps {
@@ -51,7 +43,7 @@ interface Service {
   descricao: string
   equipa: string[]
   materiais: string[]
-  totalHoras?: number  // Novo campo opcional: horas deste serviço
+  totalHoras?: number
 }
 
 export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
@@ -60,30 +52,19 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const [totalHoras, setTotalHoras] = useState(8)
   const [services, setServices] = useState<Service[]>([])
   const [activeServiceId, setActiveServiceId] = useState<string | null>(null)
-
-  // Estado local para novo material (resetado por aba)
   const [newMaterialInput, setNewMaterialInput] = useState("")
 
-  // PIN dialog
-  const [showPinDialog, setShowPinDialog] = useState(false)
-  const [pinInput, setPinInput] = useState("")
-  const [pinError, setPinError] = useState<string | null>(null)
-  const [welcomeMessage, setWelcomeMessage] = useState<string | null>(null)
-
-  // Team selector
   const [showTeamDialog, setShowTeamDialog] = useState(false)
   const [tempEquipa, setTempEquipa] = useState<string[]>([])
   const [teamFilter, setTeamFilter] = useState("")
 
   const todosColaboradores = useMemo(() => getNomesColaboradores(), [])
-
   const colaboradoresFiltrados = useMemo(() => {
     const filter = teamFilter.toLowerCase().trim()
     return todosColaboradores.filter(nome => nome.toLowerCase().includes(filter))
   }, [teamFilter, todosColaboradores])
 
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
-
   const dateStr = date ? date.toISOString().split("T")[0] : ""
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
@@ -101,55 +82,24 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     return "Segunda a Sexta - primeiras 8h normais"
   }
 
-  const formatDate = (d: Date) => {
-    return d.toLocaleDateString("pt-PT", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-  }
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
 
   const normalizeEquipa = (value: any): string[] => {
     let arr: string[] = []
-
-    if (Array.isArray(value)) {
-      arr = value.filter((item): item is string => typeof item === "string")
-    } else if (typeof value === "string") {
-      arr = value.split(/[,;]/)
-    }
-
-    const unique = new Set<string>()
-    arr.forEach(item => {
-      const cleaned = item.trim()
-      if (cleaned) unique.add(cleaned)
-    })
-
-    return Array.from(unique)
+    if (Array.isArray(value)) arr = value.filter((item): item is string => typeof item === "string")
+    else if (typeof value === "string") arr = value.split(/[,;]/)
+    return Array.from(new Set(arr.map(item => item.trim()).filter(Boolean)))
   }
 
+  // Inicializa serviços
   useEffect(() => {
     if (!date || !open) return
 
     if (existingEntry) {
       setTotalHoras(existingEntry.totalHoras ?? 8)
-
-      // Compatibilidade com dados antigos
-      if (existingEntry.services && existingEntry.services.length > 0) {
-        setServices(existingEntry.services)
-        setActiveServiceId(existingEntry.services[0]?.id || null)
-      } else {
-        const oldService: Service = {
-          id: uuidv4(),
-          obraNome: "",
-          descricao: existingEntry.descricao ?? "",
-          equipa: normalizeEquipa(existingEntry.equipa ?? []),
-          materiais: existingEntry.materiais ?? [],
-          totalHoras: undefined, // Dados antigos não têm este campo
-        }
-        setServices([oldService])
-        setActiveServiceId(oldService.id)
-      }
+      setServices(existingEntry.services ?? [])
+      setActiveServiceId(existingEntry.services?.[0]?.id || null)
     } else {
       const newService: Service = {
         id: uuidv4(),
@@ -157,21 +107,15 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         descricao: "",
         equipa: meuNome ? [meuNome] : [],
         materiais: [],
-        totalHoras: undefined, // Novo serviço começa sem valor
+        totalHoras: undefined,
       }
       setServices([newService])
       setActiveServiceId(newService.id)
       setTotalHoras(8)
     }
-
-    if (!meuNome) {
-      setShowPinDialog(true)
-    }
   }, [date, open, existingEntry, meuNome])
 
-  const activeService = useMemo(() => {
-    return services.find(s => s.id === activeServiceId) || services[0]
-  }, [services, activeServiceId])
+  const activeService = useMemo(() => services.find(s => s.id === activeServiceId) || services[0], [services, activeServiceId])
 
   const handleAddService = () => {
     const newService: Service = {
@@ -180,7 +124,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       descricao: "",
       equipa: meuNome ? [meuNome] : [],
       materiais: [],
-      totalHoras: undefined, // Novo serviço sem valor pré-definido
+      totalHoras: undefined,
     }
     setServices(prev => [...prev, newService])
     setActiveServiceId(newService.id)
@@ -197,27 +141,44 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
   const updateActiveService = (updates: Partial<Service>) => {
     setServices(prev =>
-      prev.map(s =>
-        s.id === activeServiceId ? { ...s, ...updates } : s
-      )
+      prev.map(s => s.id === activeServiceId ? { ...s, ...updates } : s)
     )
   }
 
+  // ✅ FIX: handleSave corrigido para preservar totalHoras e remover undefined
   const handleSave = () => {
     if (!date || services.length === 0) {
       alert("Adicione pelo menos um serviço.")
       return
     }
 
+    const mappedServices = services.map(s => {
+      const service: any = {
+        id: s.id,
+        obraNome: s.obraNome,
+        descricao: s.descricao,
+        equipa: s.equipa ?? [],
+        materiais: s.materiais ?? [],
+      }
+      
+      // Só adiciona totalHoras se tiver valor (não undefined e não zero)
+      if (s.totalHoras !== undefined && s.totalHoras !== null) {
+        service.totalHoras = s.totalHoras
+      }
+      
+      return service
+    })
+
     const entry: DayEntry = {
+      id: existingEntry?.id ?? uuidv4(),
       date: dateStr,
       totalHoras,
       normalHoras,
       extraHoras,
-      services,
+      services: mappedServices,
       descricao: services.length === 1 ? services[0].descricao : "Múltiplos serviços",
-      equipa: services.flatMap(s => s.equipa),
-      materiais: services.flatMap(s => s.materiais),
+      equipa: services.flatMap(s => s.equipa ?? []),
+      materiais: services.flatMap(s => s.materiais ?? []),
     }
 
     addEntry(entry)
@@ -231,23 +192,17 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     }
   }
 
-  const adjustHours = (delta: number) => {
-    setTotalHoras(prev => Math.max(0, prev + delta))
-  }
+  const adjustHours = (delta: number) => setTotalHoras(prev => Math.max(0, prev + delta))
 
   const addMaterialToActive = () => {
     if (newMaterialInput.trim()) {
-      updateActiveService({
-        materiais: [...activeService.materiais, newMaterialInput.trim()]
-      })
+      updateActiveService({ materiais: [...activeService.materiais, newMaterialInput.trim()] })
       setNewMaterialInput("")
     }
   }
 
   const removeMaterialFromActive = (index: number) => {
-    updateActiveService({
-      materiais: activeService.materiais.filter((_, i) => i !== index)
-    })
+    updateActiveService({ materiais: activeService.materiais.filter((_, i) => i !== index) })
   }
 
   const openTeamSelector = () => {
@@ -257,9 +212,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }
 
   const toggleTempMember = (nome: string) => {
-    setTempEquipa(prev =>
-      prev.includes(nome) ? prev.filter(n => n !== nome) : [...prev, nome]
-    )
+    setTempEquipa(prev => prev.includes(nome) ? prev.filter(n => n !== nome) : [...prev, nome])
   }
 
   const confirmTeamSelection = () => {
@@ -267,47 +220,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     setShowTeamDialog(false)
   }
 
-  const handleDefinirPin = () => {
-    const pin = pinInput.trim()
-    if (!pin) {
-      setPinError("Insere o teu PIN")
-      return
-    }
-
-    const colaborador = getColaboradorByPin(pin)
-    if (colaborador) {
-      localStorage.setItem("meuPin", pin)
-      localStorage.setItem("meuNome", colaborador.nome)
-
-      setWelcomeMessage(`Bem-vindo, ${colaborador.nome}!`)
-      setPinError(null)
-      setPinInput("")
-
-      updateActiveService({
-        equipa: (() => {
-          const prev = activeService.equipa
-          const lower = colaborador.nome.toLowerCase().trim()
-          if (prev.some(n => n.toLowerCase().trim() === lower)) return prev
-          return [...prev, colaborador.nome]
-        })()
-      })
-
-      setTimeout(() => {
-        setWelcomeMessage(null)
-        setShowPinDialog(false)
-      }, 3000)
-    } else {
-      setPinError("PIN inválido. Tenta novamente.")
-    }
-  }
-
   return (
     <>
-      <Sheet open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-        <SheetContent
-          side="bottom"
-          className="rounded-t-2xl border-t border-border bg-background h-auto max-h-[92dvh] min-h-[60dvh] overflow-hidden pb-2"
-        >
+      <Sheet open={open} onOpenChange={isOpen => !isOpen && onClose()}>
+        <SheetContent side="bottom" className="rounded-t-2xl border-t border-border bg-background h-auto max-h-[92dvh] min-h-[60dvh] overflow-hidden pb-2">
           <div className="flex flex-col h-full overflow-hidden">
             <SheetHeader className="px-6 pt-6 pb-4 text-left shrink-0">
               <SheetTitle className="text-xl">{isEditing ? "Editar Dia" : "Novo Registo"}</SheetTitle>
@@ -315,7 +231,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-12">
-              {/* Total de Horas do Dia (mantido manual) */}
+              {/* Total Horas */}
               <div className="space-y-2">
                 <Label className="text-base font-medium">Total de Horas do Dia</Label>
                 <div className="flex items-center gap-3">
@@ -325,7 +241,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                   <Input
                     type="number"
                     value={totalHoras}
-                    onChange={(e) => {
+                    onChange={e => {
                       const val = Number(e.target.value)
                       if (!isNaN(val)) setTotalHoras(Math.max(0, Math.floor(val)))
                     }}
@@ -340,7 +256,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 <p className="text-xs text-muted-foreground text-center">{getDayTypeLabel()}</p>
               </div>
 
-              {/* Serviços do Dia */}
+              {/* Serviços */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label className="text-lg font-semibold">Serviços do Dia</Label>
@@ -352,181 +268,76 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 {services.length > 0 ? (
                   <Tabs value={activeServiceId || ""} onValueChange={setActiveServiceId} className="w-full">
                     <TabsList className="w-full overflow-x-auto flex-nowrap justify-start bg-muted/50 rounded-lg">
-                      {services.map((service) => (
-                        <TabsTrigger
-                          key={service.id}
-                          value={service.id}
-                          className="min-w-[140px] text-sm"
-                        >
-                          {service.obraNome || `Serviço ${services.indexOf(service) + 1}`}
+                      {services.map(s => (
+                        <TabsTrigger key={s.id} value={s.id} className="min-w-[140px] text-sm">
+                          {s.obraNome || `Serviço ${services.indexOf(s) + 1}`}
                         </TabsTrigger>
                       ))}
                     </TabsList>
 
-                    {services.map((service) => (
-                      <TabsContent key={service.id} value={service.id} className="space-y-6 mt-4">
+                    {services.map(s => (
+                      <TabsContent key={s.id} value={s.id} className="space-y-6 mt-4">
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Nome da Obra / Serviço *</Label>
-                          <Input
-                            value={service.obraNome}
-                            onChange={(e) => updateActiveService({ obraNome: e.target.value })}
-                            placeholder="ex: Reabilitação Casa Sr. António - Telhado"
-                            className="h-12"
-                          />
+                          <Input value={s.obraNome} onChange={e => updateActiveService({ obraNome: e.target.value })} placeholder="ex: Reabilitação Casa Sr. António - Telhado" className="h-12" />
                         </div>
 
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Descrição</Label>
-                          <Textarea
-                            value={service.descricao}
-                            onChange={(e) => updateActiveService({ descricao: e.target.value })}
-                            placeholder="Descreva o que foi feito neste serviço..."
-                            className="min-h-24 text-base resize-y"
-                          />
+                          <Textarea value={s.descricao} onChange={e => updateActiveService({ descricao: e.target.value })} placeholder="Descreva o que foi feito neste serviço..." className="min-h-24 text-base resize-y" />
                         </div>
 
-                        {/* Novo input opcional: Horas deste serviço */}
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Horas deste serviço (opcional)</Label>
                           <div className="flex items-center gap-3">
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-12 w-12"
-                              onClick={() => {
-                                const current = service.totalHoras ?? 0
-                                updateActiveService({ totalHoras: Math.max(0, current - 1) })
-                              }}
-                            >
-                              <Minus className="h-5 w-5" />
-                            </Button>
-                            <Input
-                              type="number"
-                              value={service.totalHoras ?? ""}
-                              onChange={(e) => {
-                                const val = e.target.value === "" ? undefined : Number(e.target.value)
-                                updateActiveService({ totalHoras: val })
-                              }}
-                              placeholder="ex: 3.5"
-                              className="h-12 text-center text-xl font-bold flex-1"
-                              min={0}
-                              step={0.5}
-                            />
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-12 w-12"
-                              onClick={() => {
-                                const current = service.totalHoras ?? 0
-                                updateActiveService({ totalHoras: current + 1 })
-                              }}
-                            >
-                              <Plus className="h-5 w-5" />
-                            </Button>
+                            <Button variant="outline" size="icon" className="h-12 w-12" onClick={() => updateActiveService({ totalHoras: Math.max(0, (s.totalHoras ?? 0) - 1) })}><Minus className="h-5 w-5" /></Button>
+                            <Input type="number" value={s.totalHoras ?? ""} onChange={e => updateActiveService({ totalHoras: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="ex: 3.5" className="h-12 text-center text-xl font-bold flex-1" min={0} step={0.5} />
+                            <Button variant="outline" size="icon" className="h-12 w-12" onClick={() => updateActiveService({ totalHoras: (s.totalHoras ?? 0) + 1 })}><Plus className="h-5 w-5" /></Button>
                           </div>
-                          <p className="text-xs text-muted-foreground text-center">
-                            Tempo a cobrar/faturar neste serviço (deixa vazio se não quiseres especificar)
-                          </p>
                         </div>
 
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <Label className="text-base font-medium">Equipa deste serviço</Label>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={openTeamSelector}
-                              className="h-8 px-3 text-xs"
-                            >
-                              <Users className="h-3.5 w-3.5 mr-1" />
-                              Selecionar
+                            <Button variant="outline" size="sm" onClick={openTeamSelector} className="h-8 px-3 text-xs">
+                              <Users className="h-3.5 w-3.5 mr-1" /> Selecionar
                             </Button>
                           </div>
 
                           <div className="min-h-[42px] flex flex-wrap gap-2">
-                            {service.equipa.length === 0 ? (
-                              <p className="text-sm text-muted-foreground italic">Nenhum selecionado</p>
-                            ) : (
-                              service.equipa.map((nome) => (
-                                <Badge
-                                  key={nome}
-                                  variant="secondary"
-                                  className="text-sm px-3 py-1.5 flex items-center gap-1.5"
-                                >
+                            {s.equipa.length === 0 ? <p className="text-sm text-muted-foreground italic">Nenhum selecionado</p> :
+                              s.equipa.map(nome => (
+                                <Badge key={nome} variant="secondary" className="text-sm px-3 py-1.5 flex items-center gap-1.5">
                                   {nome}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      const newEquipa = service.equipa.filter(n => n !== nome)
-                                      updateActiveService({ equipa: newEquipa })
-                                    }}
-                                    className="ml-1 hover:text-destructive"
-                                  >
-                                    <X className="h-3.5 w-3.5" />
-                                  </button>
+                                  <button type="button" onClick={() => updateActiveService({ equipa: s.equipa.filter(n => n !== nome) })} className="ml-1 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
                                 </Badge>
                               ))
-                            )}
+                            }
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Materiais gastos neste serviço</Label>
                           <div className="flex gap-2">
-                            <Input
-                              value={newMaterialInput}
-                              onChange={(e) => setNewMaterialInput(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addMaterialToActive())}
-                              placeholder="ex: 1 isocril, Lata tinta 15L..."
-                              className="h-12 text-base flex-1"
-                            />
-                            <Button onClick={addMaterialToActive} className="h-12 px-4">
-                              <Plus className="h-5 w-5" />
-                            </Button>
+                            <Input value={newMaterialInput} onChange={e => setNewMaterialInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addMaterialToActive())} placeholder="ex: 1 isocril, Lata tinta 15L..." className="h-12 text-base flex-1" />
+                            <Button onClick={addMaterialToActive} className="h-12 px-4"><Plus className="h-5 w-5" /></Button>
                           </div>
-                          {service.materiais.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mt-3">
-                              {service.materiais.map((material, index) => (
-                                <Badge
-                                  key={index}
-                                  variant="secondary"
-                                  className="text-sm py-1.5 px-3 flex items-center gap-1"
-                                >
-                                  {material}
-                                  <button
-                                    type="button"
-                                    onClick={() => removeMaterialFromActive(index)}
-                                    className="ml-1 hover:text-destructive"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
-                              ))}
-                            </div>
-                          )}
+                          {s.materiais.length > 0 && <div className="flex flex-wrap gap-2 mt-3">
+                            {s.materiais.map((m, idx) => (
+                              <Badge key={idx} variant="secondary" className="text-sm py-1.5 px-3 flex items-center gap-1">
+                                {m}
+                                <button type="button" onClick={() => removeMaterialFromActive(idx)} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
+                              </Badge>
+                            ))}
+                          </div>}
                         </div>
 
-                        {services.length > 1 && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="mt-4"
-                            onClick={() => handleRemoveService(service.id)}
-                          >
-                            Remover este serviço
-                          </Button>
-                        )}
+                        {services.length > 1 && <Button variant="destructive" size="sm" className="mt-4" onClick={() => handleRemoveService(s.id)}>Remover este serviço</Button>}
                       </TabsContent>
                     ))}
                   </Tabs>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">
-                    Adicione um serviço para começar
-                  </p>
-                )}
+                ) : <p className="text-center text-muted-foreground py-8">Adicione um serviço para começar</p>}
               </div>
-
-              <div className="h-32" />
             </div>
 
             <SheetFooter className="shrink-0 border-t border-border bg-background p-3 pb-[env(safe-area-inset-bottom)]">
@@ -534,9 +345,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 {isEditing && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="lg" className="h-12 sm:h-14 w-14 flex items-center justify-center">
-                        <Trash2 className="h-5 w-5" />
-                      </Button>
+                      <Button variant="destructive" size="lg" className="h-12 sm:h-14 w-14 flex items-center justify-center"><Trash2 className="h-5 w-5" /></Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
@@ -550,142 +359,36 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     </AlertDialogContent>
                   </AlertDialog>
                 )}
-                <Button
-                  onClick={handleSave}
-                  size="lg"
-                  className="flex-1 h-12 sm:h-14 text-base sm:text-lg bg-green-600 hover:bg-green-700 text-white"
-                  disabled={services.length === 0}
-                >
-                  Salvar Dia
-                </Button>
+                <Button onClick={handleSave} size="lg" className="flex-1 h-12 sm:h-14 text-base sm:text-lg bg-green-600 hover:bg-green-700 text-white" disabled={services.length === 0}>Salvar Dia</Button>
               </div>
             </SheetFooter>
           </div>
         </SheetContent>
       </Sheet>
 
-      {/* PIN Dialog */}
-      <Dialog open={showPinDialog} onOpenChange={(open) => {
-        setShowPinDialog(open)
-        if (!open && !localStorage.getItem("meuNome")) {
-          onClose()
-        }
-      }}>
-        <DialogContent className="sm:max-w-md" data-hide-close-button="true">
-          <DialogHeader>
-            <DialogTitle>Quem és tu?</DialogTitle>
-            <DialogDescription>
-              Insere o teu PIN para continuar.<br />
-              *fornecido por JBricolage*
-            </DialogDescription>
-          </DialogHeader>
-
-          {welcomeMessage ? (
-            <div className="py-8 text-center">
-              <div className="text-2xl font-bold text-green-600 mb-2">
-                {welcomeMessage}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                A carregar o teu perfil...
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="pin-dialog">O teu PIN</Label>
-                <Input
-                  id="pin-dialog"
-                  type="password"
-                  inputMode="numeric"
-                  value={pinInput}
-                  onChange={(e) => {
-                    setPinInput(e.target.value)
-                    setPinError(null)
-                  }}
-                  placeholder="ex: 1010"
-                  className="h-12 text-lg"
-                  maxLength={6}
-                  onKeyDown={(e) => e.key === "Enter" && handleDefinirPin()}
-                  autoFocus
-                />
-                {pinError && <p className="text-sm text-destructive">{pinError}</p>}
-              </div>
-
-              <Button
-                onClick={handleDefinirPin}
-                disabled={!pinInput.trim()}
-                className="w-full"
-              >
-                Confirmar
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
       {/* Team Selector Dialog */}
-      <Dialog open={showTeamDialog} onOpenChange={setShowTeamDialog}>
-        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Selecionar Equipa para este serviço</DialogTitle>
-            <DialogDescription>
-              Clica nos nomes para adicionar ou remover. Confirma no final.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
-            <Input
-              placeholder="Filtrar colaboradores..."
-              value={teamFilter}
-              onChange={(e) => setTeamFilter(e.target.value)}
-              className="w-full"
-            />
-
+      <Sheet open={showTeamDialog} onOpenChange={setShowTeamDialog}>
+        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh]">
+          <div className="flex flex-col gap-4">
+            <Input placeholder="Filtrar colaboradores..." value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="w-full" />
             <div className="flex-1 overflow-y-auto border rounded-md divide-y bg-muted/30">
-              {colaboradoresFiltrados.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
-                  Nenhum colaborador encontrado
-                </div>
-              ) : (
-                colaboradoresFiltrados.map((nome) => {
+              {colaboradoresFiltrados.length === 0 ? <div className="py-8 text-center text-muted-foreground">Nenhum colaborador encontrado</div> :
+                colaboradoresFiltrados.map(nome => {
                   const isSelected = tempEquipa.includes(nome)
-                  const isMeuNome = meuNome != null && nome.toLowerCase().trim() === meuNome.toLowerCase().trim()
-                  return (
-                    <button
-                      key={nome}
-                      type="button"
-                      onClick={() => !isMeuNome && toggleTempMember(nome)}
-                      disabled={isMeuNome}
-                      className={`w-full text-left px-4 py-3.5 text-base flex justify-between items-center transition-colors ${
-                        isSelected ? "bg-primary/10 font-medium" : "hover:bg-accent"
-                      } ${isMeuNome ? "opacity-70 cursor-not-allowed" : ""}`}
-                    >
-                      <span className="flex items-center gap-2">
-                        {nome}
-                        {isMeuNome && (
-                          <Badge variant="outline" className="text-xs bg-primary/10">
-                            Eu
-                          </Badge>
-                        )}
-                      </span>
-                      {isSelected && <Check className="h-5 w-5 text-primary" />}
-                    </button>
-                  )
+                  return <button key={nome} type="button" onClick={() => toggleTempMember(nome)} className={`w-full text-left px-4 py-3.5 text-base flex justify-between items-center transition-colors ${isSelected ? "bg-primary/10 font-medium" : "hover:bg-accent"}`}>
+                    <span className="flex items-center gap-2">{nome}</span>
+                    {isSelected && <Check className="h-5 w-5 text-primary" />}
+                  </button>
                 })
-              )}
+              }
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setShowTeamDialog(false)}>Cancelar</Button>
+              <Button onClick={confirmTeamSelection}>Confirmar Seleção</Button>
             </div>
           </div>
-
-          <DialogFooter className="flex justify-between sm:justify-end gap-3 pt-4 border-t">
-            <Button variant="outline" onClick={() => setShowTeamDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={confirmTeamSelection}>
-              Confirmar Seleção
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
     </>
   )
 }

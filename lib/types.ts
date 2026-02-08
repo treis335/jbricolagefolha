@@ -19,6 +19,7 @@ export interface Service {
 
 // Tipo principal do dia (mantém compatibilidade total com dados antigos)
 export interface DayEntry {
+   id: string;
   date: string;
   totalHoras: number;
   normalHoras: number;

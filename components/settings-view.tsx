@@ -1,14 +1,33 @@
+//settings-view
+
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { MigrateLegacyDataButton } from "@/components/MigrateLegacyDataButton"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Euro,
+  Users,
+  Trash2,
+  HardHat,
+  Info,
+  Download,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  Share,
+  User,
+} from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,16 +39,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
-import { 
-  Euro, Users, Trash2, Plus, X, HardHat, Info, 
-  Download, Upload, CheckCircle2, AlertCircle, Share, User 
-} from "lucide-react"
+
 import { useWorkTracker } from "@/lib/work-tracker-context"
+import { useAuth } from "@/lib/AuthProvider"
+import { MigrateLegacyDataButton } from "@/components/MigrateLegacyDataButton"
 
-// Importa a função para validar o PIN
-import { getColaboradorByPin } from "@/lib/colaboradores"
-
-// Componente de Instalação PWA (mantido exatamente igual)
+// PWA install button
 function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
@@ -47,11 +62,12 @@ function InstallPWAButton() {
       setDeferredPrompt(e)
     }
     window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
-
     window.addEventListener("focus", checkStandalone)
-
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt
+      )
       window.removeEventListener("focus", checkStandalone)
     }
   }, [])
@@ -60,17 +76,11 @@ function InstallPWAButton() {
     if (deferredPrompt) {
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
-      if (outcome === "accepted") {
-        setIsInstalled(true)
-      }
+      if (outcome === "accepted") setIsInstalled(true)
       setDeferredPrompt(null)
     } else {
       alert(
-        "Em ambiente de desenvolvimento (localhost), o prompt automático pode não aparecer.\n\n" +
-        "Para instalar manualmente:\n" +
-        "1. No Chrome Android → menu ⋮ → 'Adicionar à tela inicial'\n" +
-        "2. No iOS Safari → menu Compartilhar → 'Adicionar à Tela de Início'\n\n" +
-        "Em produção (URL HTTPS), clica aqui para o prompt automático."
+        "Em desenvolvimento (localhost) o prompt pode não aparecer. Para instalar manualmente, usa o menu do navegador."
       )
     }
   }
@@ -88,8 +98,8 @@ function InstallPWAButton() {
         </CardTitle>
         <CardDescription>
           {isInstalled
-            ? "A aplicação já está instalada na tua tela inicial. Para remover, faz long-press no ícone e seleciona 'Remover' ou vai às definições do telemóvel."
-            : "Instala a app no teu telemóvel para usar offline, ter ícone próprio e acesso rápido."}
+            ? "A aplicação já está instalada na tua tela inicial."
+            : "Instala a app no teu telemóvel para usar offline e com ícone próprio."}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -103,7 +113,7 @@ function InstallPWAButton() {
           </Button>
         ) : (
           <div className="text-center py-2 text-sm text-green-600 font-medium">
-            Instalada com sucesso! Abre diretamente da tela inicial 🚀
+            Instalada com sucesso! 🚀
           </div>
         )}
       </CardContent>
@@ -112,57 +122,27 @@ function InstallPWAButton() {
 }
 
 export function SettingsView() {
-  const { data, updateSettings, clearAllData } = useWorkTracker()
-  const [newTeamMember, setNewTeamMember] = useState("")
+  const { data, updateSettings, clearAllData, importData } = useWorkTracker()
+  const { user, logout } = useAuth()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [textoColado, setTextoColado] = useState("")
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
-  const [textoColado, setTextoColado] = useState("")
 
-  // === NOVO: Quem sou eu? (PIN) ===
-  const [pinInput, setPinInput] = useState("")
-  const [meuNome, setMeuNome] = useState<string | null>(null)
-  const [pinError, setPinError] = useState<string | null>(null)
+  // ✅ REMOVIDO: STORAGE_KEY já não é necessário
 
-  useEffect(() => {
-    const nomeGuardado = localStorage.getItem("meuNome")
-    if (nomeGuardado) {
-      setMeuNome(nomeGuardado)
-    }
-  }, [])
-
-  const handleDefinirPin = () => {
-    const pin = pinInput.trim()
-    if (!pin) {
-      setPinError("Insere o teu PIN")
-      return
-    }
-
-    const colaborador = getColaboradorByPin(pin)
-    if (colaborador) {
-      localStorage.setItem("meuPin", pin)
-      localStorage.setItem("meuNome", colaborador.nome)
-      setMeuNome(colaborador.nome)
-      setPinInput("")
-      setPinError(null)
-      // Mensagem de sucesso (podes trocar por toast mais tarde)
-      alert(`Bem-vindo, ${colaborador.nome}! Agora a app sabe quem és.`)
-    } else {
-      setPinError("PIN inválido. Verifica e tenta novamente.")
+  // --- LOGOUT HANDLER ---
+  const handleLogout = async () => {
+    try {
+      await logout()
+      alert("Sessão terminada com sucesso!")
+    } catch (err) {
+      console.error(err)
+      alert("Erro ao terminar a sessão. Tenta novamente.")
     }
   }
 
-  const handleTrocarUtilizador = () => {
-    localStorage.removeItem("meuPin")
-    localStorage.removeItem("meuNome")
-    setMeuNome(null)
-    setPinInput("")
-    setPinError(null)
-    alert("Utilizador removido. Podes inserir um novo PIN quando quiseres.")
-  }
-
-  const STORAGE_KEY = "trabalhoDiario"
-
+  // --- Taxa horária ---
   const handleTaxaChange = (value: string) => {
     const num = Number(value)
     if (!Number.isNaN(num) && num >= 0) {
@@ -170,23 +150,29 @@ export function SettingsView() {
     }
   }
 
+  // --- Adicionar/Remover membros da equipa ---
+  const [newTeamMember, setNewTeamMember] = useState("")
   const addTeamMember = () => {
-    if (newTeamMember.trim() && !data.settings.equipaComum.includes(newTeamMember.trim())) {
+    if (
+      newTeamMember.trim() &&
+      !data.settings.equipaComum.includes(newTeamMember.trim())
+    ) {
       updateSettings({
         equipaComum: [...data.settings.equipaComum, newTeamMember.trim()],
       })
       setNewTeamMember("")
     }
   }
-
   const removeTeamMember = (member: string) => {
     updateSettings({
       equipaComum: data.settings.equipaComum.filter((m) => m !== member),
     })
   }
 
+  // --- Backup & Import ---
   const exportarDados = async () => {
-    const conteudo = localStorage.getItem(STORAGE_KEY)
+    // Exporta os dados do state atual (que vem do Firebase)
+    const conteudo = JSON.stringify(data)
     if (!conteudo) {
       setSyncMessage("Não existem dados para exportar.")
       setSyncSuccess(false)
@@ -196,44 +182,32 @@ export function SettingsView() {
     const blob = new Blob([conteudo], { type: "application/json" })
     const file = new File(
       [blob],
-      `jbricolage-horas-backup-${new Date().toISOString().split("T")[0]}.json`,
+      `jbricolage-horas-backup-${new Date()
+        .toISOString()
+        .split("T")[0]}.json`,
       { type: "application/json" }
     )
 
-    const shareData = {
-      files: [file],
-      title: "Backup das Minhas Horas JBricolage",
-      text: "Guarda este ficheiro para importar no teu outro telemóvel ou computador.",
-    }
-
-    if (navigator.canShare && navigator.canShare(shareData)) {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
-        await navigator.share(shareData)
-        setSyncMessage(
-          "Partilhado! Envia para ti mesmo via WhatsApp, Telegram, Email...\n" +
-          "Depois importa no outro dispositivo nas Definições."
-        )
+        await navigator.share({ files: [file], title: "Backup JBricolage" })
+        setSyncMessage("Partilhado com sucesso!")
         setSyncSuccess(true)
         return
       } catch (err: any) {
-        if (err.name !== "AbortError") {
-          console.error("Erro ao partilhar:", err)
-        }
+        if (err.name !== "AbortError") console.error(err)
       }
     }
 
     try {
       await navigator.clipboard.writeText(conteudo)
       setSyncMessage(
-        "Copiado para a área de transferência!\n\n" +
-        "Agora:\n" +
-        "1. Cola num chat (WhatsApp/Telegram/Email) e envia para ti mesmo\n" +
-        "2. No outro dispositivo: abre a app → Definições → cola no campo abaixo → Importar Texto Colado"
+        "Copiado para área de transferência! Agora cola no outro dispositivo."
       )
       setSyncSuccess(true)
       return
     } catch (err) {
-      console.error("Erro ao copiar texto:", err)
+      console.error(err)
     }
 
     const url = URL.createObjectURL(blob)
@@ -242,32 +216,23 @@ export function SettingsView() {
     link.download = file.name
     link.click()
     URL.revokeObjectURL(url)
-
-    setSyncMessage("Ficheiro de backup descarregado! Procura na pasta Downloads.")
+    setSyncMessage("Ficheiro de backup descarregado!")
     setSyncSuccess(true)
   }
 
   const importarDeArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     const reader = new FileReader()
     reader.onload = (ev) => {
       try {
-        const texto = ev.target?.result as string
-        const parsed = JSON.parse(texto)
-
-        if (!parsed || typeof parsed !== "object" ||
-            (!("entries" in parsed) && !("payments" in parsed) && !("settings" in parsed))) {
-          throw new Error("Formato inválido")
-        }
-
-        localStorage.setItem(STORAGE_KEY, texto)
-        setSyncMessage("Dados importados com sucesso!\nA página vai recarregar em breve...")
+        const parsed = JSON.parse(ev.target?.result as string)
+        importData(parsed) // Atualiza state e Firebase
+        setSyncMessage("Dados importados com sucesso!")
         setSyncSuccess(true)
-        setTimeout(() => window.location.reload(), 2200)
+        setTimeout(() => window.location.reload(), 1000)
       } catch {
-        setSyncMessage("Erro: o ficheiro não é um backup válido ou está corrompido.")
+        setSyncMessage("Erro: ficheiro inválido.")
         setSyncSuccess(false)
       }
     }
@@ -276,36 +241,32 @@ export function SettingsView() {
 
   const importarTextoColado = () => {
     if (!textoColado.trim()) {
-      setSyncMessage("Por favor cola o texto JSON primeiro.")
+      setSyncMessage("Por favor cola o JSON primeiro.")
       setSyncSuccess(false)
       return
     }
 
     try {
       const parsed = JSON.parse(textoColado.trim())
-
-      if (!parsed || typeof parsed !== "object" ||
-          (!("entries" in parsed) && !("payments" in parsed) && !("settings" in parsed))) {
-        throw new Error("Formato inválido")
-      }
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
-      setSyncMessage("Dados importados do texto com sucesso!\nRecarregando a aplicação...")
+      importData(parsed) // Atualiza state e Firebase
+      setSyncMessage("Dados importados com sucesso!")
       setSyncSuccess(true)
       setTextoColado("")
-      setTimeout(() => window.location.reload(), 2200)
-    } catch (err) {
-      setSyncMessage("Erro: o texto colado não é um JSON válido.\nVerifica se copiaste tudo corretamente.")
+      setTimeout(() => window.location.reload(), 1000)
+    } catch {
+      setSyncMessage("JSON inválido.")
       setSyncSuccess(false)
     }
   }
+
+  // ✅ REMOVIDO: clearLocalStorage - já não faz sentido com Firebase
 
   const totalHoras = data.entries.reduce((sum, e) => sum + e.totalHoras, 0)
 
   return (
     <ScrollArea className="h-full">
       <div className="p-4 pb-24 space-y-6">
-        {/* App Header */}
+        {/* Header */}
         <div className="text-center py-6">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
             <HardHat className="h-8 w-8 text-primary" />
@@ -314,7 +275,7 @@ export function SettingsView() {
           <p className="text-sm text-muted-foreground">Versão 1.0</p>
         </div>
 
-        {/* === NOVA SECÇÃO: QUEM SOU EU === */}
+        {/* Quem sou eu? / Logout */}
         <Card className="border-primary/30">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -322,59 +283,37 @@ export function SettingsView() {
               Quem sou eu?
             </CardTitle>
             <CardDescription>
-              Insere o teu PIN (fornecido pelo patrão) para a app saber automaticamente quem és
+              Informação da tua conta atual
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {meuNome ? (
+            {user ? (
               <div className="space-y-4">
                 <div className="p-4 bg-primary/5 rounded-lg border border-primary/20">
-                  <p className="text-sm text-muted-foreground mb-1">Utilizador atual</p>
-                  <p className="text-xl font-medium">{meuNome}</p>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Utilizador atual
+                  </p>
+                  <p className="text-xl font-medium">
+                    {user.displayName || user.email}
+                  </p>
                 </div>
                 <Button
                   variant="outline"
-                  onClick={handleTrocarUtilizador}
+                  onClick={handleLogout}
                   className="w-full"
                 >
-                  Trocar de utilizador / Sair
+                  Terminar Sessão
                 </Button>
               </div>
             ) : (
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <Label htmlFor="pin">O teu PIN</Label>
-                  <Input
-                    id="pin"
-                    type="password"
-                    inputMode="numeric"
-                    value={pinInput}
-                    onChange={(e) => {
-                      setPinInput(e.target.value)
-                      setPinError(null)
-                    }}
-                    placeholder="Pedir á Empresa"
-                    className="h-12 text-lg"
-                    maxLength={6}
-                    onKeyDown={(e) => e.key === "Enter" && handleDefinirPin()}
-                  />
-                  {pinError && (
-                    <p className="text-sm text-destructive">{pinError}</p>
-                  )}
-                </div>
-                <Button
-                  onClick={handleDefinirPin}
-                  disabled={!pinInput.trim()}
-                  className="w-full h-12"
-                >
-                  Confirmar meu PIN
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Não estás autenticado.
+              </p>
             )}
           </CardContent>
         </Card>
 
-        {/* Hourly Rate */}
+        {/* Taxa horária */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -405,9 +344,9 @@ export function SettingsView() {
               </p>
             </div>
           </CardContent>
-        </Card>        
+        </Card>
 
-        {/* Statistics */}
+        {/* Estatísticas */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Estatísticas</CardTitle>
@@ -422,13 +361,15 @@ export function SettingsView() {
               <span className="font-semibold">{data.payments.length}</span>
             </div>
             <div className="flex justify-between py-2">
-              <span className="text-muted-foreground">Horas totais registadas</span>
+              <span className="text-muted-foreground">
+                Horas totais registadas
+              </span>
               <span className="font-semibold">{totalHoras}h</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Backup & Sincronização */}
+        {/* Backup & Import */}
         <Card className="border-amber-500/30">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -436,17 +377,14 @@ export function SettingsView() {
               Backup & Sincronização
             </CardTitle>
             <CardDescription>
-              Transfere os teus dados entre telemóvel e computador sem servidor
+              Transfere os teus dados entre dispositivos
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button
-                onClick={exportarDados}
-                className="h-12"
-              >
+              <Button onClick={exportarDados} className="h-12">
                 <Share className="h-4 w-4 mr-2" />
-                Exportar para Mim Mesmo
+                Exportar Dados
               </Button>
 
               <input
@@ -467,7 +405,9 @@ export function SettingsView() {
             </div>
 
             <div className="space-y-3 pt-4 border-t">
-              <Label htmlFor="json-colado">Ou cola aqui o backup recebido:</Label>
+              <Label htmlFor="json-colado">
+                Ou cola aqui o backup recebido:
+              </Label>
               <Textarea
                 id="json-colado"
                 value={textoColado}
@@ -485,29 +425,28 @@ export function SettingsView() {
             </div>
 
             {syncMessage && (
-              <div className={`flex items-start gap-3 p-4 rounded-lg text-sm border ${
-                syncSuccess
-                  ? "bg-green-50 dark:bg-green-950/40 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800"
-                  : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
-              }`}>
+              <div
+                className={`flex items-start gap-3 p-4 rounded-lg text-sm border ${
+                  syncSuccess
+                    ? "bg-green-50 dark:bg-green-950/40 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800"
+                    : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
+                }`}
+              >
                 {syncSuccess ? (
                   <CheckCircle2 className="h-5 w-5 mt-0.5 flex-shrink-0" />
                 ) : (
                   <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
                 )}
-                <span className="whitespace-pre-wrap leading-relaxed">{syncMessage}</span>
+                <span className="whitespace-pre-wrap leading-relaxed">
+                  {syncMessage}
+                </span>
               </div>
             )}
-
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Funciona offline. Envia o backup para ti mesmo por WhatsApp, Telegram, Email ou cabo USB.
-            </p>
           </CardContent>
         </Card>
 
-        {/* Secção Instalar PWA */}
+        {/* PWA & Migration */}
         <InstallPWAButton />
-
         <MigrateLegacyDataButton />
 
         {/* Danger Zone */}
@@ -530,8 +469,8 @@ export function SettingsView() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Esta ação irá apagar permanentemente todos os registos, pagamentos e definições.
-                    Esta ação não pode ser desfeita.
+                    Esta ação irá apagar permanentemente todos os registos,
+                    pagamentos e definições. Não pode ser desfeita.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -547,22 +486,6 @@ export function SettingsView() {
             </AlertDialog>
           </CardContent>
         </Card>
-
-        {/* Info Note */}
-        <div className="flex items-start gap-3 p-4 bg-muted rounded-lg">
-          <Info className="h-5 w-5 text-muted-foreground mt-0.5" />
-          <div className="text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">Dados guardados localmente</p>
-            <p className="mt-1">
-              Todos os dados ficam guardados no seu telemóvel. Não é necessária internet.
-            </p>
-          </div>
-        </div>
-
-        {/* Credits */}
-        <div className="text-center text-xs text-muted-foreground py-4">
-          <p>Desenvolvido por JoelReis</p>
-        </div>
       </div>
     </ScrollArea>
   )
