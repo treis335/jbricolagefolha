@@ -12,6 +12,8 @@ import {
   SheetHeader,
   SheetTitle,
   SheetFooter,
+  SheetDescription,
+
 } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Plus, Minus, X, Trash2, Users, Check } from "lucide-react"
@@ -160,12 +162,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         equipa: s.equipa ?? [],
         materiais: s.materiais ?? [],
       }
-      
+
       // Só adiciona totalHoras se tiver valor (não undefined e não zero)
       if (s.totalHoras !== undefined && s.totalHoras !== null) {
         service.totalHoras = s.totalHoras
       }
-      
+
       return service
     })
 
@@ -257,7 +259,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               </div>
 
               {/* Serviços */}
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="flex items-center justify-between">
                   <Label className="text-lg font-semibold">Serviços do Dia</Label>
                   <Button onClick={handleAddService} variant="outline" size="sm">
@@ -267,76 +269,222 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
                 {services.length > 0 ? (
                   <Tabs value={activeServiceId || ""} onValueChange={setActiveServiceId} className="w-full">
-                    <TabsList className="w-full overflow-x-auto flex-nowrap justify-start bg-muted/50 rounded-lg">
-                      {services.map(s => (
-                        <TabsTrigger key={s.id} value={s.id} className="min-w-[140px] text-sm">
-                          {s.obraNome || `Serviço ${services.indexOf(s) + 1}`}
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
+                    {/* Área das abas com scroll horizontal responsivo */}
+                    <div className="relative w-full rounded-xl border border-border/40 bg-muted/30">
+                      <div className="overflow-x-auto overflow-y-hidden">
+                        <TabsList
+                          className="
+                flex
+                w-max
+                flex-nowrap 
+                gap-2 
+                px-4 py-2.5 
+                bg-transparent
+                
+                scroll-smooth
+                
+                [&::-webkit-scrollbar]:h-1.5
+                [&::-webkit-scrollbar-thumb]:rounded-full
+                [&::-webkit-scrollbar-thumb]:bg-muted-foreground/50
+                [&::-webkit-scrollbar-track]:bg-transparent
+              "
+                        >
+                          {services.map((s, index) => (
+                            <TabsTrigger
+                              key={s.id}
+                              value={s.id}
+                              className={`
+                    group
+                    relative
+                    flex-shrink-0
+                    min-w-[140px]
+                    max-w-[240px]
+                    px-4 py-3
+                    sm:px-5
+                    text-sm font-medium
+                    whitespace-nowrap 
+                    overflow-hidden
+                    text-ellipsis
+                    transition-all duration-200
+                    rounded-lg
+                    border border-border/60
+                    bg-background/80
+                    shadow-sm
+                    hover:bg-muted/70
+                    hover:shadow
+                    active:scale-95
+                    data-[state=active]:bg-background
+                    data-[state=active]:shadow-md
+                    data-[state=active]:border-primary/70
+                    data-[state=active]:border-b-2
+                    data-[state=active]:text-primary
+                    data-[state=active]:font-semibold
+                  `}
+                            >
+                              <span className="truncate block">
+                                {s.obraNome?.trim() || `Serviço ${index + 1}`}
+                              </span>
+                            </TabsTrigger>
+                          ))}
+
+                          {/* Padding extra no final */}
+                          <div className="flex-shrink-0 w-2" aria-hidden="true" />
+                        </TabsList>
+                      </div>
+
+                      {/* Indicadores de scroll */}
+                      {services.length > 2 && (
+                        <>
+                          <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-muted/30 to-transparent pointer-events-none md:hidden" />
+                          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-muted/30 to-transparent pointer-events-none md:hidden" />
+                        </>
+                      )}
+                    </div>
 
                     {services.map(s => (
-                      <TabsContent key={s.id} value={s.id} className="space-y-6 mt-4">
+                      <TabsContent key={s.id} value={s.id} className="mt-6 space-y-6">
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Nome da Obra / Serviço *</Label>
-                          <Input value={s.obraNome} onChange={e => updateActiveService({ obraNome: e.target.value })} placeholder="ex: Reabilitação Casa Sr. António - Telhado" className="h-12" />
+                          <Input
+                            value={s.obraNome}
+                            onChange={e => updateActiveService({ obraNome: e.target.value })}
+                            placeholder="ex: Reabilitação Casa Sr. António - Telhado"
+                            className="h-12"
+                          />
                         </div>
 
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Descrição</Label>
-                          <Textarea value={s.descricao} onChange={e => updateActiveService({ descricao: e.target.value })} placeholder="Descreva o que foi feito neste serviço..." className="min-h-24 text-base resize-y" />
+                          <Textarea
+                            value={s.descricao}
+                            onChange={e => updateActiveService({ descricao: e.target.value })}
+                            placeholder="Descreva o que foi feito neste serviço..."
+                            className="min-h-24 text-base resize-y"
+                          />
                         </div>
 
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Horas deste serviço (opcional)</Label>
                           <div className="flex items-center gap-3">
-                            <Button variant="outline" size="icon" className="h-12 w-12" onClick={() => updateActiveService({ totalHoras: Math.max(0, (s.totalHoras ?? 0) - 1) })}><Minus className="h-5 w-5" /></Button>
-                            <Input type="number" value={s.totalHoras ?? ""} onChange={e => updateActiveService({ totalHoras: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="ex: 3.5" className="h-12 text-center text-xl font-bold flex-1" min={0} step={0.5} />
-                            <Button variant="outline" size="icon" className="h-12 w-12" onClick={() => updateActiveService({ totalHoras: (s.totalHoras ?? 0) + 1 })}><Plus className="h-5 w-5" /></Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-12 w-12"
+                              onClick={() => updateActiveService({ totalHoras: Math.max(0, (s.totalHoras ?? 0) - 1) })}
+                            >
+                              <Minus className="h-5 w-5" />
+                            </Button>
+                            <Input
+                              type="number"
+                              value={s.totalHoras ?? ""}
+                              onChange={e => updateActiveService({ totalHoras: e.target.value === "" ? undefined : Number(e.target.value) })}
+                              placeholder="ex: 3.5"
+                              className="h-12 text-center text-xl font-bold flex-1"
+                              min={0}
+                              step={0.5}
+                            />
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-12 w-12"
+                              onClick={() => updateActiveService({ totalHoras: (s.totalHoras ?? 0) + 1 })}
+                            >
+                              <Plus className="h-5 w-5" />
+                            </Button>
                           </div>
                         </div>
 
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <Label className="text-base font-medium">Equipa deste serviço</Label>
-                            <Button variant="outline" size="sm" onClick={openTeamSelector} className="h-8 px-3 text-xs">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={openTeamSelector}
+                              className="h-8 px-3 text-xs"
+                            >
                               <Users className="h-3.5 w-3.5 mr-1" /> Selecionar
                             </Button>
                           </div>
 
                           <div className="min-h-[42px] flex flex-wrap gap-2">
-                            {s.equipa.length === 0 ? <p className="text-sm text-muted-foreground italic">Nenhum selecionado</p> :
+                            {s.equipa.length === 0 ? (
+                              <p className="text-sm text-muted-foreground italic">Nenhum selecionado</p>
+                            ) : (
                               s.equipa.map(nome => (
-                                <Badge key={nome} variant="secondary" className="text-sm px-3 py-1.5 flex items-center gap-1.5">
+                                <Badge
+                                  key={nome}
+                                  variant="secondary"
+                                  className="text-sm px-3 py-1.5 flex items-center gap-1.5"
+                                >
                                   {nome}
-                                  <button type="button" onClick={() => updateActiveService({ equipa: s.equipa.filter(n => n !== nome) })} className="ml-1 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateActiveService({ equipa: s.equipa.filter(n => n !== nome) })}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
                                 </Badge>
                               ))
-                            }
+                            )}
                           </div>
                         </div>
 
                         <div className="space-y-2">
                           <Label className="text-base font-medium">Materiais gastos neste serviço</Label>
                           <div className="flex gap-2">
-                            <Input value={newMaterialInput} onChange={e => setNewMaterialInput(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addMaterialToActive())} placeholder="ex: 1 isocril, Lata tinta 15L..." className="h-12 text-base flex-1" />
-                            <Button onClick={addMaterialToActive} className="h-12 px-4"><Plus className="h-5 w-5" /></Button>
+                            <Input
+                              value={newMaterialInput}
+                              onChange={e => setNewMaterialInput(e.target.value)}
+                              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addMaterialToActive())}
+                              placeholder="ex: 1 isocril, Lata tinta 15L..."
+                              className="h-12 text-base flex-1"
+                            />
+                            <Button onClick={addMaterialToActive} className="h-12 px-4">
+                              <Plus className="h-5 w-5" />
+                            </Button>
                           </div>
-                          {s.materiais.length > 0 && <div className="flex flex-wrap gap-2 mt-3">
-                            {s.materiais.map((m, idx) => (
-                              <Badge key={idx} variant="secondary" className="text-sm py-1.5 px-3 flex items-center gap-1">
-                                {m}
-                                <button type="button" onClick={() => removeMaterialFromActive(idx)} className="ml-1 hover:text-destructive"><X className="h-3 w-3" /></button>
-                              </Badge>
-                            ))}
-                          </div>}
+                          {s.materiais.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {s.materiais.map((m, idx) => (
+                                <Badge
+                                  key={idx}
+                                  variant="secondary"
+                                  className="text-sm py-1.5 px-3 flex items-center gap-1"
+                                >
+                                  {m}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeMaterialFromActive(idx)}
+                                    className="ml-1 hover:text-destructive"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
 
-                        {services.length > 1 && <Button variant="destructive" size="sm" className="mt-4" onClick={() => handleRemoveService(s.id)}>Remover este serviço</Button>}
+                        {services.length > 1 && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="mt-4"
+                            onClick={() => handleRemoveService(s.id)}
+                          >
+                            Remover este serviço
+                          </Button>
+                        )}
                       </TabsContent>
                     ))}
                   </Tabs>
-                ) : <p className="text-center text-muted-foreground py-8">Adicione um serviço para começar</p>}
+                ) : (
+                  <p className="text-center text-muted-foreground py-10">
+                    Adicione um serviço para começar
+                  </p>
+                )}
               </div>
             </div>
 
@@ -368,23 +516,83 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
       {/* Team Selector Dialog */}
       <Sheet open={showTeamDialog} onOpenChange={setShowTeamDialog}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh]">
-          <div className="flex flex-col gap-4">
-            <Input placeholder="Filtrar colaboradores..." value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="w-full" />
-            <div className="flex-1 overflow-y-auto border rounded-md divide-y bg-muted/30">
-              {colaboradoresFiltrados.length === 0 ? <div className="py-8 text-center text-muted-foreground">Nenhum colaborador encontrado</div> :
-                colaboradoresFiltrados.map(nome => {
-                  const isSelected = tempEquipa.includes(nome)
-                  return <button key={nome} type="button" onClick={() => toggleTempMember(nome)} className={`w-full text-left px-4 py-3.5 text-base flex justify-between items-center transition-colors ${isSelected ? "bg-primary/10 font-medium" : "hover:bg-accent"}`}>
-                    <span className="flex items-center gap-2">{nome}</span>
-                    {isSelected && <Check className="h-5 w-5 text-primary" />}
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden"
+        >
+          {/* Header com título e filtro */}
+          <div className="shrink-0 border-b bg-background px-6 pt-5 pb-4 space-y-4">
+            <SheetHeader className="text-left">
+              <SheetTitle>Selecionar Colaboradores</SheetTitle>
+              <SheetDescription className="text-sm text-muted-foreground">
+                Escolha os membros da equipa para este serviço
+              </SheetDescription>
+            </SheetHeader>
+
+            <Input
+              placeholder="Filtrar colaboradores..."
+              value={teamFilter}
+              onChange={e => setTeamFilter(e.target.value)}
+              className="w-full"
+              autoFocus
+            />
+          </div>
+
+          {/* Lista com scroll */}
+          <div className="flex-1 overflow-y-auto divide-y bg-muted/30">
+            {colaboradoresFiltrados.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                Nenhum colaborador encontrado
+              </div>
+            ) : (
+              colaboradoresFiltrados.map(nome => {
+                const isSelected = tempEquipa.includes(nome)
+                return (
+                  <button
+                    key={nome}
+                    type="button"
+                    onClick={() => toggleTempMember(nome)}
+                    className={`w-full text-left px-6 py-4 text-base flex justify-between items-center transition-colors ${isSelected
+                      ? "bg-primary/10 font-medium border-l-4 border-l-primary"
+                      : "hover:bg-accent"
+                      }`}
+                  >
+                    <span>{nome}</span>
+                    {isSelected && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
                   </button>
-                })
-              }
-            </div>
-            <div className="flex justify-end gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => setShowTeamDialog(false)}>Cancelar</Button>
-              <Button onClick={confirmTeamSelection}>Confirmar Seleção</Button>
+                )
+              })
+            )}
+          </div>
+
+          {/* Botões fixos no fundo */}
+          <div className="
+      shrink-0 
+      border-t 
+      bg-background 
+      px-6 
+      py-5 
+      sticky 
+      bottom-0 
+      z-10
+      safe-area-inset-bottom
+    ">
+            <div className="flex justify-end gap-3 max-w-md mx-auto">
+              <Button
+                variant="outline"
+                size="lg"
+                className="flex-1 sm:flex-none min-w-[120px]"
+                onClick={() => setShowTeamDialog(false)}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="lg"
+                className="flex-1 sm:flex-none min-w-[140px]"
+                onClick={confirmTeamSelection}
+              >
+                Confirmar Seleção
+              </Button>
             </div>
           </div>
         </SheetContent>
