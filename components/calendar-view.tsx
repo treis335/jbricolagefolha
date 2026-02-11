@@ -48,16 +48,19 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
     let startDayOfWeek = firstDay.getDay() - 1
     if (startDayOfWeek < 0) startDayOfWeek = 6
 
-    const days: (Date | null)[] = []
+    const days: Array<{ date: Date; index: number } | null> = []
 
     // Add empty slots for days before the first day of month
     for (let i = 0; i < startDayOfWeek; i++) {
       days.push(null)
     }
 
-    // Add all days of the month
+    // Add all days of the month with unique index
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      days.push(new Date(year, month, d))
+      days.push({
+        date: new Date(year, month, d),
+        index: startDayOfWeek + d - 1, // Unique index for each day
+      })
     }
 
     return days
@@ -92,20 +95,24 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
 
         {/* Calendar days */}
         <div className="grid grid-cols-7 gap-1">
-          {calendarDays.map((date, index) => {
-            if (!date) {
+          {calendarDays.map((dayObj, index) => {
+            if (!dayObj) {
               return <div key={`empty-${index}`} className="aspect-square" />
             }
 
+            const { date } = dayObj
             const dateStr = date.toISOString().split("T")[0]
             const hasEntry = entryMap.has(dateStr)
             const totalHoras = entryMap.get(dateStr)
             const isPaid = paidDates.has(dateStr)
             const isToday = dateStr === today
 
+            // Use a combination of month, date string, and index for a truly unique key
+            const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
+
             return (
               <button
-                key={dateStr}
+                key={uniqueKey}
                 onClick={() => onSelectDate(date)}
                 className={cn(
                   "aspect-square flex flex-col items-center justify-center rounded-lg transition-colors relative p-1",
