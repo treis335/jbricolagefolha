@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Euro, Users, Trash2, HardHat, Info, Download, Upload, CheckCircle2, AlertCircle, Share, User, } from "lucide-react"
+import { Euro, Users, Trash2, HardHat, Info, Download, Upload, CheckCircle2, AlertCircle, Share, User, Lock } from "lucide-react"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -157,8 +157,6 @@ export function SettingsView() {
   };
 
 
-  // ✅ REMOVIDO: STORAGE_KEY já não é necessário
-
   // --- LOGOUT HANDLER ---
   const handleLogout = async () => {
     try {
@@ -170,13 +168,7 @@ export function SettingsView() {
     }
   }
 
-  // --- Taxa horária ---
-  const handleTaxaChange = (value: string) => {
-    const num = Number(value)
-    if (!Number.isNaN(num) && num >= 0) {
-      updateSettings({ taxaHoraria: num })
-    }
-  }
+  // ❌ REMOVIDO: handleTaxaChange - colaborador não pode mais editar
 
   // --- Adicionar/Remover membros da equipa ---
   const [newTeamMember, setNewTeamMember] = useState("")
@@ -287,8 +279,6 @@ export function SettingsView() {
     }
   }
 
-  // ✅ REMOVIDO: clearLocalStorage - já não faz sentido com Firebase
-
   const totalHoras = data.entries.reduce((sum, e) => sum + e.totalHoras, 0)
 
   return (
@@ -299,7 +289,7 @@ export function SettingsView() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
             <HardHat className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="text-xl font-bold">JBricolage - Horas</h1>
+          <h1 className="text-xl font-bold">JBricolage - Settings</h1>
           <p className="text-sm text-muted-foreground">Versão 1.0</p>
         </div>
 
@@ -440,36 +430,42 @@ export function SettingsView() {
           </CardContent>
         </Card>
 
-        {/* Taxa horária */}
-        <Card>
+        {/* Taxa horária - APENAS LEITURA */}
+        <Card className="border-blue-500/30">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
               <Euro className="h-4 w-4" />
-              Taxa Horária Única
+              A Tua Taxa Horária
             </CardTitle>
             <CardDescription>
-              Defina a taxa para todas as horas (normais e extras)
+              Definida pela gestão da empresa
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="taxaHoraria">Taxa Horária (€/h)</Label>
-              <Input
-                id="taxaHoraria"
-                type="number"
-                value={data.settings.taxaHoraria}
-                onChange={(e) => handleTaxaChange(e.target.value)}
-                min={0}
-                step={0.5}
-                className="h-12 text-lg"
-              />
+            {/* Display da taxa - Read Only */}
+            <div className="p-6 bg-primary/5 rounded-lg border border-primary/20">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Taxa Atual
+                  </p>
+                  <p className="text-3xl font-bold text-primary">
+                    {data.settings.taxaHoraria.toFixed(2)} €/h
+                  </p>
+                </div>
+                <div className="p-3 bg-background/60 rounded-full">
+                  <Lock className="h-6 w-6 text-muted-foreground" />
+                </div>
+              </div>
             </div>
-            <div className="flex items-start gap-2 p-3 bg-muted rounded-lg">
-              <Info className="h-4 w-4 text-muted-foreground mt-0.5" />
-              <p className="text-xs text-muted-foreground">
-                O valor é calculado automaticamente: Total Horas × Taxa Horária
+
+            {/* Info box */}
+            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-blue-900 dark:text-blue-200">
+                A tua taxa horária é definida pela gestão. Se tiveres dúvidas sobre o valor, contacta o teu supervisor.
               </p>
-            </div>
+            </div>           
           </CardContent>
         </Card>
      
