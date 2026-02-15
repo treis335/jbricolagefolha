@@ -1,9 +1,9 @@
-// components/admin/admin-bottom-nav.tsx
+// components/admin/admin-bottom-nav.tsx (ATUALIZADO com Financeiro)
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Settings, Euro } from "lucide-react"
 
-export type AdminTabType = "dashboard" | "collaborators" | "reports" | "settings"
+export type AdminTabType = "dashboard" | "collaborators" | "finance" | "reports" | "settings"
 
 interface AdminBottomNavProps {
   activeTab: AdminTabType
@@ -23,6 +23,11 @@ export function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNavProps) 
       icon: Users,
     },
     {
+      id: "finance" as AdminTabType,
+      label: "Financeiro",
+      icon: Euro,
+    },
+    {
       id: "reports" as AdminTabType,
       label: "Relatórios",
       icon: FileText,
@@ -35,29 +40,29 @@ export function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNavProps) 
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="max-w-screen-xl mx-auto px-2">
-        <div className="grid grid-cols-4 gap-1">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border shadow-lg">
+      <div className="max-w-7xl mx-auto px-2 py-2">
+        <div className="grid grid-cols-5 gap-1">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
+
             return (
               <button
                 key={tab.id}
                 onClick={() => onTabChange(tab.id)}
                 className={`
-                  flex flex-col items-center justify-center py-2 px-1 transition-colors
+                  flex flex-col items-center justify-center gap-1 py-2 px-1 rounded-lg
+                  transition-colors duration-200
                   ${
                     isActive
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }
                 `}
               >
-                <Icon className={`h-5 w-5 mb-1 ${isActive ? "stroke-[2.5]" : ""}`} />
-                <span className="text-[10px] font-medium leading-none">
-                  {tab.label}
-                </span>
+                <Icon className="h-5 w-5" />
+                <span className="text-xs font-medium">{tab.label}</span>
               </button>
             )
           })}

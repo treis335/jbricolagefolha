@@ -66,6 +66,7 @@ export interface Payment {
   date: string; // YYYY-MM-DD
   valor: number;
   metodo: PaymentMethod;
+  source?: "admin" | undefined;
 }
 
 export interface Settings {

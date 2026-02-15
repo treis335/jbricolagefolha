@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -12,6 +13,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Trash2, Plus, TrendingUp, TrendingDown, AlertCircle } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import type { PaymentMethod } from "@/lib/types"
@@ -154,6 +166,20 @@ export function FinanceiroView() {
   const isQuitado = saldoEfetivoPeriodo === 0
   const isAdiantado = saldoEfetivoPeriodo < 0
 
+  // Função para eliminar pagamento (só para os do próprio user)
+  const handleDeletePayment = (paymentId: string) => {
+    const payment = pagamentosFiltrados.find(p => p.id === paymentId)
+    if (!payment) return
+
+    if (payment.source === "admin") {
+      alert("Este pagamento foi registado pelo administrador e não pode ser eliminado.")
+      return
+    }
+
+    // Se chegou aqui → é pagamento do próprio user → eliminar diretamente
+    deletePayment(paymentId)
+  }
+
   return (
     <div className="flex flex-col h-full overflow-auto pb-20">
       <div className="p-4 space-y-5">
@@ -244,7 +270,6 @@ export function FinanceiroView() {
         </Card>
 
         {/* Filtro */}
-        {/* Filtro */}
         <div className="grid grid-cols-2 gap-3 px-3 py-3 max-w-md mx-auto">
           <div className="space-y-1">
             <Label htmlFor="filtro-mes" className="text-xs text-muted-foreground block">
@@ -266,7 +291,7 @@ export function FinanceiroView() {
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="filtro-ano" className="text-xs text-muted-foreground  block">
+            <Label htmlFor="filtro-ano" className="text-xs text-muted-foreground block">
               Ano
             </Label>
             <Select value={filtroAno} onValueChange={setFiltroAno}>
@@ -366,18 +391,55 @@ export function FinanceiroView() {
                   <CardContent className="p-3.5 flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-base">{formatCurrency(payment.valor)}</p>
-                      <p className="text-sm text-muted-foreground mt-0.5">
-                        {formatDate(payment.date)} • {payment.metodo}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(payment.date)} • {payment.metodo}
+                        </p>
+                        {payment.source === "admin" && (
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                            Admin
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      onClick={() => deletePayment(payment.id)}
-                    >
-                      <Trash2 className="h-5 w-5" />
-                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {payment.source !== "admin" ? (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Confirmar eliminação</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Tem a certeza que deseja eliminar este pagamento?
+                                <br />
+                                <strong>Esta ação não pode ser desfeita.</strong>
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deletePayment(payment.id)}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                Sim, eliminar
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      ) : (
+                        // Espaço vazio ou ícone informativo para pagamentos do admin
+                        <div className="w-10 h-10" /> // mantém o alinhamento visual
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               ))}

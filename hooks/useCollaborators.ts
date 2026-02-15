@@ -1,4 +1,4 @@
-// hooks/useCollaborators.ts
+// hooks/useCollaborators.ts (VERSÃO COMPLETA FINAL)
 /**
  * Hook personalizado para buscar e gerir colaboradores do Firebase
  * 
@@ -6,6 +6,8 @@
  * - Busca todos os users com role "worker"
  * - Calcula horas totais do mês atual
  * - Calcula horas de todo o histórico
+ * - Busca array de payments (pagamentos) ✨ NOVO
+ * - Busca array de entries completo (para relatórios) ✨ NOVO
  * - Retorna estado de loading e erro
  * - Fornece função refetch para atualizar dados
  */
@@ -25,6 +27,15 @@ export interface Collaborator {
   role: string
   createdAt: any
   migrated?: boolean
+  // ✨ NOVOS CAMPOS
+  entries: any[] // Array completo de entries (para relatórios e calendário)
+  payments: Array<{
+    id: string
+    date: string
+    valor: number
+    metodo: string
+  }> // Array de pagamentos
+  totalCostThisMonth: number
 }
 
 interface UseCollaboratorsReturn {
@@ -99,7 +110,18 @@ export function useCollaborators(): UseCollaboratorsReturn {
         // TODO: No futuro, buscar de uma coleção separada de taxas com histórico
         const currentRate = userData.workData?.settings?.taxaHoraria || 0
 
-        // 5. Adicionar ao array
+        // 5. ✨ NOVO: Buscar array de payments
+        const payments = userData.workData?.payments || []
+        
+        // Garantir que cada payment tem os campos necessários
+        const formattedPayments = payments.map((p: any) => ({
+          id: p.id || "",
+          date: p.date || "",
+          valor: p.valor || 0,
+          metodo: p.metodo || "Desconhecido",
+        }))
+
+        // 6. Adicionar ao array (com entries e payments completos)
         collabsData.push({
           id: userId,
           name: userData.name || userData.username || "Sem nome",
@@ -111,14 +133,17 @@ export function useCollaborators(): UseCollaboratorsReturn {
           role: userData.role || "worker",
           createdAt: userData.createdAt,
           migrated: userData.migrated || false,
+          entries: entries, // ✨ Array completo para relatórios/calendário
+          payments: formattedPayments, // ✨ Array de pagamentos
+          totalCostThisMonth: currentRate * totalHoursThisMonth,
         })
 
         console.log(
-          `✅ ${userData.name}: ${totalHoursThisMonth.toFixed(1)}h este mês, ${totalHoursAllTime.toFixed(1)}h total`
+          `✅ ${userData.name}: ${totalHoursThisMonth.toFixed(1)}h este mês, ${totalHoursAllTime.toFixed(1)}h total, ${formattedPayments.length} pagamentos`
         )
       }
 
-      // 6. Ordenar alfabeticamente por nome
+      // 7. Ordenar alfabeticamente por nome
       collabsData.sort((a, b) => a.name.localeCompare(b.name))
 
       setCollaborators(collabsData)

@@ -1,35 +1,20 @@
-// components/admin/admin-collaborators-view.tsx
-/**
- * Admin Collaborators View
- * 
- * View de administração para gerir colaboradores.
- * Mostra lista de todos os colaboradores com suas taxas horárias,
- * horas trabalhadas e custos calculados automaticamente.
- * 
- * Features:
- * - Lista de colaboradores com dados do Firebase
- * - Pesquisa por nome, email ou username
- * - Cards de resumo (horas totais e custo mensal)
- * - Estatísticas individuais de cada colaborador
- * - Badges de status (Ativo/Inativo, Migrado)
- * - Botão de refresh para atualizar dados
- * - Resumo geral no final
- */
-
+// components/admin/admin-collaborators-view.tsx (ATUALIZADO)
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Users, Euro, Edit, History, Search, RefreshCw } from "lucide-react"
+import { Users, Euro, Edit, History, Search, RefreshCw, Eye } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
 import { useCollaborators } from "@/hooks/useCollaborators"
 
 export function AdminCollaboratorsView() {
   const [searchTerm, setSearchTerm] = useState("")
+  const router = useRouter()
   
   // Hook que busca dados do Firebase
   const { collaborators, loading, error, refetch } = useCollaborators()
@@ -240,45 +225,46 @@ export function AdminCollaboratorsView() {
                         €
                       </p>
                     </div>
-                    <div className="p-3 bg-muted rounded-lg col-span-2">
-                      <p className="text-xs text-muted-foreground mb-1">
-                        Total Horas (Todo o Histórico)
-                      </p>
-                      <p className="text-lg font-bold">
-                        {collaborator.totalHoursAllTime.toFixed(1)}h
-                      </p>
-                    </div>
                   </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2">
+                  {/* Action Buttons - ATUALIZADO */}
+                  <div className="grid grid-cols-3 gap-2 pt-2">
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
-                      className="flex-1"
-                      onClick={() => {
-                        // TODO: Implementar modal para editar taxa
-                        alert(
-                          `Editar taxa de ${collaborator.name}\n\nFuncionalidade em desenvolvimento:\n- Definir nova taxa horária\n- Data de início\n- Nota/justificação`
-                        )
-                      }}
+                      className="h-auto py-2 flex-col gap-1"
+                      onClick={() => router.push(`/admin/collaborator/${collaborator.id}`)}
                     >
-                      <Edit className="h-4 w-4 mr-1" />
-                      Editar Taxa
+                      <Eye className="h-4 w-4" />
+                      <span className="text-xs">Ver Detalhes</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
-                      className="flex-1"
+                      className="h-auto py-2 flex-col gap-1"
                       onClick={() => {
-                        // TODO: Implementar view de histórico
+                        // TODO: Implementar modal para editar taxa
                         alert(
-                          `Histórico de taxas de ${collaborator.name}\n\nFuncionalidade em desenvolvimento:\n- Ver todas as alterações\n- Data de cada mudança\n- Quem fez a alteração`
+                          `Editar taxa de ${collaborator.name}\n\nFuncionalidade em desenvolvimento`
                         )
                       }}
                     >
-                      <History className="h-4 w-4 mr-1" />
-                      Histórico
+                      <Edit className="h-4 w-4" />
+                      <span className="text-xs">Editar Taxa</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-auto py-2 flex-col gap-1"
+                      onClick={() => {
+                        // TODO: Implementar view de histórico
+                        alert(
+                          `Histórico de ${collaborator.name}\n\nFuncionalidade em desenvolvimento`
+                        )
+                      }}
+                    >
+                      <History className="h-4 w-4" />
+                      <span className="text-xs">Histórico</span>
                     </Button>
                   </div>
                 </CardContent>
@@ -326,13 +312,8 @@ export function AdminCollaboratorsView() {
         <Card className="border-blue-500/30 bg-blue-50 dark:bg-blue-950/20">
           <CardContent className="pt-6">
             <p className="text-sm text-blue-900 dark:text-blue-200">
-              💡 <strong>Nota:</strong> Os dados são atualizados em tempo real a partir
-              do Firebase. As horas mostradas referem-se ao mês atual (
-              {new Date().toLocaleDateString("pt-PT", {
-                month: "long",
-                year: "numeric",
-              })}
-              ). Usa o botão "Atualizar Dados" para refresh manual.
+              💡 <strong>Nota:</strong> Clica em "Ver Detalhes" para aceder ao calendário
+              completo e relatórios detalhados de cada colaborador.
             </p>
           </CardContent>
         </Card>

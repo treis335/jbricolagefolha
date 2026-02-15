@@ -1,4 +1,4 @@
-// app/admin/page.tsx
+// app/admin/page.tsx (ATUALIZADO com aba Financeiro)
 "use client"
 
 import { useState, useEffect } from "react"
@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 // Views do Admin
 import { AdminDashboardView } from "@/components/admin/admin-dashboard-view"
 import { AdminCollaboratorsView } from "@/components/admin/admin-collaborators-view"
+import { AdminFinanceView } from "@/components/admin/admin-finance-view" // ← NOVO
 import { AdminReportsView } from "@/components/admin/admin-reports-view"
 import { AdminSettingsView } from "@/components/admin/admin-settings-view"
 
@@ -41,7 +42,7 @@ function AdminContent() {
     if (user) {
       // Verificar se o UID está autorizado
       const authorized = isAuthorizedAdmin(user.uid)
-      
+
       if (!authorized) {
         console.log(`⛔ Acesso negado ao painel admin`)
         console.log(`   UID: ${user.uid}`)
@@ -129,6 +130,7 @@ function AdminContent() {
       <main className="flex-1 pb-16">
         {activeTab === "dashboard" && <AdminDashboardView />}
         {activeTab === "collaborators" && <AdminCollaboratorsView />}
+        {activeTab === "finance" && <AdminFinanceView />} {/* ← NOVO */}
         {activeTab === "reports" && <AdminReportsView />}
         {activeTab === "settings" && <AdminSettingsView />}
       </main>
