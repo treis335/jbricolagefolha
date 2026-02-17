@@ -14,7 +14,6 @@ import {
   SheetTitle,
   SheetFooter,
   SheetDescription,
-
 } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Plus, Minus, X, Trash2, Users, Check } from "lucide-react"
@@ -47,6 +46,41 @@ interface Service {
   equipa: string[]
   materiais: string[]
   totalHoras?: number
+}
+
+// -------- Helper: converte qualquer entrada (antiga ou nova) em lista de Services --------
+function entryToServices(entry: DayEntry): Service[] {
+  // Formato novo: tem services com conteúdo
+  if (Array.isArray(entry.services) && entry.services.length > 0) {
+    return entry.services.map((s: any) => ({
+      id: s.id ?? uuidv4(),
+      obraNome: typeof s.obraNome === "string" ? s.obraNome : "",
+      descricao: typeof s.descricao === "string" ? s.descricao : "",
+      equipa: Array.isArray(s.equipa)
+        ? [...new Set(s.equipa.filter((m: any) => typeof m === "string"))] as string[]
+        : [],
+      materiais: Array.isArray(s.materiais)
+        ? s.materiais.filter((m: any) => typeof m === "string")
+        : [],
+      totalHoras: typeof s.totalHoras === "number" ? s.totalHoras : undefined,
+    }))
+  }
+
+  // Formato antigo: sem services — reconstrói um único service a partir dos campos raiz
+  return [
+    {
+      id: uuidv4(),
+      obraNome: "",
+      descricao: typeof entry.descricao === "string" ? entry.descricao : "",
+      equipa: Array.isArray(entry.equipa)
+        ? [...new Set(entry.equipa.filter((m: any) => typeof m === "string"))] as string[]
+        : [],
+      materiais: Array.isArray(entry.materiais)
+        ? entry.materiais.filter((m: any) => typeof m === "string")
+        : [],
+      totalHoras: undefined,
+    },
+  ]
 }
 
 export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
@@ -88,22 +122,25 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const formatDate = (d: Date) =>
     d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
 
-  const normalizeEquipa = (value: any): string[] => {
-    let arr: string[] = []
-    if (Array.isArray(value)) arr = value.filter((item): item is string => typeof item === "string")
-    else if (typeof value === "string") arr = value.split(/[,;]/)
-    return Array.from(new Set(arr.map(item => item.trim()).filter(Boolean)))
-  }
-
-  // Inicializa serviços
+  // -------- Inicializa o form ao abrir --------
   useEffect(() => {
     if (!date || !open) return
 
     if (existingEntry) {
-      setTotalHoras(existingEntry.totalHoras ?? 8)
-      setServices(existingEntry.services ?? [])
-      setActiveServiceId(existingEntry.services?.[0]?.id || null)
+      // Garante totalHoras válido (compatibilidade com entradas antigas)
+      const horas =
+        typeof existingEntry.totalHoras === "number" && existingEntry.totalHoras > 0
+          ? existingEntry.totalHoras
+          : 8
+
+      setTotalHoras(horas)
+
+      // Converte entrada antiga ou nova em lista de services
+      const loadedServices = entryToServices(existingEntry)
+      setServices(loadedServices)
+      setActiveServiceId(loadedServices[0]?.id ?? null)
     } else {
+      // Nova entrada
       const newService: Service = {
         id: uuidv4(),
         obraNome: "",
@@ -116,9 +153,14 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       setActiveServiceId(newService.id)
       setTotalHoras(8)
     }
+
+    setNewMaterialInput("")
   }, [date, open, existingEntry, meuNome])
 
-  const activeService = useMemo(() => services.find(s => s.id === activeServiceId) || services[0], [services, activeServiceId])
+  const activeService = useMemo(
+    () => services.find(s => s.id === activeServiceId) ?? services[0],
+    [services, activeServiceId]
+  )
 
   const handleAddService = () => {
     const newService: Service = {
@@ -138,17 +180,16 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     if (services.length <= 1) return
     const newServices = services.filter(s => s.id !== id)
     setServices(newServices)
-    setActiveServiceId(newServices[0]?.id || null)
+    setActiveServiceId(newServices[0]?.id ?? null)
     setNewMaterialInput("")
   }
 
   const updateActiveService = (updates: Partial<Service>) => {
     setServices(prev =>
-      prev.map(s => s.id === activeServiceId ? { ...s, ...updates } : s)
+      prev.map(s => (s.id === activeServiceId ? { ...s, ...updates } : s))
     )
   }
 
-  // ✅ FIX: handleSave corrigido para preservar totalHoras e remover undefined
   const handleSave = () => {
     if (!date || services.length === 0) {
       alert("Adicione pelo menos um serviço.")
@@ -163,12 +204,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         equipa: s.equipa ?? [],
         materiais: s.materiais ?? [],
       }
-
-      // Só adiciona totalHoras se tiver valor (não undefined e não zero)
       if (s.totalHoras !== undefined && s.totalHoras !== null) {
         service.totalHoras = s.totalHoras
       }
-
       return service
     })
 
@@ -179,7 +217,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       normalHoras,
       extraHoras,
       services: mappedServices,
-      descricao: services.length === 1 ? services[0].descricao : "Múltiplos serviços",
+      descricao:
+        services.length === 1 ? services[0].descricao : "Múltiplos serviços",
       equipa: services.flatMap(s => s.equipa ?? []),
       materiais: services.flatMap(s => s.materiais ?? []),
     }
@@ -195,27 +234,34 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     }
   }
 
-  const adjustHours = (delta: number) => setTotalHoras(prev => Math.max(0, prev + delta))
+  const adjustHours = (delta: number) =>
+    setTotalHoras(prev => Math.max(0, prev + delta))
 
   const addMaterialToActive = () => {
     if (newMaterialInput.trim()) {
-      updateActiveService({ materiais: [...activeService.materiais, newMaterialInput.trim()] })
+      updateActiveService({
+        materiais: [...(activeService?.materiais ?? []), newMaterialInput.trim()],
+      })
       setNewMaterialInput("")
     }
   }
 
   const removeMaterialFromActive = (index: number) => {
-    updateActiveService({ materiais: activeService.materiais.filter((_, i) => i !== index) })
+    updateActiveService({
+      materiais: (activeService?.materiais ?? []).filter((_, i) => i !== index),
+    })
   }
 
   const openTeamSelector = () => {
-    setTempEquipa([...activeService.equipa])
+    setTempEquipa([...(activeService?.equipa ?? [])])
     setTeamFilter("")
     setShowTeamDialog(true)
   }
 
   const toggleTempMember = (nome: string) => {
-    setTempEquipa(prev => prev.includes(nome) ? prev.filter(n => n !== nome) : [...prev, nome])
+    setTempEquipa(prev =>
+      prev.includes(nome) ? prev.filter(n => n !== nome) : [...prev, nome]
+    )
   }
 
   const confirmTeamSelection = () => {
@@ -226,11 +272,20 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   return (
     <>
       <Sheet open={open} onOpenChange={isOpen => !isOpen && onClose()}>
-        <SheetContent side="bottom" className="rounded-t-2xl border-t border-border bg-background h-auto max-h-[92dvh] min-h-[60dvh] overflow-hidden pb-2">
+        <SheetContent
+          side="bottom"
+          className="rounded-t-2xl border-t border-border bg-background h-auto max-h-[92dvh] min-h-[60dvh] overflow-hidden pb-2"
+        >
           <div className="flex flex-col h-full overflow-hidden">
             <SheetHeader className="px-6 pt-6 pb-4 text-left shrink-0">
-              <SheetTitle className="text-xl">{isEditing ? "Editar Dia" : "Novo Registo"}</SheetTitle>
-              {date && <p className="text-sm text-muted-foreground capitalize">{formatDate(date)}</p>}
+              <SheetTitle className="text-xl">
+                {isEditing ? "Editar Dia" : "Novo Registo"}
+              </SheetTitle>
+              {date && (
+                <p className="text-sm text-muted-foreground capitalize">
+                  {formatDate(date)}
+                </p>
+              )}
             </SheetHeader>
 
             <div className="flex-1 overflow-y-auto px-6 space-y-6 pb-12">
@@ -238,7 +293,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               <div className="space-y-2">
                 <Label className="text-base font-medium">Total de Horas do Dia</Label>
                 <div className="flex items-center gap-3">
-                  <Button variant="outline" size="icon" className="h-14 w-14" onClick={() => adjustHours(-1)}>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-14 w-14"
+                    onClick={() => adjustHours(-1)}
+                  >
                     <Minus className="h-6 w-6" />
                   </Button>
                   <Input
@@ -252,11 +312,18 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     min={0}
                     step={1}
                   />
-                  <Button variant="outline" size="icon" className="h-14 w-14" onClick={() => adjustHours(1)}>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-14 w-14"
+                    onClick={() => adjustHours(1)}
+                  >
                     <Plus className="h-6 w-6" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground text-center">{getDayTypeLabel()}</p>
+                <p className="text-xs text-muted-foreground text-center">
+                  {getDayTypeLabel()}
+                </p>
               </div>
 
               {/* Serviços */}
@@ -269,71 +336,47 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 </div>
 
                 {services.length > 0 ? (
-                  <Tabs value={activeServiceId || ""} onValueChange={setActiveServiceId} className="w-full">
-                    {/* Área das abas com scroll horizontal responsivo */}
+                  <Tabs
+                    value={activeServiceId || ""}
+                    onValueChange={setActiveServiceId}
+                    className="w-full"
+                  >
+                    {/* Abas com scroll horizontal */}
                     <div className="relative w-full rounded-xl border border-border/40 bg-muted/30">
                       <div className="overflow-x-auto overflow-y-hidden">
                         <TabsList
                           className="
-                flex
-                w-max
-                flex-nowrap 
-                gap-2 
-                px-4 py-2.5 
-                bg-transparent
-                
-                scroll-smooth
-                
-                [&::-webkit-scrollbar]:h-1.5
-                [&::-webkit-scrollbar-thumb]:rounded-full
-                [&::-webkit-scrollbar-thumb]:bg-muted-foreground/50
-                [&::-webkit-scrollbar-track]:bg-transparent
-              "
+                            flex w-max flex-nowrap gap-2 px-4 py-2.5 bg-transparent scroll-smooth
+                            [&::-webkit-scrollbar]:h-1.5
+                            [&::-webkit-scrollbar-thumb]:rounded-full
+                            [&::-webkit-scrollbar-thumb]:bg-muted-foreground/50
+                            [&::-webkit-scrollbar-track]:bg-transparent
+                          "
                         >
                           {services.map((s, index) => (
                             <TabsTrigger
                               key={s.id}
                               value={s.id}
-                              className={`
-                    group
-                    relative
-                    flex-shrink-0
-                    min-w-[140px]
-                    max-w-[240px]
-                    px-4 py-3
-                    sm:px-5
-                    text-sm font-medium
-                    whitespace-nowrap 
-                    overflow-hidden
-                    text-ellipsis
-                    transition-all duration-200
-                    rounded-lg
-                    border border-border/60
-                    bg-background/80
-                    shadow-sm
-                    hover:bg-muted/70
-                    hover:shadow
-                    active:scale-95
-                    data-[state=active]:bg-background
-                    data-[state=active]:shadow-md
-                    data-[state=active]:border-primary/70
-                    data-[state=active]:border-b-2
-                    data-[state=active]:text-primary
-                    data-[state=active]:font-semibold
-                  `}
+                              className="
+                                group relative flex-shrink-0 min-w-[140px] max-w-[240px]
+                                px-4 py-3 sm:px-5 text-sm font-medium whitespace-nowrap
+                                overflow-hidden text-ellipsis transition-all duration-200
+                                rounded-lg border border-border/60 bg-background/80 shadow-sm
+                                hover:bg-muted/70 hover:shadow active:scale-95
+                                data-[state=active]:bg-background data-[state=active]:shadow-md
+                                data-[state=active]:border-primary/70 data-[state=active]:border-b-2
+                                data-[state=active]:text-primary data-[state=active]:font-semibold
+                              "
                             >
                               <span className="truncate block">
                                 {s.obraNome?.trim() || `Serviço ${index + 1}`}
                               </span>
                             </TabsTrigger>
                           ))}
-
-                          {/* Padding extra no final */}
                           <div className="flex-shrink-0 w-2" aria-hidden="true" />
                         </TabsList>
                       </div>
 
-                      {/* Indicadores de scroll */}
                       {services.length > 2 && (
                         <>
                           <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-muted/30 to-transparent pointer-events-none md:hidden" />
@@ -345,10 +388,14 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     {services.map(s => (
                       <TabsContent key={s.id} value={s.id} className="mt-6 space-y-6">
                         <div className="space-y-2">
-                          <Label className="text-base font-medium">Nome da Obra / Serviço *</Label>
+                          <Label className="text-base font-medium">
+                            Nome da Obra / Serviço *
+                          </Label>
                           <Input
                             value={s.obraNome}
-                            onChange={e => updateActiveService({ obraNome: e.target.value })}
+                            onChange={e =>
+                              updateActiveService({ obraNome: e.target.value })
+                            }
                             placeholder="ex: Reabilitação Casa Sr. António - Telhado"
                             className="h-12"
                           />
@@ -358,27 +405,42 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                           <Label className="text-base font-medium">Descrição</Label>
                           <Textarea
                             value={s.descricao}
-                            onChange={e => updateActiveService({ descricao: e.target.value })}
+                            onChange={e =>
+                              updateActiveService({ descricao: e.target.value })
+                            }
                             placeholder="Descreva o que foi feito neste serviço..."
                             className="min-h-24 text-base resize-y"
                           />
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-base font-medium">Horas deste serviço (opcional)</Label>
+                          <Label className="text-base font-medium">
+                            Horas deste serviço (opcional)
+                          </Label>
                           <div className="flex items-center gap-3">
                             <Button
                               variant="outline"
                               size="icon"
                               className="h-12 w-12"
-                              onClick={() => updateActiveService({ totalHoras: Math.max(0, (s.totalHoras ?? 0) - 1) })}
+                              onClick={() =>
+                                updateActiveService({
+                                  totalHoras: Math.max(0, (s.totalHoras ?? 0) - 1),
+                                })
+                              }
                             >
                               <Minus className="h-5 w-5" />
                             </Button>
                             <Input
                               type="number"
                               value={s.totalHoras ?? ""}
-                              onChange={e => updateActiveService({ totalHoras: e.target.value === "" ? undefined : Number(e.target.value) })}
+                              onChange={e =>
+                                updateActiveService({
+                                  totalHoras:
+                                    e.target.value === ""
+                                      ? undefined
+                                      : Number(e.target.value),
+                                })
+                              }
                               placeholder="ex: 3.5"
                               className="h-12 text-center text-xl font-bold flex-1"
                               min={0}
@@ -388,7 +450,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                               variant="outline"
                               size="icon"
                               className="h-12 w-12"
-                              onClick={() => updateActiveService({ totalHoras: (s.totalHoras ?? 0) + 1 })}
+                              onClick={() =>
+                                updateActiveService({
+                                  totalHoras: (s.totalHoras ?? 0) + 1,
+                                })
+                              }
                             >
                               <Plus className="h-5 w-5" />
                             </Button>
@@ -397,7 +463,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
                         <div className="space-y-3">
                           <div className="flex items-center justify-between">
-                            <Label className="text-base font-medium">Equipa deste serviço</Label>
+                            <Label className="text-base font-medium">
+                              Equipa deste serviço
+                            </Label>
                             <Button
                               variant="outline"
                               size="sm"
@@ -410,7 +478,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
                           <div className="min-h-[42px] flex flex-wrap gap-2">
                             {s.equipa.length === 0 ? (
-                              <p className="text-sm text-muted-foreground italic">Nenhum selecionado</p>
+                              <p className="text-sm text-muted-foreground italic">
+                                Nenhum selecionado
+                              </p>
                             ) : (
                               s.equipa.map(nome => (
                                 <Badge
@@ -421,7 +491,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                   {nome}
                                   <button
                                     type="button"
-                                    onClick={() => updateActiveService({ equipa: s.equipa.filter(n => n !== nome) })}
+                                    onClick={() =>
+                                      updateActiveService({
+                                        equipa: s.equipa.filter(n => n !== nome),
+                                      })
+                                    }
                                     className="ml-1 hover:text-destructive"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -433,12 +507,17 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-base font-medium">Materiais gastos neste serviço</Label>
+                          <Label className="text-base font-medium">
+                            Materiais gastos neste serviço
+                          </Label>
                           <div className="flex gap-2">
                             <Input
                               value={newMaterialInput}
                               onChange={e => setNewMaterialInput(e.target.value)}
-                              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addMaterialToActive())}
+                              onKeyDown={e =>
+                                e.key === "Enter" &&
+                                (e.preventDefault(), addMaterialToActive())
+                              }
                               placeholder="ex: 1 isocril, Lata tinta 15L..."
                               className="h-12 text-base flex-1"
                             />
@@ -494,12 +573,20 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 {isEditing && (
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="lg" className="h-12 sm:h-14 w-14 flex items-center justify-center"><Trash2 className="h-5 w-5" /></Button>
+                      <Button
+                        variant="destructive"
+                        size="lg"
+                        className="h-12 sm:h-14 w-14 flex items-center justify-center"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
                         <AlertDialogTitle>Apagar registo?</AlertDialogTitle>
-                        <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                        <AlertDialogDescription>
+                          Esta ação não pode ser desfeita.
+                        </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -508,7 +595,14 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     </AlertDialogContent>
                   </AlertDialog>
                 )}
-                <Button onClick={handleSave} size="lg" className="flex-1 h-12 sm:h-14 text-base sm:text-lg bg-green-600 hover:bg-green-700 text-white" disabled={services.length === 0}>Salvar Dia</Button>
+                <Button
+                  onClick={handleSave}
+                  size="lg"
+                  className="flex-1 h-12 sm:h-14 text-base sm:text-lg bg-green-600 hover:bg-green-700 text-white"
+                  disabled={services.length === 0}
+                >
+                  Salvar Dia
+                </Button>
               </div>
             </SheetFooter>
           </div>
@@ -521,7 +615,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
           side="bottom"
           className="rounded-t-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden"
         >
-          {/* Header com título e filtro */}
           <div className="shrink-0 border-b bg-background px-6 pt-5 pb-4 space-y-4">
             <SheetHeader className="text-left">
               <SheetTitle>Selecionar Colaboradores</SheetTitle>
@@ -539,7 +632,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             />
           </div>
 
-          {/* Lista com scroll */}
           <div className="flex-1 overflow-y-auto divide-y bg-muted/30">
             {colaboradoresFiltrados.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
@@ -553,31 +645,23 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     key={nome}
                     type="button"
                     onClick={() => toggleTempMember(nome)}
-                    className={`w-full text-left px-6 py-4 text-base flex justify-between items-center transition-colors ${isSelected
-                      ? "bg-primary/10 font-medium border-l-4 border-l-primary"
-                      : "hover:bg-accent"
-                      }`}
+                    className={`w-full text-left px-6 py-4 text-base flex justify-between items-center transition-colors ${
+                      isSelected
+                        ? "bg-primary/10 font-medium border-l-4 border-l-primary"
+                        : "hover:bg-accent"
+                    }`}
                   >
                     <span>{nome}</span>
-                    {isSelected && <Check className="h-5 w-5 text-primary flex-shrink-0" />}
+                    {isSelected && (
+                      <Check className="h-5 w-5 text-primary flex-shrink-0" />
+                    )}
                   </button>
                 )
               })
             )}
           </div>
 
-          {/* Botões fixos no fundo */}
-          <div className="
-      shrink-0 
-      border-t 
-      bg-background 
-      px-6 
-      py-5 
-      sticky 
-      bottom-0 
-      z-10
-      safe-area-inset-bottom
-    ">
+          <div className="shrink-0 border-t bg-background px-6 py-5 sticky bottom-0 z-10 safe-area-inset-bottom">
             <div className="flex justify-end gap-3 max-w-md mx-auto">
               <Button
                 variant="outline"
