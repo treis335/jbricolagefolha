@@ -187,11 +187,11 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                     </span>
                   )}
 
-                  {/* Status dot */}
+                  {/* Status dot — top-left corner */}
                   {hasEntry && (
                     <span
                       className={cn(
-                        "absolute bottom-1.5 md:bottom-2 left-1/2 -translate-x-1/2 rounded-full",
+                        "absolute top-1.5 left-1.5 md:top-2 md:left-2 rounded-full",
                         "w-1.5 h-1.5 md:w-2 md:h-2",
                         "transition-transform duration-150 group-hover:scale-125",
                         isPaid ? "bg-emerald-500" : "bg-amber-400"
