@@ -757,7 +757,7 @@ export function AdminDashboard() {
 
         {/* Footer */}
         <div className="text-center text-sm text-slate-600 dark:text-slate-400 py-8">
-          <p>Dashboard Administrativo · J.Bricolage Folha</p>
+          <p>Dashboard Administrativo · J.Bricolage</p>
           <p className="text-xs mt-1">Última atualização: {new Date().toLocaleString("pt-PT")}</p>
         </div>
       </div>

@@ -27,14 +27,14 @@ export function Header() {
           <div className="relative w-10 h-10">
             <Image
               src="/icon-dark-32x32.png"
-              alt="JBricolage Horas"
+              alt="JBRICOLAGE"
               fill
               className="object-contain"
               priority
             />
           </div>
           <span className="text-xl font-bold text-primary">
-            Folha de Serviços
+            JBRICOLAGE
           </span>
         </Link>
 

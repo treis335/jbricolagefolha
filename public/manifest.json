@@ -1,7 +1,7 @@
 {
-  "name": "JBricolage Folha",
-  "short_name": "Folha JB",
-  "description": "Registo de horas, serviços e pagamentos para colaboradores",
+  "name": "JBricolage App",
+  "short_name": "JBricolage",
+  "description": "JBricolage App",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
