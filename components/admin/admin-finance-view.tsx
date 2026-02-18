@@ -1,3 +1,5 @@
+//admin-finance-view.tsx
+
 "use client"
 
 import React, { useState, useMemo, useEffect } from "react"

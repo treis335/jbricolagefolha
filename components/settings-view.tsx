@@ -1,591 +1,463 @@
-//settings-view
-
+//settings-view.tsx
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Euro, Users, Trash2, HardHat, Info, Download, Upload, CheckCircle2, AlertCircle, Share, User, Lock } from "lucide-react"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import {
+  Euro, Trash2, HardHat, Info, Download, Upload,
+  CheckCircle2, AlertCircle, Share, User, Lock,
+  LogOut, Pencil, X, Check, Copy, Smartphone,
+  ShieldAlert, DatabaseBackup, ChevronRight,
+} from "lucide-react"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
 import { MigrateLegacyDataButton } from "@/components/MigrateLegacyDataButton"
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
+import { cn } from "@/lib/utils"
 
-
-// PWA install button
+// ── PWA Install ──────────────────────────────────────────────────────────────
 function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
 
   useEffect(() => {
-    const checkStandalone = () => {
-      if (window.matchMedia("(display-mode: standalone)").matches) {
-        setIsInstalled(true)
-      }
+    const check = () => {
+      if (window.matchMedia("(display-mode: standalone)").matches) setIsInstalled(true)
     }
-    checkStandalone()
-
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e)
-    }
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt)
-    window.addEventListener("focus", checkStandalone)
+    check()
+    const handler = (e: Event) => { e.preventDefault(); setDeferredPrompt(e) }
+    window.addEventListener("beforeinstallprompt", handler)
+    window.addEventListener("focus", check)
     return () => {
-      window.removeEventListener(
-        "beforeinstallprompt",
-        handleBeforeInstallPrompt
-      )
-      window.removeEventListener("focus", checkStandalone)
+      window.removeEventListener("beforeinstallprompt", handler)
+      window.removeEventListener("focus", check)
     }
   }, [])
 
-  const handleInstallClick = async () => {
+  const handleInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt()
       const { outcome } = await deferredPrompt.userChoice
       if (outcome === "accepted") setIsInstalled(true)
       setDeferredPrompt(null)
     } else {
-      alert(
-        "Em desenvolvimento (localhost) o prompt pode não aparecer. Para instalar manualmente, usa o menu do navegador."
-      )
+      alert("Para instalar, usa o menu do navegador.")
     }
   }
 
   return (
-    <Card className="border-primary/30">
-      <CardHeader>
-        <CardTitle className="text-base flex items-center gap-2">
-          {isInstalled ? (
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {isInstalled ? "App Já Instalada" : "Instalar Aplicação"}
-        </CardTitle>
-        <CardDescription>
-          {isInstalled
-            ? "A aplicação já está instalada na tua tela inicial."
-            : "Instala a app no teu telemóvel para usar offline e com ícone próprio."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {!isInstalled ? (
-          <Button
-            onClick={handleInstallClick}
-            className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Download className="h-5 w-5 mr-2" />
-            Instalar agora
-          </Button>
-        ) : (
-          <div className="text-center py-2 text-sm text-green-600 font-medium">
-            Instalada com sucesso! 🚀
+    <Section icon={<Smartphone className="h-5 w-5" />} iconColor="text-violet-600 dark:text-violet-400" iconBg="bg-violet-100 dark:bg-violet-950/50" title="Instalar App">
+      {isInstalled ? (
+        <Row>
+          <div className="flex items-center gap-3 py-1">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+            <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Aplicação já instalada</span>
           </div>
-        )}
-      </CardContent>
-    </Card>
+        </Row>
+      ) : (
+        <Row>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Instalar no dispositivo</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Acesso rápido e modo offline</p>
+          </div>
+          <Button size="sm" onClick={handleInstall} className="shrink-0 bg-violet-600 hover:bg-violet-700 text-white h-9 px-4">
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Instalar
+          </Button>
+        </Row>
+      )}
+    </Section>
   )
 }
 
-
-
+// ── Main ─────────────────────────────────────────────────────────────────────
 export function SettingsView() {
-  const { data, updateSettings, clearAllData, importData } = useWorkTracker()
+  const { data, clearAllData, importData } = useWorkTracker()
   const { user, logout } = useAuth()
-  const [username, setUsername] = useState<string>("");
-  const [loadingUsername, setLoadingUsername] = useState(true);
+  const [username, setUsername] = useState("")
+  const [loadingUsername, setLoadingUsername] = useState(true)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [textoColado, setTextoColado] = useState("")
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
+  const [isEditingUsername, setIsEditingUsername] = useState(false)
+  const [editedUsername, setEditedUsername] = useState("")
+  const [savingUsername, setSavingUsername] = useState(false)
+  const [copiedUid, setCopiedUid] = useState(false)
 
-  // Carrega o username do Firestore quando o user estiver disponível
   useEffect(() => {
-    if (!user?.uid) {
-      setLoadingUsername(false);
-      return;
-    }
-
-    const fetchUsername = async () => {
-      try {
-        const userRef = doc(db, "users", user.uid);
-        const snap = await getDoc(userRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          // Usa o campo 'username' que criaste no AuthProvider
-          setUsername(data?.username || "");
-        }
-      } catch (err) {
-        console.error("Erro ao carregar username:", err);
-      } finally {
-        setLoadingUsername(false);
-      }
-    };
-
-    fetchUsername();
-  }, [user?.uid]);
-
-  const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [editedUsername, setEditedUsername] = useState("");
-  const [savingUsername, setSavingUsername] = useState(false);
+    if (!user?.uid) { setLoadingUsername(false); return }
+    getDoc(doc(db, "users", user.uid))
+      .then((snap) => { if (snap.exists()) setUsername(snap.data()?.username || "") })
+      .catch(console.error)
+      .finally(() => setLoadingUsername(false))
+  }, [user?.uid])
 
   const handleSaveUsername = async () => {
-    if (!user?.uid || !editedUsername.trim()) return;
-
-    setSavingUsername(true);
+    if (!user?.uid || !editedUsername.trim()) return
+    setSavingUsername(true)
     try {
-      const userRef = doc(db, "users", user.uid);
-      await setDoc(userRef, { username: editedUsername.trim() }, { merge: true });
+      await setDoc(doc(db, "users", user.uid), { username: editedUsername.trim() }, { merge: true })
+      setUsername(editedUsername.trim())
+      setIsEditingUsername(false)
+    } catch { alert("Erro ao guardar o nome.") }
+    finally { setSavingUsername(false) }
+  }
 
-      setUsername(editedUsername.trim());
-      setIsEditingUsername(false);
-      alert("Nome atualizado com sucesso!");
-    } catch (err) {
-      console.error("Erro ao guardar username:", err);
-      alert("Erro ao guardar o nome. Tenta novamente.");
-    } finally {
-      setSavingUsername(false);
-    }
-  };
+  const handleCopyUid = () => {
+    if (!user?.uid) return
+    navigator.clipboard.writeText(user.uid)
+    setCopiedUid(true)
+    setTimeout(() => setCopiedUid(false), 2000)
+  }
 
-
-  // --- LOGOUT HANDLER ---
   const handleLogout = async () => {
-    try {
-      await logout()
-      alert("Sessão terminada com sucesso!")
-    } catch (err) {
-      console.error(err)
-      alert("Erro ao terminar a sessão. Tenta novamente.")
-    }
+    try { await logout() } catch { alert("Erro ao terminar a sessão.") }
   }
 
-  // ❌ REMOVIDO: handleTaxaChange - colaborador não pode mais editar
-
-  // --- Adicionar/Remover membros da equipa ---
-  const [newTeamMember, setNewTeamMember] = useState("")
-  const addTeamMember = () => {
-    if (
-      newTeamMember.trim() &&
-      !data.settings.equipaComum.includes(newTeamMember.trim())
-    ) {
-      updateSettings({
-        equipaComum: [...data.settings.equipaComum, newTeamMember.trim()],
-      })
-      setNewTeamMember("")
-    }
-  }
-  const removeTeamMember = (member: string) => {
-    updateSettings({
-      equipaComum: data.settings.equipaComum.filter((m) => m !== member),
-    })
-  }
-
-  // --- Backup & Import ---
   const exportarDados = async () => {
-    // Exporta os dados do state atual (que vem do Firebase)
     const conteudo = JSON.stringify(data)
-    if (!conteudo) {
-      setSyncMessage("Não existem dados para exportar.")
-      setSyncSuccess(false)
-      return
-    }
-
+    if (!conteudo) { setSyncMessage("Não há dados para exportar."); setSyncSuccess(false); return }
     const blob = new Blob([conteudo], { type: "application/json" })
-    const file = new File(
-      [blob],
-      `jbricolage-horas-backup-${new Date()
-        .toISOString()
-        .split("T")[0]}.json`,
-      { type: "application/json" }
-    )
-
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title: "Backup JBricolage" })
-        setSyncMessage("Partilhado com sucesso!")
-        setSyncSuccess(true)
-        return
-      } catch (err: any) {
-        if (err.name !== "AbortError") console.error(err)
-      }
+    const file = new File([blob], `jbricolage-backup-${new Date().toISOString().split("T")[0]}.json`, { type: "application/json" })
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: "Backup JBricolage" }); setSyncMessage("Partilhado!"); setSyncSuccess(true); return }
+      catch (e: any) { if (e.name !== "AbortError") console.error(e) }
     }
-
-    try {
-      await navigator.clipboard.writeText(conteudo)
-      setSyncMessage(
-        "Copiado para área de transferência! Agora cola no outro dispositivo."
-      )
-      setSyncSuccess(true)
-      return
-    } catch (err) {
-      console.error(err)
-    }
-
+    try { await navigator.clipboard.writeText(conteudo); setSyncMessage("Copiado para a área de transferência!"); setSyncSuccess(true); return } catch {}
     const url = URL.createObjectURL(blob)
-    const link = document.createElement("a")
-    link.href = url
-    link.download = file.name
-    link.click()
-    URL.revokeObjectURL(url)
-    setSyncMessage("Ficheiro de backup descarregado!")
-    setSyncSuccess(true)
+    const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); URL.revokeObjectURL(url)
+    setSyncMessage("Ficheiro descarregado!"); setSyncSuccess(true)
   }
 
   const importarDeArquivo = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0]; if (!file) return
     const reader = new FileReader()
     reader.onload = (ev) => {
-      try {
-        const parsed = JSON.parse(ev.target?.result as string)
-        importData(parsed) // Atualiza state e Firebase
-        setSyncMessage("Dados importados com sucesso!")
-        setSyncSuccess(true)
-        setTimeout(() => window.location.reload(), 1000)
-      } catch {
-        setSyncMessage("Erro: ficheiro inválido.")
-        setSyncSuccess(false)
-      }
+      try { importData(JSON.parse(ev.target?.result as string)); setSyncMessage("Importado com sucesso!"); setSyncSuccess(true); setTimeout(() => window.location.reload(), 1000) }
+      catch { setSyncMessage("Ficheiro inválido."); setSyncSuccess(false) }
     }
     reader.readAsText(file)
   }
 
   const importarTextoColado = () => {
-    if (!textoColado.trim()) {
-      setSyncMessage("Por favor cola o JSON primeiro.")
-      setSyncSuccess(false)
-      return
-    }
-
-    try {
-      const parsed = JSON.parse(textoColado.trim())
-      importData(parsed) // Atualiza state e Firebase
-      setSyncMessage("Dados importados com sucesso!")
-      setSyncSuccess(true)
-      setTextoColado("")
-      setTimeout(() => window.location.reload(), 1000)
-    } catch {
-      setSyncMessage("JSON inválido.")
-      setSyncSuccess(false)
-    }
+    if (!textoColado.trim()) { setSyncMessage("Cola o JSON primeiro."); setSyncSuccess(false); return }
+    try { importData(JSON.parse(textoColado.trim())); setSyncMessage("Importado com sucesso!"); setSyncSuccess(true); setTextoColado(""); setTimeout(() => window.location.reload(), 1000) }
+    catch { setSyncMessage("JSON inválido."); setSyncSuccess(false) }
   }
 
-  const totalHoras = data.entries.reduce((sum, e) => sum + e.totalHoras, 0)
+  const displayName = loadingUsername
+    ? "A carregar..."
+    : username || user?.displayName || user?.email?.split("@")[0] || "Utilizador"
 
   return (
-    <ScrollArea className="h-full">
-      <div className="p-4 pb-24 space-y-6">
-        {/* Header */}
-        <div className="text-center py-6">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-3">
-            <HardHat className="h-8 w-8 text-primary" />
+    <ScrollArea className="h-full bg-muted/20">
+      <div className="pb-28 md:pb-16 max-w-xl mx-auto">
+
+        {/* ── Hero header ── */}
+        <div className="bg-card border-b px-5 pt-8 pb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+              <HardHat className="h-7 w-7 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight">Definições</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">JBricolage · v1.0</p>
+            </div>
           </div>
-          <h1 className="text-xl font-bold">JBricolage - Settings</h1>
-          <p className="text-sm text-muted-foreground">Versão 1.0</p>
         </div>
 
-        {/* Quem sou eu? / Logout */}
-        <Card className="border-primary/30">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Quem sou eu?
-            </CardTitle>
-            <CardDescription>
-              Informação da tua conta atual
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {user ? (
-              <div className="space-y-6">
-                <div className="p-5 bg-primary/5 rounded-lg border border-primary/20 space-y-5 text-sm">
-                  {/* Nome / Utilizador - com edição */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-muted-foreground font-medium">Nome / Utilizador</p>
-                      {!isEditingUsername && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 px-2 text-xs"
-                          onClick={() => {
-                            setIsEditingUsername(true);
-                            setEditedUsername(username || user.displayName || user.email?.split('@')[0] || "");
-                          }}
-                        >
-                          Editar
-                        </Button>
-                      )}
-                    </div>
+        <div className="space-y-3 px-4 pt-4">
 
+          {/* ── Account section ── */}
+          <Section
+            icon={<User className="h-5 w-5" />}
+            iconColor="text-blue-600 dark:text-blue-400"
+            iconBg="bg-blue-100 dark:bg-blue-950/50"
+            title="A minha conta"
+          >
+            {user ? (
+              <>
+                {/* Name */}
+                <Row>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-semibold mb-1">Nome</p>
                     {isEditingUsername ? (
-                      <div className="space-y-3">
+                      <div className="flex items-center gap-2 mt-1">
                         <Input
                           value={editedUsername}
                           onChange={(e) => setEditedUsername(e.target.value)}
-                          placeholder="Nome visível na app"
-                          className="bg-background"
+                          placeholder="O teu nome"
+                          className="h-9 text-sm flex-1"
                           autoFocus
                           disabled={savingUsername}
+                          onKeyDown={(e) => e.key === "Enter" && handleSaveUsername()}
                         />
-                        <div className="flex gap-2">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="flex-1"
-                            onClick={handleSaveUsername}
-                            disabled={savingUsername || !editedUsername.trim()}
-                          >
-                            {savingUsername ? "A guardar..." : "Guardar"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="flex-1"
-                            onClick={() => {
-                              setIsEditingUsername(false);
-                              setEditedUsername("");
-                            }}
-                            disabled={savingUsername}
-                          >
-                            Cancelar
-                          </Button>
-                        </div>
+                        <Button size="icon" className="h-9 w-9 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleSaveUsername} disabled={savingUsername || !editedUsername.trim()}>
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="outline" className="h-9 w-9 shrink-0" onClick={() => setIsEditingUsername(false)} disabled={savingUsername}>
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                     ) : (
-                      <p className="text-lg font-semibold">
-                        {loadingUsername
-                          ? "A carregar..."
-                          : username || user.displayName || user.email?.split('@')[0] || "Utilizador"}
-                      </p>
+                      <p className="text-sm font-semibold truncate">{displayName}</p>
                     )}
                   </div>
+                  {!isEditingUsername && (
+                    <button
+                      className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors shrink-0"
+                      onClick={() => { setIsEditingUsername(true); setEditedUsername(username || user.displayName || user.email?.split("@")[0] || "") }}
+                    >
+                      <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  )}
+                </Row>
 
-                  {/* Email */}
-                  <div>
-                    <p className="text-muted-foreground mb-1 font-medium">Email da conta</p>
-                    <p className="font-medium break-all">
-                      {user.email || "—"}
+                <Divider />
+
+                {/* Email */}
+                <Row>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-semibold mb-1">Email</p>
+                    <p className="text-sm font-medium truncate">{user.email || "—"}</p>
+                  </div>
+                </Row>
+
+                <Divider />
+
+                {/* UID */}
+                <Row>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-semibold mb-1">ID da conta</p>
+                    <p className="text-xs font-mono text-muted-foreground truncate">
+                      {user.uid.slice(0, 8)}…{user.uid.slice(-4)}
                     </p>
                   </div>
+                  <button
+                    className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-muted transition-colors shrink-0"
+                    onClick={handleCopyUid}
+                  >
+                    {copiedUid
+                      ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                      : <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+                    }
+                  </button>
+                </Row>
 
-                  {/* UID abreviado */}
-                  <div className="pt-2 border-t border-border/30">
-                    <p className="text-xs text-muted-foreground mb-1 font-medium">ID da conta (UID)</p>
-                    <div className="flex items-center gap-3">
-                      <code className="text-sm font-mono bg-background/60 px-3 py-1.5 rounded border border-border/40 break-all flex-1">
-                        {user.uid.slice(0, 4)}....{user.uid.slice(-2)}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={() => {
-                          navigator.clipboard.writeText(user.uid);
-                          alert("UID completo copiado!");
-                        }}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="lucide lucide-copy"
-                        >
-                          <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                          <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                        </svg>
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <Divider />
 
-                <Button
-                  variant="outline"
+                {/* Logout */}
+                <button
                   onClick={handleLogout}
-                  className="w-full"
+                  className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors active:scale-[0.99]"
                 >
-                  Terminar Sessão
-                </Button>
-              </div>
+                  <LogOut className="h-4 w-4 shrink-0" />
+                  Terminar sessão
+                  <ChevronRight className="h-4 w-4 ml-auto opacity-40" />
+                </button>
+              </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                Não estás autenticado.
-              </p>
+              <Row>
+                <p className="text-sm text-muted-foreground py-2">Não estás autenticado.</p>
+              </Row>
             )}
-          </CardContent>
-        </Card>
+          </Section>
 
-        {/* Taxa horária - APENAS LEITURA */}
-        <Card className="border-blue-500/30">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Euro className="h-4 w-4" />
-              A Tua Taxa Horária
-            </CardTitle>
-            <CardDescription>
-              Definida pela gestão da empresa
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Display da taxa - Read Only */}
-            <div className="p-6 bg-primary/5 rounded-lg border border-primary/20">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground font-medium">
-                    Taxa Atual
-                  </p>
-                  <p className="text-3xl font-bold text-primary">
-                    {data.settings.taxaHoraria.toFixed(2)} €/h
-                  </p>
-                </div>
-                <div className="p-3 bg-background/60 rounded-full">
-                  <Lock className="h-6 w-6 text-muted-foreground" />
-                </div>
+          {/* ── Hourly rate (read-only) ── */}
+          <Section
+            icon={<Euro className="h-5 w-5" />}
+            iconColor="text-emerald-600 dark:text-emerald-400"
+            iconBg="bg-emerald-100 dark:bg-emerald-950/50"
+            title="Taxa Horária"
+          >
+            <Row>
+              <div className="flex-1">
+                <p className="text-[11px] uppercase tracking-widest text-muted-foreground/60 font-semibold mb-1">Taxa atual</p>
+                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                  {data.settings.taxaHoraria.toFixed(2)} €
+                  <span className="text-sm font-normal text-muted-foreground ml-0.5">/h</span>
+                </p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-muted/60 flex items-center justify-center shrink-0">
+                <Lock className="h-4 w-4 text-muted-foreground/60" />
+              </div>
+            </Row>
+
+            <div className="mx-4 mb-3">
+              <div className="flex items-start gap-2.5 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/30 px-3 py-2.5 rounded-xl border border-blue-200/60 dark:border-blue-800/60">
+                <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>Definida pela gestão. Contacta o supervisor se tiveres dúvidas.</span>
               </div>
             </div>
+          </Section>
 
-            {/* Info box */}
-            <div className="flex items-start gap-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-              <p className="text-xs text-blue-900 dark:text-blue-200">
-                A tua taxa horária é definida pela gestão. Se tiveres dúvidas sobre o valor, contacta o teu supervisor.
-              </p>
-            </div>           
-          </CardContent>
-        </Card>
-     
-        {/* Backup & Import */}
-        <Card className="border-amber-500/30">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Backup & Sincronização
-            </CardTitle>
-            <CardDescription>
-              Transfere os teus dados entre dispositivos
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <Button onClick={exportarDados} className="h-12">
-                <Share className="h-4 w-4 mr-2" />
-                Exportar Dados
-              </Button>
+          {/* ── Backup & Sync ── */}
+          <Section
+            icon={<DatabaseBackup className="h-5 w-5" />}
+            iconColor="text-amber-600 dark:text-amber-400"
+            iconBg="bg-amber-100 dark:bg-amber-950/50"
+            title="Backup & Sincronização"
+          >
+            {/* Export */}
+            <button onClick={exportarDados} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-medium hover:bg-muted/60 transition-colors active:scale-[0.99]">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+                <Share className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-medium">Exportar dados</p>
+                <p className="text-xs text-muted-foreground">Partilhar ou guardar backup</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+            </button>
 
-              <input
-                type="file"
-                accept=".json"
-                ref={fileInputRef}
-                onChange={importarDeArquivo}
-                className="hidden"
-              />
-              <Button
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="h-12"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Importar de Ficheiro
-              </Button>
-            </div>
+            <Divider />
 
-            <div className="space-y-3 pt-4 border-t">
-              <Label htmlFor="json-colado">
-                Ou cola aqui o backup recebido:
-              </Label>
+            {/* Import from file */}
+            <button onClick={() => fileInputRef.current?.click()} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-medium hover:bg-muted/60 transition-colors active:scale-[0.99]">
+              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+                <Upload className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-medium">Importar de ficheiro</p>
+                <p className="text-xs text-muted-foreground">Carregar backup .json</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+            </button>
+            <input type="file" accept=".json" ref={fileInputRef} onChange={importarDeArquivo} className="hidden" />
+
+            {/* Paste JSON */}
+            <div className="px-4 pb-4 pt-2 border-t border-border/40 space-y-3 mt-1">
+              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">Ou cola o JSON de backup:</p>
               <Textarea
-                id="json-colado"
                 value={textoColado}
                 onChange={(e) => setTextoColado(e.target.value)}
-                placeholder='Cole o JSON completo aqui (ex: {"entries":[...],"payments":[...],"settings":{...}})'
-                className="min-h-[140px] font-mono text-sm resize-y"
+                placeholder='{"entries":[...],"payments":[...],...}'
+                className="min-h-[90px] font-mono text-xs resize-none bg-muted/30 border-border/50"
               />
               <Button
                 onClick={importarTextoColado}
                 disabled={!textoColado.trim()}
-                className="w-full sm:w-auto"
+                variant="secondary"
+                className="w-full h-10"
               >
-                Importar Texto Colado
+                Importar texto colado
               </Button>
             </div>
 
+            {/* Status */}
             {syncMessage && (
-              <div
-                className={`flex items-start gap-3 p-4 rounded-lg text-sm border ${syncSuccess
-                  ? "bg-green-50 dark:bg-green-950/40 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800"
-                  : "bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800"
-                  }`}
-              >
-                {syncSuccess ? (
-                  <CheckCircle2 className="h-5 w-5 mt-0.5 flex-shrink-0" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
-                )}
-                <span className="whitespace-pre-wrap leading-relaxed">
-                  {syncMessage}
-                </span>
+              <div className={cn(
+                "mx-4 mb-4 flex items-start gap-2.5 px-3.5 py-3 rounded-xl text-sm border",
+                syncSuccess
+                  ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-200 border-emerald-200/60 dark:border-emerald-800/60"
+                  : "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-200 border-red-200/60 dark:border-red-800/60"
+              )}>
+                {syncSuccess
+                  ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
+                  : <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-500" />
+                }
+                <span className="leading-snug">{syncMessage}</span>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </Section>
 
-        {/* PWA & Migration */}
-        <InstallPWAButton />
-        <MigrateLegacyDataButton />
+          {/* ── PWA & Migration ── */}
+          <InstallPWAButton />
+          <MigrateLegacyDataButton />
 
-        {/* Danger Zone */}
-        <Card className="border-destructive/30">
-          <CardHeader>
-            <CardTitle className="text-base text-destructive flex items-center gap-2">
-              <Trash2 className="h-4 w-4" />
-              Zona de Perigo
-            </CardTitle>
-            <CardDescription>Ações irreversíveis</CardDescription>
-          </CardHeader>
-          <CardContent>
+          {/* ── Danger zone ── */}
+          <Section
+            icon={<ShieldAlert className="h-5 w-5" />}
+            iconColor="text-red-600 dark:text-red-400"
+            iconBg="bg-red-100 dark:bg-red-950/50"
+            title="Zona de Perigo"
+          >
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full h-12">
-                  Limpar Todos os Dados
-                </Button>
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors active:scale-[0.99]">
+                  <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0">
+                    <Trash2 className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium">Limpar todos os dados</p>
+                    <p className="text-xs text-muted-foreground">Apaga registos, pagamentos e definições</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-red-400/50 shrink-0" />
+                </button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="max-w-[90vw] rounded-2xl">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Tem a certeza?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação irá apagar permanentemente todos os registos,
-                    pagamentos e definições. Não pode ser desfeita.
+                  <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/40 mx-auto mb-2">
+                    <Trash2 className="h-6 w-6 text-red-600" />
+                  </div>
+                  <AlertDialogTitle className="text-center text-lg">Tens a certeza?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-center">
+                    Todos os registos, pagamentos e definições serão apagados permanentemente. <strong>Esta ação não pode ser desfeita.</strong>
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={clearAllData}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Sim, Apagar Tudo
+                <AlertDialogFooter className="flex-row gap-3 mt-2">
+                  <AlertDialogCancel className="flex-1 h-11 rounded-xl">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={clearAllData} className="flex-1 h-11 rounded-xl bg-red-600 hover:bg-red-700 text-white">
+                    Apagar tudo
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </CardContent>
-        </Card>
+          </Section>
+
+        </div>
       </div>
     </ScrollArea>
   )
+}
+
+// ── UI Primitives ─────────────────────────────────────────────────────────────
+
+function Section({
+  icon, iconColor, iconBg, title, children,
+}: {
+  icon: React.ReactNode
+  iconColor: string
+  iconBg: string
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-2xl border border-border/60 bg-card shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border/40">
+        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", iconBg)}>
+          <span className={iconColor}>{icon}</span>
+        </div>
+        <p className="text-sm font-bold">{title}</p>
+      </div>
+      {/* Body */}
+      <div className="divide-y divide-border/30">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function Row({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3.5">
+      {children}
+    </div>
+  )
+}
+
+function Divider() {
+  return <div className="h-px bg-border/30 mx-4" />
 }

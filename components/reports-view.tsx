@@ -1,3 +1,4 @@
+//reports-view.tsx
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
@@ -6,7 +7,11 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Clock, ChevronLeft, ChevronRight, FileDown } from "lucide-react"
+import {
+  Clock, ChevronLeft, ChevronRight, FileDown,
+  TrendingUp, Users, Package, CalendarDays,
+  Hammer, Euro, BarChart3,
+} from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import type { DayEntry } from "@/lib/types"
 import { getNomesColaboradores } from "@/lib/colaboradores"
@@ -20,29 +25,19 @@ export function ReportsView() {
 
   const { startDate, endDate, rangeLabel } = useMemo(() => {
     const today = new Date(currentDate)
-    let start: Date
-    let end: Date
-    let label: string
+    let start: Date, end: Date, label: string
 
     switch (period) {
       case "daily":
-        start = new Date(today)
-        end = new Date(today)
-        label = today.toLocaleDateString("pt-PT", {
-          weekday: "long",
-          day: "numeric",
-          month: "long",
-          year: "numeric",
-        })
+        start = new Date(today); end = new Date(today)
+        label = today.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
         break
       case "weekly": {
-        const dayOfWeek = today.getDay()
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-        start = new Date(today)
-        start.setDate(today.getDate() + diffToMonday)
-        end = new Date(start)
-        end.setDate(start.getDate() + 6)
-        label = `${start.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })} - ${end.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`
+        const dow = today.getDay()
+        const diff = dow === 0 ? -6 : 1 - dow
+        start = new Date(today); start.setDate(today.getDate() + diff)
+        end = new Date(start); end.setDate(start.getDate() + 6)
+        label = `${start.toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
         break
       }
       case "monthly":
@@ -53,265 +48,167 @@ export function ReportsView() {
     }
 
     return {
-      startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
-      rangeLabel: label,
+      startDate: start!.toISOString().split("T")[0],
+      endDate: end!.toISOString().split("T")[0],
+      rangeLabel: label!,
     }
   }, [period, currentDate])
 
   const filteredEntries = useMemo(() => {
     const entries = Array.isArray(data.entries) ? data.entries : []
     return entries
-      .filter((entry) => entry && entry.date && entry.date >= startDate && entry.date <= endDate)
+      .filter((e) => e?.date && e.date >= startDate && e.date <= endDate)
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
   }, [data.entries, startDate, endDate])
 
   const totals = useMemo(() => {
-    let totalNormais = 0
-    let totalExtras = 0
-    let totalHoras = 0
-
-    filteredEntries.forEach((entry) => {
-      totalHoras += entry.totalHoras ?? 0
-      totalNormais += entry.normalHoras ?? 0
-      totalExtras += entry.extraHoras ?? 0
+    let totalNormais = 0, totalExtras = 0, totalHoras = 0
+    filteredEntries.forEach((e) => {
+      totalHoras += e.totalHoras ?? 0
+      totalNormais += e.normalHoras ?? 0
+      totalExtras += e.extraHoras ?? 0
     })
-
-    const valorTotal = totalHoras * (data.settings.taxaHoraria ?? 0)
-
-    return { totalNormais, totalExtras, totalHoras, valorTotal }
+    return { totalNormais, totalExtras, totalHoras, valorTotal: totalHoras * (data.settings.taxaHoraria ?? 0) }
   }, [filteredEntries, data.settings.taxaHoraria])
 
   const horasPorColaborador = useMemo(() => {
     const nomesOficiais = new Set(getNomesColaboradores())
     const horas: Record<string, number> = {}
-
     filteredEntries.forEach((entry) => {
-      const nomesUnicosDoDia = new Set<string>()
-
-      const equipaDia = entry.equipa ?? []
-      equipaDia.forEach((nome) => {
-        if (nome && typeof nome === "string") {
-          nomesUnicosDoDia.add(nome.trim())
-        }
-      })
-
-      const servicesDia = entry.services ?? []
-      servicesDia.forEach((s) => {
-        const equipaServico = s.equipa ?? []
-        equipaServico.forEach((nome) => {
-          if (nome && typeof nome === "string") {
-            nomesUnicosDoDia.add(nome.trim())
-          }
-        })
-      })
-
-      const horasDia = entry.totalHoras ?? 0
-      nomesUnicosDoDia.forEach((nomeLimpo) => {
-        if (nomesOficiais.has(nomeLimpo)) {
-          horas[nomeLimpo] = (horas[nomeLimpo] || 0) + horasDia
-        }
+      const nomesUnicos = new Set<string>()
+      ;(entry.equipa ?? []).forEach((n) => typeof n === "string" && nomesUnicos.add(n.trim()))
+      ;(entry.services ?? []).forEach((s) =>
+        (s.equipa ?? []).forEach((n) => typeof n === "string" && nomesUnicos.add(n.trim()))
+      )
+      const h = entry.totalHoras ?? 0
+      nomesUnicos.forEach((nome) => {
+        if (nomesOficiais.has(nome)) horas[nome] = (horas[nome] || 0) + h
       })
     })
-
     return Object.entries(horas)
       .filter(([, h]) => h > 0)
       .map(([nome, horas]) => ({ nome, horas }))
-      .sort((a, b) => a.nome.localeCompare(b.nome))
+      .sort((a, b) => b.horas - a.horas)
   }, [filteredEntries])
 
   const navigate = (direction: "prev" | "next") => {
     setCurrentDate((prev) => {
-      const newDate = new Date(prev)
-      if (period === "daily") {
-        newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
-      } else if (period === "weekly") {
-        newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7))
-      } else {
-        newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1))
-      }
-      return newDate
+      const d = new Date(prev)
+      const delta = direction === "next" ? 1 : -1
+      if (period === "daily") d.setDate(d.getDate() + delta)
+      else if (period === "weekly") d.setDate(d.getDate() + delta * 7)
+      else d.setMonth(d.getMonth() + delta)
+      return d
     })
   }
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(value)
+  const formatCurrency = (v: number) =>
+    new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v)
 
-  const formatDateWithWeekday = (dateStr: string, short: boolean = true) => {
+  const formatDate = (dateStr: string, short = true) => {
     const date = new Date(dateStr)
-    if (short) {
-      return date.toLocaleDateString("pt-PT", {
-        weekday: "short",
-        day: "2-digit",
-        month: "2-digit",
-      })
+    if (short) return date.toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "2-digit" })
+    return date.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+  }
+
+  const exportPDF = useCallback(async () => {
+    const { jsPDF } = await import("jspdf")
+    const autoTable = (await import("jspdf-autotable")).default
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    const ml = 10, mr = 16
+
+    const drawHeader = () => {
+      try { doc.addImage("/apple-icon.png", "PNG", ml, 11, 20, 20) } catch (_) {}
+      doc.setFontSize(14); doc.setFont("helvetica", "bold")
+      doc.text(`Relatório ${period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"}`, pageWidth / 2, 17, { align: "center" })
+      doc.setFontSize(9); doc.setFont("helvetica", "normal")
+      doc.text(rangeLabel, pageWidth / 2, 24, { align: "center" })
     }
-    return date.toLocaleDateString("pt-PT", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    })
-  }
 
-const exportPDF = useCallback(async () => {
-  const { jsPDF } = await import("jspdf")
-  const autoTable = (await import("jspdf-autotable")).default
-
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4",
-  })
-
-  const pageWidth = doc.internal.pageSize.getWidth()
-  const marginLeft = 10
-  const marginRight = 16
-  const marginTop = 12
-
-  const periodLabel = period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
-  const reportType = `Relatório ${periodLabel}`
-
-  const drawHeader = () => {
-    doc.addImage("/apple-icon.png", "PNG", marginLeft, marginTop - 1, 20, 20)
-
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text(reportType, pageWidth / 2, marginTop + 5, { align: "center" })
-
-    doc.setFontSize(9)
-    doc.setFont("helvetica", "normal")
-    doc.text(rangeLabel, pageWidth / 2, marginTop + 12, { align: "center" })
-  }
-
-  const tableBody: string[][] = []
-
-  filteredEntries.forEach((entry) => {
-    const totalHoras = entry.totalHoras ?? 0
-    const dataComHoras = `${formatDateWithWeekday(entry.date, true)} – ${totalHoras}h`
-
-    if (entry.services && entry.services.length > 0) {
-      entry.services.forEach((s, index) => {
-        const isFirst = index === 0
-
-        // Adiciona (Xh) - só se o serviço tiver totalHoras > 0
-        let descricaoFormatada = s.descricao || "-"
-        if (s.totalHoras !== undefined && s.totalHoras > 0) {
-          descricaoFormatada = `(${s.totalHoras}h) - ${descricaoFormatada}`
-        }
-
+    const tableBody: string[][] = []
+    filteredEntries.forEach((entry) => {
+      const totalH = entry.totalHoras ?? 0
+      const dataLabel = `${formatDate(entry.date, true)} – ${totalH}h`
+      if (entry.services && entry.services.length > 0) {
+        entry.services.forEach((s, i) => {
+          let desc = s.descricao || "-"
+          if (s.totalHoras && s.totalHoras > 0) desc = `(${s.totalHoras}h) ${desc}`
+          tableBody.push([
+            i === 0 ? dataLabel : "",
+            `${s.obraNome ? s.obraNome + " — " : ""}${desc}`,
+            (s.equipa ?? []).join(", ") || "Nenhum",
+            (s.materiais ?? []).join(", ") || "-",
+          ])
+        })
+      } else {
         tableBody.push([
-          isFirst ? dataComHoras : "", // data + total horas só na primeira linha do dia
-          `${s.obraNome ? s.obraNome + " - " : ""}${descricaoFormatada}`,
-          (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Nenhum",
-          (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-"
+          dataLabel, entry.descricao || "-",
+          (entry.equipa ?? []).join(", ") || "Nenhum",
+          (entry.materiais ?? []).join(", ") || "-",
         ])
-      })
-    } else {
-      // Dados antigos sem services
-      tableBody.push([
-        dataComHoras,
-        entry.descricao || "-",
-        (entry.equipa ?? []).length > 0 ? (entry.equipa ?? []).join(", ") : "Nenhum",
-        (entry.materiais ?? []).length > 0 ? (entry.materiais ?? []).join(", ") : "-"
-      ])
-    }
-  })
-
-  autoTable(doc, {
-    startY: 38,
-    head: [["Data", "Obra / Descrição", "Equipa", "Materiais"]],
-    body: tableBody,
-    theme: "grid",
-    styles: {
-      fontSize: 9.5,
-      cellPadding: 4,
-      lineWidth: 0.1,
-      overflow: "linebreak",
-    },
-    headStyles: {
-      fillColor: [41, 128, 185],
-      textColor: 255,
-      fontStyle: "bold",
-      halign: "center",
-    },
-    columnStyles: {
-      0: { cellWidth: 50, halign: "left" },
-      1: { cellWidth: 110, halign: "left" },
-      2: { cellWidth: 55, halign: "left" },
-      3: { cellWidth: 60, halign: "left" },
-    },
-    alternateRowStyles: { fillColor: [248, 248, 248] },
-    margin: { top: 38, left: marginLeft, right: marginRight },
-    didParseCell: (data) => {
-      // Fundo azul bebé + negrito só nas linhas com data (primeira de cada dia)
-      if (
-        data.section === "body" &&
-        data.column.index === 0 &&
-        data.cell.text &&
-        data.cell.text[0] !== ""
-      ) {
-        data.cell.styles.fillColor = [220, 230, 241]
-        data.cell.styles.fontStyle = "bold"
       }
-    },
-    didDrawPage: drawHeader,
-  })
-
-  const finalY = (doc as any).lastAutoTable?.finalY + 15 || 110
-
-  doc.setFontSize(12)
-  doc.setFont("helvetica", "bold")
-  doc.text("RESUMO DO PERÍODO", marginLeft, finalY)
-
-  doc.setFontSize(9.5)
-  doc.setFont("helvetica", "normal")
-  doc.text(
-    `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
-    marginLeft,
-    finalY + 8
-  )
-
-  if (horasPorColaborador.length > 0) {
-    doc.addPage()
-    drawHeader()
+    })
 
     autoTable(doc, {
       startY: 38,
-      head: [["Colaborador", "Total de Horas"]],
-      body: horasPorColaborador.map(({ nome, horas }) => [nome, `${horas}h`]),
+      head: [["Data", "Obra / Descrição", "Equipa", "Materiais"]],
+      body: tableBody,
       theme: "grid",
-      styles: { fontSize: 10, cellPadding: 5 },
-      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "left" },
-      columnStyles: {
-        0: { cellWidth: 120, halign: "left" },
-        1: { cellWidth: 60, halign: "center" },
-      },
+      styles: { fontSize: 9.5, cellPadding: 4, overflow: "linebreak" },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "center" },
+      columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 110 }, 2: { cellWidth: 55 }, 3: { cellWidth: 60 } },
       alternateRowStyles: { fillColor: [248, 248, 248] },
-      margin: { top: 38, left: marginLeft, right: marginRight },
+      margin: { top: 38, left: ml, right: mr },
+      didParseCell: (d) => {
+        if (d.section === "body" && d.column.index === 0 && d.cell.text?.[0] !== "") {
+          d.cell.styles.fillColor = [220, 230, 241]
+          d.cell.styles.fontStyle = "bold"
+        }
+      },
+      didDrawPage: drawHeader,
     })
-  }
 
-  const totalPages = (doc as any).internal.getNumberOfPages()
+    const finalY = (doc as any).lastAutoTable?.finalY + 12 || 110
+    doc.setFontSize(11); doc.setFont("helvetica", "bold")
+    doc.text("RESUMO DO PERÍODO", ml, finalY)
+    doc.setFontSize(9.5); doc.setFont("helvetica", "normal")
+    doc.text(
+      `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total: ${totals.totalHoras}h   |   Valor: ${formatCurrency(totals.valorTotal)}`,
+      ml, finalY + 8
+    )
 
-  for (let i = 1; i <= totalPages; i++) {
-    doc.setPage(i)
-    drawHeader()
-  }
+    if (horasPorColaborador.length > 0) {
+      doc.addPage(); drawHeader()
+      autoTable(doc, {
+        startY: 38,
+        head: [["Colaborador", "Total de Horas"]],
+        body: horasPorColaborador.map(({ nome, horas }) => [nome, `${horas}h`]),
+        theme: "grid",
+        styles: { fontSize: 10, cellPadding: 5 },
+        headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold" },
+        columnStyles: { 0: { cellWidth: 120 }, 1: { cellWidth: 60, halign: "center" } },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        margin: { top: 38, left: ml, right: mr },
+      })
+    }
 
-  const filename = `relatorio-${period}-${startDate}.pdf`
-  doc.save(filename)
-}, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
-
+    const pages = (doc as any).internal.getNumberOfPages()
+    for (let i = 1; i <= pages; i++) { doc.setPage(i); drawHeader() }
+    doc.save(`relatorio-${period}-${startDate}.pdf`)
+  }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
 
   const hasEntries = filteredEntries.length > 0
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <div className="sticky top-0 z-10 bg-background border-b">
-        <div className="px-4 pt-4 pb-2">
+    <div className="flex flex-col h-screen bg-background">
+
+      {/* ── Sticky header ── */}
+      <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b shadow-sm">
+        {/* Period tabs */}
+        <div className="px-4 pt-3 pb-2 md:px-8">
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-            <TabsList className="w-full grid grid-cols-3 h-10 rounded-md">
+            <TabsList className="w-full grid grid-cols-3 h-9 md:w-auto md:inline-grid">
               <TabsTrigger value="daily" className="text-sm">Diário</TabsTrigger>
               <TabsTrigger value="weekly" className="text-sm">Semanal</TabsTrigger>
               <TabsTrigger value="monthly" className="text-sm">Mensal</TabsTrigger>
@@ -319,244 +216,267 @@ const exportPDF = useCallback(async () => {
           </Tabs>
         </div>
 
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-background/95 backdrop-blur-sm">
-          <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
+        {/* Navigation */}
+        <div className="flex items-center justify-between px-3 py-2 md:px-7">
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" onClick={() => navigate("prev")}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
-          <h3 className="text-base font-medium text-center flex-1 px-2">
-            {rangeLabel}
-          </h3>
-          <Button variant="ghost" size="icon" onClick={() => navigate("next")}>
+          <p className="text-sm font-semibold text-center capitalize flex-1 px-3 truncate">{rangeLabel}</p>
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" onClick={() => navigate("next")}>
             <ChevronRight className="h-5 w-5" />
           </Button>
         </div>
+
+        {/* KPI strip */}
+        {hasEntries && (
+          <div className="grid grid-cols-4 divide-x divide-border border-t bg-muted/20">
+            {[
+              { value: filteredEntries.length.toString(), label: "dias", color: "text-foreground" },
+              { value: `${totals.totalHoras}h`, label: "total", color: "text-blue-600 dark:text-blue-400" },
+              { value: `${totals.totalExtras}h`, label: "extras", color: "text-red-500 dark:text-red-400" },
+              { value: `${totals.valorTotal.toFixed(0)}€`, label: "valor", color: "text-emerald-600 dark:text-emerald-400" },
+            ].map((kpi) => (
+              <div key={kpi.label} className="flex flex-col items-center py-2.5">
+                <span className={`text-base font-bold leading-none tabular-nums ${kpi.color}`}>{kpi.value}</span>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold mt-0.5">{kpi.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
+      {/* ── Content ── */}
       <ScrollArea className="flex-1">
-        <div className="p-4 space-y-6 pb-32 md:pb-12">
-          {period === "daily" && hasEntries && (
-            <div className="mx-auto max-w-3xl space-y-6">
-              {filteredEntries.map((entry) => (
-                <Card key={entry.date} className="overflow-hidden shadow-md">
-                  <CardContent className="p-6 space-y-5">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <p className="text-2xl font-bold">{formatDateWithWeekday(entry.date, false)}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {entry.totalHoras ?? 0}h trabalhadas
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="text-lg px-5 py-2">
-                        {formatCurrency((entry.totalHoras ?? 0) * data.settings.taxaHoraria)}
-                      </Badge>
-                    </div>
+        <div className="p-4 md:p-8 space-y-4 pb-32 md:pb-20 max-w-4xl mx-auto">
 
-                    {entry.services && entry.services.length > 0 ? (
-                      <div className="space-y-6">
-                        {entry.services.map((s, idx) => (
-                          <div key={s.id || idx} className="border-t pt-5 first:border-t-0 first:pt-0">
-                            <p className="text-lg font-semibold mb-2">
-                              {s.obraNome || `Serviço ${idx + 1}`}
-                            </p>
-                            {s.descricao && (
-                              <p className="text-sm whitespace-pre-line mb-3">{s.descricao}</p>
-                            )}
-                            <div className="flex flex-wrap gap-6 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Equipa: </span>
-                                {(s.equipa ?? []).join(", ") || "Nenhum"}
-                              </div>
-                              {(s.materiais ?? []).length > 0 && (
-                                <div>
-                                  <span className="text-muted-foreground">Materiais: </span>
-                                  {(s.materiais ?? []).join(", ")}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        {entry.descricao && (
-                          <div className="mt-2">
-                            <p className="text-xs text-muted-foreground">Descrição</p>
-                            <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
-                          </div>
-                        )}
-
-                        <div className="mt-3">
-                          <p className="text-xs text-muted-foreground">Equipa</p>
-                          <p className="text-sm">
-                            {(entry.equipa ?? []).join(", ") || "Nenhum"}
-                          </p>
-                        </div>
-
-                        {(entry.materiais ?? []).length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-xs text-muted-foreground">Materiais</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(entry.materiais ?? []).map((m, i) => (
-                                <Badge key={i} variant="outline" className="text-xs">
-                                  {m}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    
-                  </CardContent>
-                </Card>
-              ))}
+          {/* Empty state */}
+          {!hasEntries && (
+            <div className="flex flex-col items-center justify-center py-32 text-center">
+              <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center mb-5 shadow-inner">
+                <CalendarDays className="h-10 w-10 text-muted-foreground/40" />
+              </div>
+              <p className="font-bold text-lg text-foreground">Sem registos</p>
+              <p className="text-sm text-muted-foreground mt-1.5">Nenhum registo encontrado neste período</p>
             </div>
           )}
 
-          {(period === "weekly" || period === "monthly") && hasEntries && (
-            <div className="mx-auto max-w-3xl space-y-6">
-              {filteredEntries.map((entry) => (
-                <Card key={entry.date} className="overflow-hidden shadow-md">
-                  <CardContent className="p-6 space-y-5">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <p className="text-xl font-bold">{formatDateWithWeekday(entry.date, false)}</p>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {entry.totalHoras ?? 0}h trabalhadas
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="text-lg px-5 py-2">
-                        {formatCurrency((entry.totalHoras ?? 0) * data.settings.taxaHoraria)}
-                      </Badge>
-                    </div>
+          {/* Entries */}
+          {hasEntries && filteredEntries.map((entry) => (
+            <EntryCard
+              key={entry.date}
+              entry={entry}
+              taxaHoraria={data.settings.taxaHoraria}
+              formatDate={formatDate}
+              formatCurrency={formatCurrency}
+            />
+          ))}
 
-                    {entry.services && entry.services.length > 0 ? (
-                      <div className="space-y-5">
-                        {entry.services.map((s, idx) => (
-                          <div key={s.id || idx} className="border-t pt-4 first:border-t-0 first:pt-0">
-                            <p className="text-base font-semibold mb-2">
-                              {s.obraNome || `Serviço ${idx + 1}`}
-                            </p>
-                            {s.descricao && (
-                              <p className="text-sm whitespace-pre-line mb-3">{s.descricao}</p>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                              <div>
-                                <span className="text-muted-foreground font-medium">Equipa: </span>
-                                {(s.equipa ?? []).join(", ") || "Nenhum"}
-                              </div>
-                              {(s.materiais ?? []).length > 0 && (
-                                <div>
-                                  <span className="text-muted-foreground font-medium">Materiais: </span>
-                                  {(s.materiais ?? []).join(", ")}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <>
-                        {entry.descricao && (
-                          <div className="mt-2">
-                            <p className="text-sm text-muted-foreground">Descrição</p>
-                            <p className="text-sm whitespace-pre-line">{entry.descricao}</p>
-                          </div>
-                        )}
-
-                        <div className="mt-3">
-                          <p className="text-sm text-muted-foreground">Equipa</p>
-                          <p className="text-sm">
-                            {(entry.equipa ?? []).join(", ") || "Nenhum"}
-                          </p>
-                        </div>
-
-                        {(entry.materiais ?? []).length > 0 && (
-                          <div className="mt-3">
-                            <p className="text-sm text-muted-foreground">Materiais</p>
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {(entry.materiais ?? []).map((m, i) => (
-                                <Badge key={i} variant="outline" className="text-xs">
-                                  {m}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <div className="mt-5 pt-4 border-t text-sm font-medium">
-                      Total do dia: {entry.totalHoras ?? 0}h
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-
+          {/* ── Summary ── */}
           {hasEntries && (
-            <div className="space-y-6 mx-auto max-w-3xl">
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
-                  <CardContent className="p-5 text-center">
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-1">
-                      <Clock className="h-4 w-4" />
-                      Horas Normais
-                    </div>
-                    <p className="text-3xl font-bold">{totals.totalNormais}h</p>
-                  </CardContent>
-                </Card>
+            <div className="space-y-4 pt-4 md:pt-6">
 
-                <Card className="border-destructive/30">
-                  <CardContent className="p-5 text-center">
-                    <div className="flex items-center justify-center gap-2 text-destructive text-sm mb-1">
-                      <Clock className="h-4 w-4" />
-                      Horas Extras
-                    </div>
-                    <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
-                  </CardContent>
-                </Card>
+              {/* Divider with label */}
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 flex items-center gap-1.5">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Resumo do período
+                </span>
+                <div className="h-px flex-1 bg-border" />
               </div>
 
-              <div className="flex justify-center">
-                <Card className="w-full max-w-md bg-primary/5 border-primary/30">
-                  <CardContent className="p-6 text-center">
-                    <p className="text-primary text-sm mb-1">Valor Total do Período</p>
-                    <p className="text-4xl font-bold text-primary">
+              {/* Hours breakdown — 3 columns on desktop */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                <Card className="border border-border/60 bg-card shadow-sm">
+                  <CardContent className="p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center">
+                        <Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wide">Normais</span>
+                    </div>
+                    <p className="text-3xl md:text-4xl font-bold text-blue-600 dark:text-blue-400">{totals.totalNormais}h</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-border/60 bg-card shadow-sm">
+                  <CardContent className="p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+                        <TrendingUp className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wide">Extras</span>
+                    </div>
+                    <p className="text-3xl md:text-4xl font-bold text-red-500 dark:text-red-400">{totals.totalExtras}h</p>
+                  </CardContent>
+                </Card>
+
+                {/* Total value — full width on mobile, 1 col on desktop */}
+                <Card className="col-span-2 md:col-span-1 border border-border/60 bg-card shadow-sm">
+                  <CardContent className="p-4 md:p-5">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
+                        <Euro className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-wide">Total</span>
+                    </div>
+                    <p className="text-3xl md:text-4xl font-bold text-emerald-600 dark:text-emerald-400">
                       {formatCurrency(totals.valorTotal)}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-2">
+                    <p className="text-xs text-muted-foreground mt-1.5">
                       {totals.totalHoras}h × {formatCurrency(data.settings.taxaHoraria)}/h
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
-              <div className="flex justify-center mt-8">
-                <Button
-                  onClick={exportPDF}
-                  className="w-full max-w-md h-12 text-base"
-                  size="lg"
-                >
-                  <FileDown className="h-5 w-5 mr-2" />
-                  Exportar PDF
-                </Button>
-              </div>
-            </div>
-          )}
+              {/* Collaborators */}
+              {horasPorColaborador.length > 0 && (
+                <Card className="border border-border/60 bg-card shadow-sm">
+                  <CardContent className="p-4 md:p-6">
+                    <div className="flex items-center gap-2.5 mb-4">
+                      <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center">
+                        <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm font-bold">Horas por Colaborador</span>
+                    </div>
 
-          {!hasEntries && (
-            <div className="mx-auto max-w-md">
-              <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
-                  Nenhum registo encontrado neste período
-                </CardContent>
-              </Card>
+                    <div className="space-y-3 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-3 md:space-y-0">
+                      {horasPorColaborador.map(({ nome, horas }) => {
+                        const pct = totals.totalHoras > 0 ? (horas / totals.totalHoras) * 100 : 0
+                        return (
+                          <div key={nome} className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-medium truncate pr-2">{nome}</span>
+                              <span className="text-sm font-bold tabular-nums shrink-0">{horas}h</span>
+                            </div>
+                            <div className="h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-blue-500 transition-all duration-700"
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Export button */}
+              <Button
+                onClick={exportPDF}
+                className="w-full h-12 md:h-14 text-base font-semibold bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 shadow-md"
+                size="lg"
+              >
+                <FileDown className="h-5 w-5 mr-2" />
+                Exportar PDF
+              </Button>
             </div>
           )}
         </div>
       </ScrollArea>
     </div>
+  )
+}
+
+// ── Entry Card ────────────────────────────────────────────────────────────────
+function EntryCard({
+  entry,
+  taxaHoraria,
+  formatDate,
+  formatCurrency,
+}: {
+  entry: DayEntry
+  taxaHoraria: number
+  formatDate: (d: string, short?: boolean) => string
+  formatCurrency: (v: number) => string
+}) {
+  const hasServices = Array.isArray(entry.services) && entry.services.length > 0
+  const totalHoras = entry.totalHoras ?? 0
+  const valor = totalHoras * taxaHoraria
+
+  return (
+    <Card className="overflow-hidden border border-border/70 bg-card shadow-sm hover:shadow-md transition-shadow duration-200">
+      {/* Day header */}
+      <div className="flex items-center justify-between px-4 md:px-5 py-3 md:py-3.5 bg-muted/30 border-b border-border/50">
+        <p className="text-sm md:text-base font-semibold capitalize">{formatDate(entry.date, false)}</p>
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge
+            variant="secondary"
+            className="font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40 border-0 text-xs"
+          >
+            {totalHoras}h
+          </Badge>
+          <Badge
+            variant="secondary"
+            className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/40 border-0 text-xs"
+          >
+            {formatCurrency(valor)}
+          </Badge>
+        </div>
+      </div>
+
+      {/* Services */}
+      <div className="divide-y divide-border/30">
+        {hasServices ? (
+          entry.services!.map((s, idx) => (
+            <div key={s.id || idx} className="px-4 md:px-5 py-3 md:py-3.5 space-y-1.5">
+              {s.obraNome && (
+                <div className="flex items-center gap-2">
+                  <Hammer className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+                  <span className="text-sm font-semibold truncate">{s.obraNome}</span>
+                  {s.totalHoras != null && s.totalHoras > 0 && (
+                    <Badge variant="outline" className="ml-auto text-xs shrink-0 font-medium">
+                      {s.totalHoras}h
+                    </Badge>
+                  )}
+                </div>
+              )}
+
+              {s.descricao && (
+                <p className="text-sm text-muted-foreground leading-relaxed pl-5">{s.descricao}</p>
+              )}
+
+              <div className="pl-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {(s.equipa ?? []).length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3 shrink-0" />
+                    {(s.equipa ?? []).join(", ")}
+                  </span>
+                )}
+                {(s.materiais ?? []).length > 0 && (
+                  <span className="flex items-center gap-1">
+                    <Package className="h-3 w-3 shrink-0" />
+                    {(s.materiais ?? []).join(", ")}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="px-4 md:px-5 py-3 md:py-3.5 space-y-1.5">
+            {entry.descricao && (
+              <p className="text-sm text-muted-foreground leading-relaxed">{entry.descricao}</p>
+            )}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+              {(entry.equipa ?? []).length > 0 && (
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3 shrink-0" />
+                  {(entry.equipa ?? []).join(", ")}
+                </span>
+              )}
+              {(entry.materiais ?? []).length > 0 && (
+                <span className="flex items-center gap-1">
+                  <Package className="h-3 w-3 shrink-0" />
+                  {(entry.materiais ?? []).join(", ")}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
   )
 }
