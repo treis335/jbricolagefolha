@@ -26,7 +26,7 @@ export function Header() {
         <Link href="/" className="flex items-center gap-3">
           <div className="relative w-10 h-10">
             <Image
-              src="/icon-dark-32x32.png"
+              src="/apple-icon.png"
               alt="JBRICOLAGE"
               fill
               className="object-contain"

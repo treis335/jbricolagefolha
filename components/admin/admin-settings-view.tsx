@@ -7,6 +7,7 @@ import { Settings, Shield, Database, LogOut, ChevronRight, Bell, Lock, Building2
 import { useAuth } from "@/lib/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { FirebaseExportButton } from "@/components/admin/FirebaseExportButton"
 
 export function AdminSettingsView() {
   const { user, logout } = useAuth()
@@ -26,6 +27,7 @@ export function AdminSettingsView() {
     { icon: <Lock className="h-4 w-4" />, label: "Permissões de utilizadores", desc: "Gestão de acessos e funções" },
     { icon: <Bell className="h-4 w-4" />, label: "Notificações e alertas", desc: "Configurar alertas automáticos" },
     { icon: <HardDrive className="h-4 w-4" />, label: "Backup automático", desc: "Cópias de segurança dos dados" },
+    
   ]
 
   return (
@@ -132,6 +134,8 @@ export function AdminSettingsView() {
 
           {/* Future Features Card */}
           <Card>
+
+            <FirebaseExportButton />
             <CardHeader className="pb-4">
               <CardTitle className="text-base flex items-center gap-2">
                 <Settings className="h-4 w-4 text-primary" />

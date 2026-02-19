@@ -6,8 +6,9 @@
  * - Busca todos os users com role "worker"
  * - Calcula horas totais do mês atual
  * - Calcula horas de todo o histórico
- * - Busca array de payments (pagamentos) ✨ NOVO
- * - Busca array de entries completo (para relatórios) ✨ NOVO
+ * - Calcula custo do mês usando a taxa histórica de cada entry ✅
+ * - Busca array de payments (pagamentos)
+ * - Busca array de entries completo (para relatórios)
  * - Retorna estado de loading e erro
  * - Fornece função refetch para atualizar dados
  */
@@ -27,14 +28,14 @@ export interface Collaborator {
   role: string
   createdAt: any
   migrated?: boolean
-  // ✨ NOVOS CAMPOS
   entries: any[] // Array completo de entries (para relatórios e calendário)
   payments: Array<{
     id: string
     date: string
     valor: number
     metodo: string
-  }> // Array de pagamentos
+  }>
+  // ✅ Custo calculado com taxa histórica por entry (não currentRate * horas)
   totalCostThisMonth: number
 }
 
@@ -43,6 +44,20 @@ interface UseCollaboratorsReturn {
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
+}
+
+// ✅ Helper: resolve a taxa de uma entry com todos os fallbacks possíveis
+// 1. taxa na raiz da entry (formato correto mais recente)
+// 2. taxa dentro de services[0] (formato intermédio gravado antes do fix)
+// 3. fallback para a taxa atual do colaborador (entries muito antigas sem taxa gravada)
+function resolveEntryTaxa(entry: any, currentRate: number): number {
+  if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0)
+    return entry.taxaHoraria
+  if (Array.isArray(entry.services) && entry.services.length > 0) {
+    const s0Taxa = entry.services[0]?.taxaHoraria
+    if (typeof s0Taxa === "number" && s0Taxa > 0) return s0Taxa
+  }
+  return currentRate
 }
 
 export function useCollaborators(): UseCollaboratorsReturn {
@@ -57,7 +72,6 @@ export function useCollaborators(): UseCollaboratorsReturn {
     try {
       console.log("🔄 Iniciando busca de colaboradores...")
 
-      // 1. Buscar todos os users com role "worker"
       const usersRef = collection(db, "users")
       const workersQuery = query(usersRef, where("role", "==", "worker"))
       const usersSnapshot = await getDocs(workersQuery)
@@ -66,54 +80,42 @@ export function useCollaborators(): UseCollaboratorsReturn {
 
       const collabsData: Collaborator[] = []
 
-      // 2. Para cada colaborador, processar os dados
       for (const userDoc of usersSnapshot.docs) {
         const userData = userDoc.data()
         const userId = userDoc.id
 
-        // 3. Calcular horas do mês atual
         const now = new Date()
         const currentMonth = now.getMonth() // 0-11
         const currentYear = now.getFullYear()
 
-        let totalHoursThisMonth = 0
-        let totalHoursAllTime = 0
-
-        // Verificar se tem workData.entries (array de entradas de trabalho)
         const entries = userData.workData?.entries || []
-
-        if (entries.length > 0) {
-          entries.forEach((entry: any) => {
-            const entryDate = entry.date // formato "YYYY-MM-DD"
-            const totalHoras = entry.totalHoras || 0
-
-            // Somar total de todas as horas (histórico completo)
-            totalHoursAllTime += totalHoras
-
-            // Verificar se a entrada é do mês atual
-            if (entryDate) {
-              try {
-                const [year, month] = entryDate.split("-").map(Number)
-                // month no formato YYYY-MM-DD é 1-12, por isso fazemos month - 1
-                if (year === currentYear && month - 1 === currentMonth) {
-                  totalHoursThisMonth += totalHoras
-                }
-              } catch (e) {
-                console.warn(`⚠️ Data inválida para entrada: ${entryDate}`)
-              }
-            }
-          })
-        }
-
-        // 4. Pegar a taxa horária atual
-        // Por agora vem de workData.settings.taxaHoraria
-        // TODO: No futuro, buscar de uma coleção separada de taxas com histórico
         const currentRate = userData.workData?.settings?.taxaHoraria || 0
 
-        // 5. ✨ NOVO: Buscar array de payments
+        let totalHoursThisMonth = 0
+        let totalHoursAllTime = 0
+        let totalCostThisMonth = 0 // ✅ acumulado com taxa histórica
+
+        entries.forEach((entry: any) => {
+          const entryDate = entry.date // formato "YYYY-MM-DD"
+          const totalHoras = entry.totalHoras || 0
+
+          totalHoursAllTime += totalHoras
+
+          if (entryDate) {
+            try {
+              const [year, month] = entryDate.split("-").map(Number)
+              if (year === currentYear && month - 1 === currentMonth) {
+                totalHoursThisMonth += totalHoras
+                // ✅ Taxa histórica da entry em vez de sempre currentRate
+                totalCostThisMonth += totalHoras * resolveEntryTaxa(entry, currentRate)
+              }
+            } catch (e) {
+              console.warn(`⚠️ Data inválida para entrada: ${entryDate}`)
+            }
+          }
+        })
+
         const payments = userData.workData?.payments || []
-        
-        // Garantir que cada payment tem os campos necessários
         const formattedPayments = payments.map((p: any) => ({
           id: p.id || "",
           date: p.date || "",
@@ -121,31 +123,28 @@ export function useCollaborators(): UseCollaboratorsReturn {
           metodo: p.metodo || "Desconhecido",
         }))
 
-        // 6. Adicionar ao array (com entries e payments completos)
         collabsData.push({
           id: userId,
           name: userData.name || userData.username || "Sem nome",
           username: userData.username || "",
           email: userData.email || "",
-          currentRate: currentRate,
-          totalHoursThisMonth: totalHoursThisMonth,
-          totalHoursAllTime: totalHoursAllTime,
+          currentRate,
+          totalHoursThisMonth,
+          totalHoursAllTime,
           role: userData.role || "worker",
           createdAt: userData.createdAt,
           migrated: userData.migrated || false,
-          entries: entries, // ✨ Array completo para relatórios/calendário
-          payments: formattedPayments, // ✨ Array de pagamentos
-          totalCostThisMonth: currentRate * totalHoursThisMonth,
+          entries,
+          payments: formattedPayments,
+          totalCostThisMonth, // ✅ calculado com taxa histórica
         })
 
         console.log(
-          `✅ ${userData.name}: ${totalHoursThisMonth.toFixed(1)}h este mês, ${totalHoursAllTime.toFixed(1)}h total, ${formattedPayments.length} pagamentos`
+          `✅ ${userData.name}: ${totalHoursThisMonth.toFixed(1)}h este mês, custo ${totalCostThisMonth.toFixed(2)}€, ${formattedPayments.length} pagamentos`
         )
       }
 
-      // 7. Ordenar alfabeticamente por nome
       collabsData.sort((a, b) => a.name.localeCompare(b.name))
-
       setCollaborators(collabsData)
       console.log(`✅ Total processados: ${collabsData.length} colaboradores`)
     } catch (err) {
@@ -156,7 +155,6 @@ export function useCollaborators(): UseCollaboratorsReturn {
     }
   }
 
-  // Executar fetch ao montar o componente
   useEffect(() => {
     fetchCollaborators()
   }, [])

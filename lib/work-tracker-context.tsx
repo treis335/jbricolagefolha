@@ -45,13 +45,13 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<AppData>(defaultAppData)
   const [isLoading, setIsLoading] = useState(true)
   const [paidDates, setPaidDates] = useState<Set<string>>(new Set())
-  const hasLoadedRef = useRef(false) // Previne re-loads
+  const hasLoadedRef = useRef(false)
 
   // -------- Helper: Remove undefined values recursively --------
   const removeUndefined = (obj: any): any => {
     if (obj === null || obj === undefined) return null
     if (Array.isArray(obj)) return obj.map(removeUndefined)
-    if (typeof obj === 'object') {
+    if (typeof obj === "object") {
       const cleaned: any = {}
       for (const key in obj) {
         if (obj[key] !== undefined) {
@@ -66,9 +66,7 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
   // -------- Load Data & Migrate from LocalStorage ONCE --------
   useEffect(() => {
     if (isAuthLoading || !user || hasLoadedRef.current) {
-      if (!isAuthLoading && !user) {
-        setIsLoading(false)
-      }
+      if (!isAuthLoading && !user) setIsLoading(false)
       return
     }
 
@@ -88,54 +86,37 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
 
           if (!migrated) {
             console.log(`🔄 Migração inicial para user ${user.uid}`)
-            
-            // ⚠️ MIGRAÇÃO ÚNICA: Tenta encontrar dados legacy APENAS DESTE USER
             const userSpecificKey = `trabalhoDiario_${user.uid}`
             const legacyKey = "trabalhoDiario"
-            
             let localRaw = localStorage.getItem(userSpecificKey)
             let migratedFrom = userSpecificKey
-            
-            // Se não existir chave específica, tenta legacy (só na PRIMEIRA vez de qualquer user)
-            if (!localRaw) {
-              localRaw = localStorage.getItem(legacyKey)
-              migratedFrom = legacyKey
-            }
-            
+            if (!localRaw) { localRaw = localStorage.getItem(legacyKey); migratedFrom = legacyKey }
             const localData: AppData | null = localRaw ? JSON.parse(localRaw) : null
 
             if (localData) {
               console.log(`✅ Dados encontrados em ${migratedFrom}, migrando...`)
               finalData = localData
-              
-              // Salva no Firebase com flag migrated
               const cleanData = removeUndefined(finalData)
-              await setDoc(userDocRef, { 
-                workData: cleanData, 
+              await setDoc(userDocRef, {
+                workData: cleanData,
                 migrated: true,
                 migratedAt: new Date().toISOString(),
-                migratedFrom: migratedFrom
+                migratedFrom,
               }, { merge: true })
-              
-              // LIMPA as chaves do localStorage para este user
               localStorage.removeItem(userSpecificKey)
-              
-              // ⚠️ SÓ apaga a legacy se foi este user que a usou
               if (migratedFrom === legacyKey) {
                 console.log("🗑️ Removendo chave legacy do localStorage")
                 localStorage.removeItem(legacyKey)
               }
             } else {
               console.log("ℹ️ Sem dados para migrar, criando documento vazio")
-              // Nenhum dado local, marca como migrado com dados vazios
-              await setDoc(userDocRef, { 
+              await setDoc(userDocRef, {
                 workData: defaultAppData,
                 migrated: true,
-                migratedAt: new Date().toISOString()
+                migratedAt: new Date().toISOString(),
               }, { merge: true })
             }
           } else if (workData) {
-            // Usuário já migrado, carrega do Firebase
             console.log(`✅ Carregando dados do Firebase para user ${user.uid}`)
             finalData = {
               entries: Array.isArray(workData.entries) ? workData.entries : [],
@@ -148,12 +129,11 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
             console.log("⚠️ User migrado mas sem workData, usando defaults")
           }
         } else {
-          // Documento não existe, criar novo
           console.log(`🆕 Criando novo documento para user ${user.uid}`)
-          await setDoc(userDocRef, { 
+          await setDoc(userDocRef, {
             workData: defaultAppData,
             migrated: true,
-            createdAt: new Date().toISOString()
+            createdAt: new Date().toISOString(),
           }, { merge: true })
         }
 
@@ -161,7 +141,7 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
         console.log(`✅ Dados carregados:`, {
           entries: finalData.entries.length,
           payments: finalData.payments.length,
-          userId: user.uid
+          userId: user.uid,
         })
       } catch (err) {
         console.error("❌ Erro ao carregar dados Firebase:", err)
@@ -187,10 +167,9 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
     setPaidDates(calculatePaidStatus(data.entries, data.payments, data.settings.taxaHoraria))
   }, [data])
 
-  // -------- Save Data to Firebase (SEM localStorage!) --------
+  // -------- Save Data to Firebase --------
   useEffect(() => {
     if (!user || !data || isLoading || !hasLoadedRef.current) return
-
     const saveData = async () => {
       try {
         const cleanData = removeUndefined(data)
@@ -200,35 +179,39 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
         console.error("❌ Erro ao salvar dados Firebase:", err)
       }
     }
-
-    // Debounce para evitar saves excessivos
     const timeoutId = setTimeout(saveData, 500)
     return () => clearTimeout(timeoutId)
   }, [data, user, isLoading])
 
   // -------- CRUD Functions --------
+
   const addEntry = (entry: DayEntry) => {
     const { normalHoras, extraHoras } = calculateHours(entry.date, entry.totalHoras)
-    const newEntry: DayEntry = { 
-      ...entry, 
-      normalHoras, 
+    const newEntry: DayEntry = {
+      ...entry,
+      normalHoras,
       extraHoras,
+      // ✅ Grava sempre o taxaHoraria vigente nesta entry
+      taxaHoraria: entry.taxaHoraria ?? data.settings.taxaHoraria,
     }
-
     setData((prev) => ({
       ...prev,
-      entries: [...prev.entries.filter((e) => e.date !== entry.date), newEntry].sort((a, b) => a.date.localeCompare(b.date)),
+      entries: [
+        ...prev.entries.filter((e) => e.date !== entry.date),
+        newEntry,
+      ].sort((a, b) => a.date.localeCompare(b.date)),
     }))
   }
 
   const updateEntry = (date: string, entry: DayEntry) => {
     const { normalHoras, extraHoras } = calculateHours(entry.date, entry.totalHoras)
-    const newEntry: DayEntry = { 
-      ...entry, 
-      normalHoras, 
+    const newEntry: DayEntry = {
+      ...entry,
+      normalHoras,
       extraHoras,
+      // ✅ Preserva o taxaHoraria já gravado na entry; se não existir, usa o atual
+      taxaHoraria: entry.taxaHoraria ?? data.settings.taxaHoraria,
     }
-
     setData((prev) => ({
       ...prev,
       entries: prev.entries.map((e) => (e.date === date ? newEntry : e)),
@@ -269,16 +252,14 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // -------- Import (APENAS Firebase, ZERO localStorage) --------
   const importData = (appData: AppData) => {
     try {
       setData(appData)
-      
       if (user) {
         const cleanData = removeUndefined(appData)
         setDoc(doc(db, "users", user.uid), { workData: cleanData }, { merge: true })
           .then(() => console.log("✅ Import concluído"))
-          .catch(err => console.error("❌ Erro ao importar:", err))
+          .catch((err) => console.error("❌ Erro ao importar:", err))
       }
     } catch (err) {
       console.error("❌ Erro ao importar dados:", err)
@@ -294,7 +275,13 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const getTotalValor = () => data.entries.reduce((sum, e) => sum + e.totalHoras * data.settings.taxaHoraria, 0)
+  // ✅ getTotalValor usa o taxaHoraria de cada entry como fallback
+  const getTotalValor = () =>
+    data.entries.reduce(
+      (sum, e) => sum + e.totalHoras * (e.taxaHoraria ?? data.settings.taxaHoraria),
+      0
+    )
+
   const getTotalPago = () => data.payments.reduce((sum, p) => sum + p.valor, 0)
   const getFaltaReceber = () => getTotalValor() - getTotalPago()
 

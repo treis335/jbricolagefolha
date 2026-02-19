@@ -30,10 +30,8 @@ export function AdminCollaboratorsView() {
     active: collaborators.filter((c) => c.totalHoursThisMonth > 0).length,
     inactive: collaborators.filter((c) => c.totalHoursThisMonth === 0).length,
     totalHoursThisMonth: collaborators.reduce((sum, c) => sum + c.totalHoursThisMonth, 0),
-    totalCostThisMonth: collaborators.reduce(
-      (sum, c) => sum + c.totalHoursThisMonth * c.currentRate,
-      0
-    ),
+    // ✅ Usa totalCostThisMonth calculado com taxa histórica por entry
+    totalCostThisMonth: collaborators.reduce((sum, c) => sum + c.totalCostThisMonth, 0),
   }
 
   if (loading) {
@@ -126,8 +124,9 @@ export function AdminCollaboratorsView() {
               bg: "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800",
               iconBg: "bg-emerald-100 dark:bg-emerald-900/50",
               label: "Custo (Mês)",
+              // ✅ Usa totalCostThisMonth com taxa histórica
               value: `${stats.totalCostThisMonth.toFixed(0)} €`,
-              sub: "total estimado",
+              sub: "taxa histórica",
             },
           ].map((item) => (
             <Card key={item.label} className={`relative overflow-hidden ${item.bg}`}>
@@ -161,7 +160,7 @@ export function AdminCollaboratorsView() {
           )}
         </div>
 
-        {/* ── Collaborators — Desktop Table / Mobile Cards ── */}
+        {/* ── Collaborators ── */}
         {filteredCollaborators.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
@@ -186,7 +185,6 @@ export function AdminCollaboratorsView() {
             <div className="hidden md:block">
               <Card>
                 <div className="overflow-hidden rounded-xl">
-                  {/* Table Header */}
                   <div className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-3 bg-muted/50 border-b text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                     <span>Colaborador</span>
                     <span>Taxa Atual</span>
@@ -195,14 +193,12 @@ export function AdminCollaboratorsView() {
                     <span>Ações</span>
                   </div>
 
-                  {/* Table Rows */}
                   <div className="divide-y">
                     {filteredCollaborators.map((collaborator) => (
                       <div
                         key={collaborator.id}
                         className="grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-6 py-4 items-center hover:bg-muted/30 transition-colors"
                       >
-                        {/* Name + email */}
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-medium text-sm">{collaborator.name}</p>
@@ -222,7 +218,6 @@ export function AdminCollaboratorsView() {
                           )}
                         </div>
 
-                        {/* Rate */}
                         <div>
                           {collaborator.currentRate > 0 ? (
                             <span className="text-sm font-bold text-primary">
@@ -233,21 +228,19 @@ export function AdminCollaboratorsView() {
                           )}
                         </div>
 
-                        {/* Hours */}
                         <div>
                           <span className="text-sm font-semibold">
                             {collaborator.totalHoursThisMonth.toFixed(1)}h
                           </span>
                         </div>
 
-                        {/* Cost */}
+                        {/* ✅ Usa totalCostThisMonth com taxa histórica */}
                         <div>
                           <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                            {(collaborator.totalHoursThisMonth * collaborator.currentRate).toFixed(2)} €
+                            {collaborator.totalCostThisMonth.toFixed(2)} €
                           </span>
                         </div>
 
-                        {/* Actions */}
                         <div className="flex items-center gap-1.5 shrink-0">
                           <Button
                             variant="default"
@@ -330,10 +323,11 @@ export function AdminCollaboratorsView() {
                         <p className="text-xs text-muted-foreground mb-1">Horas (Mês)</p>
                         <p className="text-lg font-bold">{collaborator.totalHoursThisMonth.toFixed(1)}h</p>
                       </div>
+                      {/* ✅ Usa totalCostThisMonth com taxa histórica */}
                       <div className="p-3 bg-muted rounded-lg">
                         <p className="text-xs text-muted-foreground mb-1">Custo (Mês)</p>
                         <p className="text-lg font-bold">
-                          {(collaborator.totalHoursThisMonth * collaborator.currentRate).toFixed(2)} €
+                          {collaborator.totalCostThisMonth.toFixed(2)} €
                         </p>
                       </div>
                     </div>
@@ -373,7 +367,6 @@ export function AdminCollaboratorsView() {
           </>
         )}
 
-        {/* Footer info */}
         <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
           <span className="text-lg shrink-0">💡</span>
           <p className="text-sm text-blue-900 dark:text-blue-200">

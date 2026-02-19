@@ -62,13 +62,17 @@ export function ReportsView() {
   }, [data.entries, startDate, endDate])
 
   const totals = useMemo(() => {
-    let totalNormais = 0, totalExtras = 0, totalHoras = 0
+    let totalNormais = 0, totalExtras = 0, totalHoras = 0, valorTotal = 0
     filteredEntries.forEach((e) => {
-      totalHoras += e.totalHoras ?? 0
+      const horas = e.totalHoras ?? 0
+      // ✅ Usa a taxa gravada na entry; fallback para a taxa atual dos settings
+      const taxa = e.taxaHoraria ?? data.settings.taxaHoraria ?? 0
+      totalHoras += horas
       totalNormais += e.normalHoras ?? 0
       totalExtras += e.extraHoras ?? 0
+      valorTotal += horas * taxa
     })
-    return { totalNormais, totalExtras, totalHoras, valorTotal: totalHoras * (data.settings.taxaHoraria ?? 0) }
+    return { totalNormais, totalExtras, totalHoras, valorTotal }
   }, [filteredEntries, data.settings.taxaHoraria])
 
   const horasPorColaborador = useMemo(() => {
@@ -129,7 +133,9 @@ export function ReportsView() {
     const tableBody: string[][] = []
     filteredEntries.forEach((entry) => {
       const totalH = entry.totalHoras ?? 0
-      const dataLabel = `${formatDate(entry.date, true)} – ${totalH}h`
+      const taxa = entry.taxaHoraria ?? data.settings.taxaHoraria ?? 0
+      const valorDia = (totalH * taxa).toFixed(2)
+      const dataLabel = `${formatDate(entry.date, true)} – ${totalH}h (${valorDia}€)`
       if (entry.services && entry.services.length > 0) {
         entry.services.forEach((s, i) => {
           let desc = s.descricao || "-"
@@ -152,12 +158,12 @@ export function ReportsView() {
 
     autoTable(doc, {
       startY: 38,
-      head: [["Data", "Obra / Descrição", "Equipa", "Materiais"]],
+      head: [["Data / Valor", "Obra / Descrição", "Equipa", "Materiais"]],
       body: tableBody,
       theme: "grid",
       styles: { fontSize: 9.5, cellPadding: 4, overflow: "linebreak" },
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "center" },
-      columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 110 }, 2: { cellWidth: 55 }, 3: { cellWidth: 60 } },
+      columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 105 }, 2: { cellWidth: 55 }, 3: { cellWidth: 60 } },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { top: 38, left: ml, right: mr },
       didParseCell: (d) => {
@@ -196,7 +202,7 @@ export function ReportsView() {
     const pages = (doc as any).internal.getNumberOfPages()
     for (let i = 1; i <= pages; i++) { doc.setPage(i); drawHeader() }
     doc.save(`relatorio-${period}-${startDate}.pdf`)
-  }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador])
+  }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador, data.settings.taxaHoraria])
 
   const hasEntries = filteredEntries.length > 0
 
@@ -205,7 +211,6 @@ export function ReportsView() {
 
       {/* ── Sticky header ── */}
       <div className="sticky top-0 z-10 bg-card/95 backdrop-blur-sm border-b shadow-sm">
-        {/* Period tabs */}
         <div className="px-4 pt-3 pb-2 md:px-8">
           <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
             <TabsList className="w-full grid grid-cols-3 h-9 md:w-auto md:inline-grid">
@@ -216,7 +221,6 @@ export function ReportsView() {
           </Tabs>
         </div>
 
-        {/* Navigation */}
         <div className="flex items-center justify-between px-3 py-2 md:px-7">
           <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg" onClick={() => navigate("prev")}>
             <ChevronLeft className="h-5 w-5" />
@@ -227,7 +231,6 @@ export function ReportsView() {
           </Button>
         </div>
 
-        {/* KPI strip */}
         {hasEntries && (
           <div className="grid grid-cols-4 divide-x divide-border border-t bg-muted/20">
             {[
@@ -249,7 +252,6 @@ export function ReportsView() {
       <ScrollArea className="flex-1">
         <div className="p-4 md:p-8 space-y-4 pb-32 md:pb-20 max-w-4xl mx-auto">
 
-          {/* Empty state */}
           {!hasEntries && (
             <div className="flex flex-col items-center justify-center py-32 text-center">
               <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center mb-5 shadow-inner">
@@ -260,22 +262,18 @@ export function ReportsView() {
             </div>
           )}
 
-          {/* Entries */}
           {hasEntries && filteredEntries.map((entry) => (
             <EntryCard
               key={entry.date}
               entry={entry}
-              taxaHoraria={data.settings.taxaHoraria}
+              defaultTaxaHoraria={data.settings.taxaHoraria}
               formatDate={formatDate}
               formatCurrency={formatCurrency}
             />
           ))}
 
-          {/* ── Summary ── */}
           {hasEntries && (
             <div className="space-y-4 pt-4 md:pt-6">
-
-              {/* Divider with label */}
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-border" />
                 <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground/60 flex items-center gap-1.5">
@@ -285,7 +283,6 @@ export function ReportsView() {
                 <div className="h-px flex-1 bg-border" />
               </div>
 
-              {/* Hours breakdown — 3 columns on desktop */}
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 <Card className="border border-border/60 bg-card shadow-sm">
                   <CardContent className="p-4 md:p-5">
@@ -311,7 +308,6 @@ export function ReportsView() {
                   </CardContent>
                 </Card>
 
-                {/* Total value — full width on mobile, 1 col on desktop */}
                 <Card className="col-span-2 md:col-span-1 border border-border/60 bg-card shadow-sm">
                   <CardContent className="p-4 md:p-5">
                     <div className="flex items-center gap-2 text-muted-foreground mb-2.5">
@@ -324,13 +320,12 @@ export function ReportsView() {
                       {formatCurrency(totals.valorTotal)}
                     </p>
                     <p className="text-xs text-muted-foreground mt-1.5">
-                      {totals.totalHoras}h × {formatCurrency(data.settings.taxaHoraria)}/h
+                      {totals.totalHoras}h · taxa por entrada
                     </p>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Collaborators */}
               {horasPorColaborador.length > 0 && (
                 <Card className="border border-border/60 bg-card shadow-sm">
                   <CardContent className="p-4 md:p-6">
@@ -340,7 +335,6 @@ export function ReportsView() {
                       </div>
                       <span className="text-sm font-bold">Horas por Colaborador</span>
                     </div>
-
                     <div className="space-y-3 md:grid md:grid-cols-2 md:gap-x-8 md:gap-y-3 md:space-y-0">
                       {horasPorColaborador.map(({ nome, horas }) => {
                         const pct = totals.totalHoras > 0 ? (horas / totals.totalHoras) * 100 : 0
@@ -351,10 +345,7 @@ export function ReportsView() {
                               <span className="text-sm font-bold tabular-nums shrink-0">{horas}h</span>
                             </div>
                             <div className="h-2 rounded-full bg-muted overflow-hidden">
-                              <div
-                                className="h-full rounded-full bg-blue-500 transition-all duration-700"
-                                style={{ width: `${pct}%` }}
-                              />
+                              <div className="h-full rounded-full bg-blue-500 transition-all duration-700" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
                         )
@@ -364,7 +355,6 @@ export function ReportsView() {
                 </Card>
               )}
 
-              {/* Export button */}
               <Button
                 onClick={exportPDF}
                 className="w-full h-12 md:h-14 text-base font-semibold bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 shadow-md"
@@ -384,41 +374,41 @@ export function ReportsView() {
 // ── Entry Card ────────────────────────────────────────────────────────────────
 function EntryCard({
   entry,
-  taxaHoraria,
+  defaultTaxaHoraria,
   formatDate,
   formatCurrency,
 }: {
   entry: DayEntry
-  taxaHoraria: number
+  defaultTaxaHoraria: number
   formatDate: (d: string, short?: boolean) => string
   formatCurrency: (v: number) => string
 }) {
   const hasServices = Array.isArray(entry.services) && entry.services.length > 0
   const totalHoras = entry.totalHoras ?? 0
-  const valor = totalHoras * taxaHoraria
+  // ✅ Usa a taxa gravada na entry; fallback para a taxa atual
+  const taxa = entry.taxaHoraria ?? defaultTaxaHoraria
+  const valor = totalHoras * taxa
 
   return (
     <Card className="overflow-hidden border border-border/70 bg-card shadow-sm hover:shadow-md transition-shadow duration-200">
-      {/* Day header */}
       <div className="flex items-center justify-between px-4 md:px-5 py-3 md:py-3.5 bg-muted/30 border-b border-border/50">
         <p className="text-sm md:text-base font-semibold capitalize">{formatDate(entry.date, false)}</p>
         <div className="flex items-center gap-2 shrink-0">
-          <Badge
-            variant="secondary"
-            className="font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40 border-0 text-xs"
-          >
+          <Badge variant="secondary" className="font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40 border-0 text-xs">
             {totalHoras}h
           </Badge>
-          <Badge
-            variant="secondary"
-            className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/40 border-0 text-xs"
-          >
+          {/* ✅ Mostra a taxa se for diferente da atual */}
+          {entry.taxaHoraria && entry.taxaHoraria !== defaultTaxaHoraria && (
+            <Badge variant="outline" className="text-xs text-muted-foreground border-dashed">
+              {entry.taxaHoraria}€/h
+            </Badge>
+          )}
+          <Badge variant="secondary" className="font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/40 border-0 text-xs">
             {formatCurrency(valor)}
           </Badge>
         </div>
       </div>
 
-      {/* Services */}
       <div className="divide-y divide-border/30">
         {hasServices ? (
           entry.services!.map((s, idx) => (
@@ -428,50 +418,30 @@ function EntryCard({
                   <Hammer className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
                   <span className="text-sm font-semibold truncate">{s.obraNome}</span>
                   {s.totalHoras != null && s.totalHoras > 0 && (
-                    <Badge variant="outline" className="ml-auto text-xs shrink-0 font-medium">
-                      {s.totalHoras}h
-                    </Badge>
+                    <Badge variant="outline" className="ml-auto text-xs shrink-0 font-medium">{s.totalHoras}h</Badge>
                   )}
                 </div>
               )}
-
-              {s.descricao && (
-                <p className="text-sm text-muted-foreground leading-relaxed pl-5">{s.descricao}</p>
-              )}
-
+              {s.descricao && <p className="text-sm text-muted-foreground leading-relaxed pl-5">{s.descricao}</p>}
               <div className="pl-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {(s.equipa ?? []).length > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3 shrink-0" />
-                    {(s.equipa ?? []).join(", ")}
-                  </span>
+                  <span className="flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{(s.equipa ?? []).join(", ")}</span>
                 )}
                 {(s.materiais ?? []).length > 0 && (
-                  <span className="flex items-center gap-1">
-                    <Package className="h-3 w-3 shrink-0" />
-                    {(s.materiais ?? []).join(", ")}
-                  </span>
+                  <span className="flex items-center gap-1"><Package className="h-3 w-3 shrink-0" />{(s.materiais ?? []).join(", ")}</span>
                 )}
               </div>
             </div>
           ))
         ) : (
           <div className="px-4 md:px-5 py-3 md:py-3.5 space-y-1.5">
-            {entry.descricao && (
-              <p className="text-sm text-muted-foreground leading-relaxed">{entry.descricao}</p>
-            )}
+            {entry.descricao && <p className="text-sm text-muted-foreground leading-relaxed">{entry.descricao}</p>}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               {(entry.equipa ?? []).length > 0 && (
-                <span className="flex items-center gap-1">
-                  <Users className="h-3 w-3 shrink-0" />
-                  {(entry.equipa ?? []).join(", ")}
-                </span>
+                <span className="flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{(entry.equipa ?? []).join(", ")}</span>
               )}
               {(entry.materiais ?? []).length > 0 && (
-                <span className="flex items-center gap-1">
-                  <Package className="h-3 w-3 shrink-0" />
-                  {(entry.materiais ?? []).join(", ")}
-                </span>
+                <span className="flex items-center gap-1"><Package className="h-3 w-3 shrink-0" />{(entry.materiais ?? []).join(", ")}</span>
               )}
             </div>
           </div>

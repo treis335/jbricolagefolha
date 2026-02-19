@@ -52,6 +52,20 @@ const DELETE_WARN_KEY = "adminDeletePaymentWarnDismissed"
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v)
 
+// ✅ Helper: resolve a taxa de uma entry com todos os fallbacks possíveis
+function resolveEntryTaxa(entry: any, currentRate: number): number {
+  // 1. Taxa na raiz da entry (formato novo correto)
+  if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0)
+    return entry.taxaHoraria
+  // 2. Taxa dentro de services[0] (formato intermédio — gravado antes do fix)
+  if (Array.isArray(entry.services) && entry.services.length > 0) {
+    const s0Taxa = entry.services[0]?.taxaHoraria
+    if (typeof s0Taxa === "number" && s0Taxa > 0) return s0Taxa
+  }
+  // 3. Fallback para a taxa atual do colaborador (entries muito antigas)
+  return currentRate
+}
+
 export function AdminFinanceView() {
   const { collaborators, loading, error, refetch } = useCollaborators()
   const router = useRouter()
@@ -70,7 +84,6 @@ export function AdminFinanceView() {
   const [historyData, setHistoryData] = useState<MonthSummary[]>([])
   const [isMobile, setIsMobile] = useState(false)
 
-  // Delete warning
   const [showDeleteWarn, setShowDeleteWarn] = useState(false)
   const [deleteWarnDontShow, setDeleteWarnDontShow] = useState(false)
   const [pendingDeletePayment, setPendingDeletePayment] = useState<any>(null)
@@ -93,7 +106,7 @@ export function AdminFinanceView() {
   const financeData = useMemo(() => {
     return collaborators
       .map((collab) => {
-        const rate = collab.currentRate || 0
+        const currentRate = collab.currentRate || 0
         const entries = collab.entries || []
         const payments = [...(collab.payments || [])].sort(
           (a, b) => new Date(a.date || 0).getTime() - new Date(b.date || 0).getTime()
@@ -108,8 +121,11 @@ export function AdminFinanceView() {
           if (!monthMap.has(periodo))
             monthMap.set(periodo, { periodo, hours: 0, cost: 0, paid: 0, pending: 0, payments: [] })
           const m = monthMap.get(periodo)!
-          m.hours += entry.totalHoras || 0
-          m.cost += rate * (entry.totalHoras || 0)
+          const horas = entry.totalHoras || 0
+          // ✅ Usa helper com todos os fallbacks (raiz → services[0] → taxa atual)
+          const taxa = resolveEntryTaxa(entry, currentRate)
+          m.hours += horas
+          m.cost += taxa * horas
         })
 
         payments.forEach((p: any) => {
@@ -121,6 +137,7 @@ export function AdminFinanceView() {
 
         let allMonths = Array.from(monthMap.values()).sort((a, b) => a.periodo.localeCompare(b.periodo))
 
+        // FIFO payment allocation
         let paymentIdx = 0, remainingPayment = 0
         for (const m of allMonths) {
           let remaining = m.cost
@@ -152,7 +169,7 @@ export function AdminFinanceView() {
           name: collab.name,
           email: collab.email,
           totalHoursThisMonth: currentMonthData.hours,
-          currentRate: rate,
+          currentRate,
           thisMonthCost: currentMonthData.cost,
           thisMonthPaid: currentMonthData.paid,
           thisMonthPending: currentMonthData.pending,
@@ -216,7 +233,7 @@ export function AdminFinanceView() {
       date: paymentDate,
       valor: Number(paymentAmount),
       metodo: selectedMethod,
-      source: "admin", // always Admin when registered here
+      source: "admin",
     }
     try {
       await updateDoc(doc(db, "users", selectedCollab.collaboratorId), {
@@ -231,53 +248,28 @@ export function AdminFinanceView() {
     }
   }
 
-  // ── Delete flow with optional warning ──
   const requestDeletePayment = (payment: any) => {
     const dismissed = typeof window !== "undefined" && localStorage.getItem(DELETE_WARN_KEY) === "true"
-    if (dismissed) {
-      commitDeletePayment(payment)
-    } else {
-      setPendingDeletePayment(payment)
-      setDeleteWarnDontShow(false)
-      setShowDeleteWarn(true)
-    }
+    if (dismissed) commitDeletePayment(payment)
+    else { setPendingDeletePayment(payment); setDeleteWarnDontShow(false); setShowDeleteWarn(true) }
   }
 
   const commitDeletePayment = async (payment: any) => {
     if (!selectedCollab) return
     try {
       const userRef = doc(db, "users", selectedCollab.collaboratorId)
-
-      // 1. Read the full current document from Firestore
       const snap = await getDoc(userRef)
       if (!snap.exists()) { alert("Colaborador não encontrado."); return }
-
       const workData = snap.data()?.workData || {}
       const currentPayments: any[] = workData.payments || []
-
-      // 2. Filter out by id — safe regardless of field order or type coercion
       const updatedPayments = currentPayments.filter((p: any) => p.id !== payment.id)
-
       if (updatedPayments.length === currentPayments.length) {
-        // Nothing was removed — payment not found in Firestore
-        alert("Pagamento não encontrado. Tenta atualizar a página.")
-        return
+        alert("Pagamento não encontrado. Tenta atualizar a página."); return
       }
-
-      // 3. Write the filtered array back
       await updateDoc(userRef, { "workData.payments": updatedPayments })
-
       setShowDeleteWarn(false)
       setPendingDeletePayment(null)
-
-      // 4. Update history dialog in-place so it stays open
-      setHistoryData(prev =>
-        prev.map(m => ({
-          ...m,
-          payments: m.payments.filter(p => p.id !== payment.id),
-        }))
-      )
-
+      setHistoryData(prev => prev.map(m => ({ ...m, payments: m.payments.filter(p => p.id !== payment.id) })))
       refetch()
     } catch (err) {
       console.error(err)
@@ -286,9 +278,7 @@ export function AdminFinanceView() {
   }
 
   const handleConfirmDelete = () => {
-    if (deleteWarnDontShow && typeof window !== "undefined") {
-      localStorage.setItem(DELETE_WARN_KEY, "true")
-    }
+    if (deleteWarnDontShow && typeof window !== "undefined") localStorage.setItem(DELETE_WARN_KEY, "true")
     if (pendingDeletePayment) commitDeletePayment(pendingDeletePayment)
   }
 
@@ -319,7 +309,7 @@ export function AdminFinanceView() {
             <div>
               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gestão Financeira</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
-                Pagamentos em tempo real · Cálculo FIFO por colaborador
+                Pagamentos em tempo real · Taxa histórica por entrada
               </p>
             </div>
           </div>
@@ -336,10 +326,10 @@ export function AdminFinanceView() {
         {/* ── KPIs ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { icon: <DollarSign className="h-5 w-5" />,   label: "Custo Mês Atual",              value: `${totals.totalCost.toFixed(2)} €`,    theme: "blue" },
-            { icon: <CheckCircle2 className="h-5 w-5" />, label: "Pago Mês Atual",               value: `${totals.totalPaid.toFixed(2)} €`,    theme: "emerald" },
-            { icon: <Clock className="h-5 w-5" />,        label: "Total Pendente",                value: `${totals.totalPending.toFixed(2)} €`, theme: "amber" },
-            { icon: <AlertTriangle className="h-5 w-5" />,label: `${totals.withOverdue} em atraso`, value: `${totals.overdueTotal.toFixed(2)} €`, theme: "red" },
+            { icon: <DollarSign className="h-5 w-5" />,    label: "Custo Mês Atual",               value: `${totals.totalCost.toFixed(2)} €`,    theme: "blue" },
+            { icon: <CheckCircle2 className="h-5 w-5" />,  label: "Pago Mês Atual",                value: `${totals.totalPaid.toFixed(2)} €`,    theme: "emerald" },
+            { icon: <Clock className="h-5 w-5" />,         label: "Total Pendente",                 value: `${totals.totalPending.toFixed(2)} €`, theme: "amber" },
+            { icon: <AlertTriangle className="h-5 w-5" />, label: `${totals.withOverdue} em atraso`, value: `${totals.overdueTotal.toFixed(2)} €`, theme: "red" },
           ].map((kpi) => {
             const t: Record<string, string> = {
               blue:    "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400",
@@ -379,9 +369,7 @@ export function AdminFinanceView() {
                     viewMode === mode ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {mode === "cards"
-                    ? <><LayoutGrid className="h-4 w-4" /> Cards</>
-                    : <><TableIcon className="h-4 w-4" /> Tabela</>}
+                  {mode === "cards" ? <><LayoutGrid className="h-4 w-4" /> Cards</> : <><TableIcon className="h-4 w-4" /> Tabela</>}
                 </button>
               ))}
             </div>
@@ -407,10 +395,10 @@ export function AdminFinanceView() {
                     <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground">{currentMonthKey}</p>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                       {[
-                        { label: "Horas",    value: `${f.totalHoursThisMonth.toFixed(1)}h`, color: "" },
-                        { label: "Custo",    value: `${f.thisMonthCost.toFixed(2)} €`,       color: "text-blue-600 dark:text-blue-400" },
-                        { label: "Pago",     value: `${f.thisMonthPaid.toFixed(2)} €`,       color: "text-emerald-600 dark:text-emerald-400" },
-                        { label: "Pendente", value: `${f.thisMonthPending.toFixed(2)} €`,    color: "text-amber-600 dark:text-amber-400" },
+                        { label: "Horas",    value: `${f.totalHoursThisMonth.toFixed(1)}h`,  color: "" },
+                        { label: "Custo",    value: `${f.thisMonthCost.toFixed(2)} €`,        color: "text-blue-600 dark:text-blue-400" },
+                        { label: "Pago",     value: `${f.thisMonthPaid.toFixed(2)} €`,        color: "text-emerald-600 dark:text-emerald-400" },
+                        { label: "Pendente", value: `${f.thisMonthPending.toFixed(2)} €`,     color: "text-amber-600 dark:text-amber-400" },
                       ].map(row => (
                         <div key={row.label} className="flex justify-between col-span-2 md:col-span-1">
                           <span className="text-muted-foreground">{row.label}</span>
@@ -555,31 +543,21 @@ export function AdminFinanceView() {
                       <div className="px-5 py-3 space-y-2">
                         <p className="text-[10px] uppercase tracking-widest font-semibold text-muted-foreground mb-3">Pagamentos</p>
                         {m.payments.map((p: any) => (
-                          <div
-                            key={p.id}
-                            className="flex items-center justify-between py-2.5 px-4 bg-muted/40 rounded-lg hover:bg-muted/70 transition-colors group"
-                          >
+                          <div key={p.id} className="flex items-center justify-between py-2.5 px-4 bg-muted/40 rounded-lg hover:bg-muted/70 transition-colors group">
                             <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
                               <span className="font-semibold text-sm">{p.valor.toFixed(2)} €</span>
                               <span className="text-xs text-muted-foreground hidden sm:block">
                                 {new Date(p.date).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" })}
                               </span>
                               <span className="text-xs px-2 py-0.5 rounded-md bg-background border capitalize">{p.metodo}</span>
-                              {/* Source badge */}
                               {p.source === "admin" ? (
-                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold">
-                                  Admin
-                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold">Admin</span>
                               ) : (
-                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">
-                                  Colaborador
-                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-medium">Colaborador</span>
                               )}
                             </div>
-                            {/* Admin can delete ANY payment */}
                             <Button
-                              variant="ghost"
-                              size="icon"
+                              variant="ghost" size="icon"
                               className="h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 opacity-0 group-hover:opacity-100 transition-all shrink-0"
                               onClick={() => requestDeletePayment(p)}
                             >
@@ -589,7 +567,6 @@ export function AdminFinanceView() {
                         ))}
                       </div>
                     )}
-
                     {m.payments.length === 0 && m.cost > 0 && (
                       <p className="px-5 py-3 text-xs text-muted-foreground italic">Sem pagamentos registados neste mês.</p>
                     )}
@@ -626,26 +603,14 @@ export function AdminFinanceView() {
               <Label className="text-sm font-medium">Valor a pagar</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">€</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(Number(e.target.value))}
-                  className="pl-8 text-2xl font-bold h-14"
-                />
+                <Input type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(Number(e.target.value))} className="pl-8 text-2xl font-bold h-14" />
               </div>
               {selectedCollab && (
                 <div className="flex gap-2 mt-2 flex-wrap">
-                  <button
-                    onClick={() => setPaymentAmount(selectedCollab.thisMonthPending)}
-                    className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/70 transition-colors"
-                  >
+                  <button onClick={() => setPaymentAmount(selectedCollab.thisMonthPending)} className="text-xs px-2.5 py-1 rounded-md bg-muted hover:bg-muted/70 transition-colors">
                     Só mês atual ({selectedCollab.thisMonthPending.toFixed(2)} €)
                   </button>
-                  <button
-                    onClick={() => setPaymentAmount(selectedCollab.totalPendingAll)}
-                    className="text-xs px-2.5 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 transition-colors"
-                  >
+                  <button onClick={() => setPaymentAmount(selectedCollab.totalPendingAll)} className="text-xs px-2.5 py-1 rounded-md bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-200 transition-colors">
                     Total pendente ({selectedCollab.totalPendingAll.toFixed(2)} €)
                   </button>
                 </div>
@@ -672,7 +637,6 @@ export function AdminFinanceView() {
                 </SelectContent>
               </Select>
             </div>
-            {/* Info: labeled as Admin */}
             <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 px-3 py-2.5 rounded-lg">
               <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <span>Este pagamento ficará registado como <strong>Admin</strong> no histórico do colaborador.</span>
@@ -687,7 +651,7 @@ export function AdminFinanceView() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Warning AlertDialog ── */}
+      {/* ── Delete Warning ── */}
       <AlertDialog open={showDeleteWarn} onOpenChange={setShowDeleteWarn}>
         <AlertDialogContent className="max-w-sm">
           <AlertDialogHeader>
@@ -718,25 +682,15 @@ export function AdminFinanceView() {
                 )}
                 <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl px-4 py-3 text-left">
                   <p className="text-red-700 dark:text-red-400 text-xs leading-relaxed">
-                    Como administrador podes eliminar qualquer pagamento.
-                    Esta ação <strong>não pode ser desfeita</strong> e irá
-                    afetar os cálculos de saldo deste colaborador.
+                    Esta ação <strong>não pode ser desfeita</strong> e irá afetar os cálculos de saldo deste colaborador.
                   </p>
                 </div>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-
-          {/* Don't show again */}
-          <div
-            onClick={() => setDeleteWarnDontShow(v => !v)}
-            className="flex items-center gap-2.5 px-1 py-1 cursor-pointer group select-none"
-          >
-            <div className={cn(
-              "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0",
-              deleteWarnDontShow
-                ? "bg-primary border-primary"
-                : "border-muted-foreground/40 group-hover:border-primary/60"
+          <div onClick={() => setDeleteWarnDontShow(v => !v)} className="flex items-center gap-2.5 px-1 py-1 cursor-pointer group select-none">
+            <div className={cn("w-4 h-4 rounded border-2 flex items-center justify-center transition-colors shrink-0",
+              deleteWarnDontShow ? "bg-primary border-primary" : "border-muted-foreground/40 group-hover:border-primary/60"
             )}>
               {deleteWarnDontShow && (
                 <svg className="w-2.5 h-2.5 text-primary-foreground" viewBox="0 0 10 8" fill="none">
@@ -744,18 +698,11 @@ export function AdminFinanceView() {
                 </svg>
               )}
             </div>
-            <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">
-              Não voltar a mostrar este aviso
-            </span>
+            <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors">Não voltar a mostrar este aviso</span>
           </div>
-
           <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel onClick={() => { setShowDeleteWarn(false); setPendingDeletePayment(null) }}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700 text-white">
-              Sim, eliminar
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => { setShowDeleteWarn(false); setPendingDeletePayment(null) }}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmDelete} className="bg-red-600 hover:bg-red-700 text-white">Sim, eliminar</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -48,11 +48,23 @@ interface Service {
   totalHoras?: number
 }
 
+// -------- Helper: resolve a taxa de uma entry existente com todos os fallbacks --------
+function resolveExistingTaxa(entry: DayEntry): number | undefined {
+  // 1. Taxa na raiz da entry (formato correto mais recente)
+  if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0)
+    return entry.taxaHoraria
+  // 2. Taxa dentro de services[0] (formato intermédio gravado antes do fix)
+  if (Array.isArray((entry as any).services) && (entry as any).services.length > 0) {
+    const s0Taxa = (entry as any).services[0]?.taxaHoraria
+    if (typeof s0Taxa === "number" && s0Taxa > 0) return s0Taxa
+  }
+  return undefined
+}
+
 // -------- Helper: converte qualquer entrada (antiga ou nova) em lista de Services --------
 function entryToServices(entry: DayEntry): Service[] {
-  // Formato novo: tem services com conteúdo
-  if (Array.isArray(entry.services) && entry.services.length > 0) {
-    return entry.services.map((s: any) => ({
+  if (Array.isArray((entry as any).services) && (entry as any).services.length > 0) {
+    return (entry as any).services.map((s: any) => ({
       id: s.id ?? uuidv4(),
       obraNome: typeof s.obraNome === "string" ? s.obraNome : "",
       descricao: typeof s.descricao === "string" ? s.descricao : "",
@@ -66,7 +78,6 @@ function entryToServices(entry: DayEntry): Service[] {
     }))
   }
 
-  // Formato antigo: sem services — reconstrói um único service a partir dos campos raiz
   return [
     {
       id: uuidv4(),
@@ -84,7 +95,7 @@ function entryToServices(entry: DayEntry): Service[] {
 }
 
 export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
-  const { getEntry, addEntry, deleteEntry } = useWorkTracker()
+  const { getEntry, addEntry, deleteEntry, data } = useWorkTracker()
 
   const [totalHoras, setTotalHoras] = useState(8)
   const [services, setServices] = useState<Service[]>([])
@@ -122,12 +133,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const formatDate = (d: Date) =>
     d.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
 
-  // -------- Inicializa o form ao abrir --------
   useEffect(() => {
     if (!date || !open) return
 
     if (existingEntry) {
-      // Garante totalHoras válido (compatibilidade com entradas antigas)
       const horas =
         typeof existingEntry.totalHoras === "number" && existingEntry.totalHoras > 0
           ? existingEntry.totalHoras
@@ -135,12 +144,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
       setTotalHoras(horas)
 
-      // Converte entrada antiga ou nova em lista de services
       const loadedServices = entryToServices(existingEntry)
       setServices(loadedServices)
       setActiveServiceId(loadedServices[0]?.id ?? null)
     } else {
-      // Nova entrada
       const newService: Service = {
         id: uuidv4(),
         obraNome: "",
@@ -210,6 +217,14 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       return service
     })
 
+    // ✅ Resolve a taxa com todos os fallbacks:
+    // 1. Taxa na raiz da entry existente
+    // 2. Taxa em services[0] da entry existente (formato intermédio)
+    // 3. Taxa atual das settings (nova entry)
+    const taxaHoraria = existingEntry
+      ? (resolveExistingTaxa(existingEntry) ?? data.settings.taxaHoraria)
+      : data.settings.taxaHoraria
+
     const entry: DayEntry = {
       id: existingEntry?.id ?? uuidv4(),
       date: dateStr,
@@ -221,6 +236,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         services.length === 1 ? services[0].descricao : "Múltiplos serviços",
       equipa: services.flatMap(s => s.equipa ?? []),
       materiais: services.flatMap(s => s.materiais ?? []),
+      // ✅ Sempre gravado na raiz da entry, nunca dentro dos services
+      taxaHoraria,
     }
 
     addEntry(entry)
@@ -341,7 +358,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     onValueChange={setActiveServiceId}
                     className="w-full"
                   >
-                    {/* Abas com scroll horizontal */}
                     <div className="relative w-full rounded-xl border border-border/40 bg-muted/30">
                       <div className="overflow-x-auto overflow-y-hidden">
                         <TabsList

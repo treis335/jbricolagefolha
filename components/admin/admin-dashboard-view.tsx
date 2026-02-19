@@ -16,10 +16,8 @@ export function AdminDashboardView() {
   const stats = {
     totalCollaborators: collaborators.length,
     totalHoursThisMonth: collaborators.reduce((sum, c) => sum + c.totalHoursThisMonth, 0),
-    totalCostThisMonth: collaborators.reduce(
-      (sum, c) => sum + c.totalHoursThisMonth * c.currentRate,
-      0
-    ),
+    // ✅ Usa totalCostThisMonth calculado com taxa histórica por entry
+    totalCostThisMonth: collaborators.reduce((sum, c) => sum + c.totalCostThisMonth, 0),
     activeThisMonth: collaborators.filter((c) => c.totalHoursThisMonth > 0).length,
     inactiveThisMonth: collaborators.filter((c) => c.totalHoursThisMonth === 0).length,
     totalHoursAllTime: collaborators.reduce((sum, c) => sum + c.totalHoursAllTime, 0),
@@ -143,8 +141,9 @@ export function AdminDashboardView() {
                 {stats.totalCostThisMonth.toFixed(0)}
                 <span className="text-lg font-medium ml-0.5">€</span>
               </p>
+              {/* ✅ Legenda atualizada para refletir que usa taxa histórica */}
               <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-                Baseado nas taxas atuais
+                Baseado nas taxas históricas
               </p>
             </CardContent>
           </Card>
@@ -170,10 +169,10 @@ export function AdminDashboardView() {
           </Card>
         </div>
 
-        {/* ── Main Content Grid (desktop: 3 cols) ── */}
+        {/* ── Main Content Grid ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-          {/* Top Collaborators — 2 cols wide */}
+          {/* Top Collaborators */}
           <Card className="md:col-span-2">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
@@ -208,7 +207,6 @@ export function AdminDashboardView() {
 
                       return (
                         <div key={collab.id} className="group flex items-center gap-4 p-3 rounded-xl hover:bg-muted/50 transition-colors">
-                          {/* Rank */}
                           <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold shrink-0 ${
                             index === 0 ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400" :
                             index === 1 ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" :
@@ -218,14 +216,14 @@ export function AdminDashboardView() {
                             {index + 1}
                           </div>
 
-                          {/* Name + progress */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1.5">
                               <p className="font-medium text-sm truncate">{collab.name}</p>
                               <div className="flex items-center gap-3 shrink-0 ml-2">
                                 <span className="text-sm font-bold">{collab.totalHoursThisMonth.toFixed(1)}h</span>
+                                {/* ✅ Usa totalCostThisMonth com taxa histórica */}
                                 <span className="text-xs text-muted-foreground hidden md:inline">
-                                  {(collab.totalHoursThisMonth * collab.currentRate).toFixed(2)} €
+                                  {collab.totalCostThisMonth.toFixed(2)} €
                                 </span>
                               </div>
                             </div>
@@ -249,7 +247,7 @@ export function AdminDashboardView() {
             </CardContent>
           </Card>
 
-          {/* Estatísticas Adicionais — 1 col */}
+          {/* Estatísticas + Quick Actions */}
           <div className="space-y-4">
             <Card>
               <CardHeader className="pb-3">
@@ -273,7 +271,6 @@ export function AdminDashboardView() {
               </CardContent>
             </Card>
 
-            {/* Quick Actions */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">

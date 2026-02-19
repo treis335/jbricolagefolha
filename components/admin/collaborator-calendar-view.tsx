@@ -1,4 +1,4 @@
-// components/admin/collaborator-calendar-view.tsx (VERSÃO MELHORADA)
+// components/admin/collaborator-calendar-view.tsx 
 "use client"
 
 import { useState, useMemo } from "react"
@@ -21,6 +21,17 @@ interface CollaboratorCalendarViewProps {
   entries: any[]
 }
 
+// ✅ Helper: resolve a taxa de uma entry com todos os fallbacks
+function resolveEntryTaxa(entry: any, currentRate: number): number {
+  if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0)
+    return entry.taxaHoraria
+  if (Array.isArray(entry.services) && entry.services.length > 0) {
+    const s0Taxa = entry.services[0]?.taxaHoraria
+    if (typeof s0Taxa === "number" && s0Taxa > 0) return s0Taxa
+  }
+  return currentRate
+}
+
 export function CollaboratorCalendarView({
   collaboratorId,
   collaboratorName,
@@ -31,103 +42,71 @@ export function CollaboratorCalendarView({
   const [selectedEntry, setSelectedEntry] = useState<any>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
 
-  // Criar mapa de entradas por data
   const entryMap = useMemo(() => {
     const map = new Map<string, any>()
     entries.forEach((entry) => {
-      if (entry.date) {
-        map.set(entry.date, entry)
-      }
+      if (entry.date) map.set(entry.date, entry)
     })
     return map
   }, [entries])
 
-  // Navegar entre meses
   const handleMonthChange = (direction: "prev" | "next") => {
     setCurrentMonth((prev) => {
       const newDate = new Date(prev)
-      if (direction === "prev") {
-        newDate.setMonth(newDate.getMonth() - 1)
-      } else {
-        newDate.setMonth(newDate.getMonth() + 1)
-      }
+      newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1))
       return newDate
     })
   }
 
-  const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
-  }
+  const formatMonthYear = (date: Date) =>
+    date.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
 
-  // Gerar dias do calendário
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
 
-    // Ajustar para começar na segunda-feira
     let startDayOfWeek = firstDay.getDay() - 1
     if (startDayOfWeek < 0) startDayOfWeek = 6
 
     const days: Array<{ date: Date; index: number } | null> = []
-
-    // Slots vazios antes do primeiro dia
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push(null)
-    }
-
-    // Dias do mês
+    for (let i = 0; i < startDayOfWeek; i++) days.push(null)
     for (let d = 1; d <= lastDay.getDate(); d++) {
-      days.push({
-        date: new Date(year, month, d),
-        index: startDayOfWeek + d - 1,
-      })
+      days.push({ date: new Date(year, month, d), index: startDayOfWeek + d - 1 })
     }
-
     return days
   }, [currentMonth])
 
-  // Calcular totais do mês
+  // ✅ Calcula custo do mês com taxa histórica por entry
   const monthStats = useMemo(() => {
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
 
-    let totalHours = 0
-    let normalHours = 0
-    let extraHours = 0
-    let daysWorked = 0
+    let totalHours = 0, normalHours = 0, extraHours = 0, daysWorked = 0, totalCost = 0
 
     entries.forEach((entry) => {
       if (!entry.date) return
       const [y, m] = entry.date.split("-").map(Number)
       if (y === year && m - 1 === month) {
-        totalHours += entry.totalHoras || 0
+        const horas = entry.totalHoras || 0
+        totalHours += horas
         normalHours += entry.normalHoras || 0
         extraHours += entry.extraHoras || 0
         daysWorked++
+        // ✅ Taxa histórica da entry em vez de sempre currentRate
+        totalCost += horas * resolveEntryTaxa(entry, currentRate)
       }
     })
 
-    const totalCost = totalHours * currentRate
-
-    return {
-      totalHours,
-      normalHours,
-      extraHours,
-      daysWorked,
-      totalCost,
-    }
+    return { totalHours, normalHours, extraHours, daysWorked, totalCost }
   }, [entries, currentMonth, currentRate])
 
   const handleDayClick = (date: Date | null) => {
     if (!date) return
     const dateStr = date.toISOString().split("T")[0]
     const entry = entryMap.get(dateStr)
-    if (entry) {
-      setSelectedEntry(entry)
-      setSheetOpen(true)
-    }
+    if (entry) { setSelectedEntry(entry); setSheetOpen(true) }
   }
 
   const weekDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
@@ -135,23 +114,13 @@ export function CollaboratorCalendarView({
 
   return (
     <div className="space-y-4">
-      {/* Header com navegação */}
+      {/* Navegação mês */}
       <div className="flex items-center justify-between px-4 py-3 border border-border rounded-lg bg-card">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => handleMonthChange("prev")}
-        >
+        <Button variant="ghost" size="icon" onClick={() => handleMonthChange("prev")}>
           <ChevronLeft className="h-5 w-5" />
         </Button>
-        <h2 className="text-lg font-semibold capitalize">
-          {formatMonthYear(currentMonth)}
-        </h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => handleMonthChange("next")}
-        >
+        <h2 className="text-lg font-semibold capitalize">{formatMonthYear(currentMonth)}</h2>
+        <Button variant="ghost" size="icon" onClick={() => handleMonthChange("next")}>
           <ChevronRight className="h-5 w-5" />
         </Button>
       </div>
@@ -160,9 +129,7 @@ export function CollaboratorCalendarView({
       <div className="grid grid-cols-2 gap-3">
         <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-blue-900 dark:text-blue-200 mb-1">
-              Total Horas
-            </p>
+            <p className="text-xs text-blue-900 dark:text-blue-200 mb-1">Total Horas</p>
             <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {monthStats.totalHours.toFixed(1)}h
             </p>
@@ -170,9 +137,8 @@ export function CollaboratorCalendarView({
         </Card>
         <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
           <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-green-900 dark:text-green-200 mb-1">
-              Custo Total
-            </p>
+            <p className="text-xs text-green-900 dark:text-green-200 mb-1">Custo Total</p>
+            {/* ✅ Custo com taxa histórica */}
             <p className="text-2xl font-bold text-green-600 dark:text-green-400">
               {monthStats.totalCost.toFixed(2)} €
             </p>
@@ -183,32 +149,23 @@ export function CollaboratorCalendarView({
       {/* Calendário */}
       <Card>
         <CardContent className="pt-6">
-          {/* Dias da semana */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {weekDays.map((day) => (
-              <div
-                key={day}
-                className="text-center text-xs font-medium text-muted-foreground py-2"
-              >
+              <div key={day} className="text-center text-xs font-medium text-muted-foreground py-2">
                 {day}
               </div>
             ))}
           </div>
 
-          {/* Dias do mês */}
           <div className="grid grid-cols-7 gap-1">
             {calendarDays.map((dayObj, index) => {
-              if (!dayObj) {
-                return <div key={`empty-${index}`} className="aspect-square" />
-              }
+              if (!dayObj) return <div key={`empty-${index}`} className="aspect-square" />
 
               const { date } = dayObj
               const dateStr = date.toISOString().split("T")[0]
               const entry = entryMap.get(dateStr)
               const hasEntry = !!entry
-              const totalHoras = entry?.totalHoras
               const isToday = dateStr === today
-
               const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
 
               return (
@@ -223,20 +180,17 @@ export function CollaboratorCalendarView({
                       : "hover:bg-muted/50"
                   )}
                 >
-                  <span
-                    className={cn(
-                      "text-sm font-medium",
-                      isToday && "text-primary",
-                      hasEntry && "text-primary",
-                      !hasEntry && "text-foreground"
-                    )}
-                  >
+                  <span className={cn(
+                    "text-sm font-medium",
+                    isToday && "text-primary",
+                    hasEntry && "text-primary",
+                    !hasEntry && "text-foreground"
+                  )}>
                     {date.getDate()}
                   </span>
-
-                  {hasEntry && totalHoras && (
+                  {hasEntry && entry.totalHoras && (
                     <span className="text-[10px] font-semibold text-primary mt-0.5">
-                      {totalHoras}h
+                      {entry.totalHoras}h
                     </span>
                   )}
                 </button>
@@ -262,12 +216,10 @@ export function CollaboratorCalendarView({
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Horas Extras:</span>
-            <span className="font-bold text-destructive">
-              {monthStats.extraHours.toFixed(1)}h
-            </span>
+            <span className="font-bold text-destructive">{monthStats.extraHours.toFixed(1)}h</span>
           </div>
           <div className="flex justify-between text-sm pt-2 border-t">
-            <span className="text-muted-foreground">Taxa Horária:</span>
+            <span className="text-muted-foreground">Taxa Atual:</span>
             <span className="font-bold">{currentRate.toFixed(2)} €/h</span>
           </div>
         </CardContent>
@@ -285,17 +237,14 @@ export function CollaboratorCalendarView({
         </span>
       </div>
 
-      {/* Sheet com detalhes do dia */}
+      {/* Sheet: detalhe do dia */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
         <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl">
           <SheetHeader className="mb-6">
             <SheetTitle className="text-left">
               {selectedEntry
                 ? new Date(selectedEntry.date).toLocaleDateString("pt-PT", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
+                    weekday: "long", day: "numeric", month: "long", year: "numeric",
                   })
                 : ""}
             </SheetTitle>
@@ -303,7 +252,6 @@ export function CollaboratorCalendarView({
 
           {selectedEntry && (
             <div className="space-y-6 overflow-y-auto max-h-[calc(85vh-120px)]">
-              {/* Total Horas Card */}
               <Card className="bg-primary/5 border-primary/20">
                 <CardContent className="pt-4">
                   <div className="flex items-center justify-between mb-3">
@@ -318,27 +266,23 @@ export function CollaboratorCalendarView({
                   <div className="grid grid-cols-3 gap-2 text-sm">
                     <div className="flex flex-col p-2 bg-background rounded">
                       <span className="text-muted-foreground text-xs">Normais:</span>
-                      <span className="font-medium">
-                        {selectedEntry.normalHoras || 0}h
-                      </span>
+                      <span className="font-medium">{selectedEntry.normalHoras || 0}h</span>
                     </div>
                     <div className="flex flex-col p-2 bg-background rounded">
                       <span className="text-muted-foreground text-xs">Extras:</span>
-                      <span className="font-medium text-destructive">
-                        {selectedEntry.extraHoras || 0}h
-                      </span>
+                      <span className="font-medium text-destructive">{selectedEntry.extraHoras || 0}h</span>
                     </div>
                     <div className="flex flex-col p-2 bg-background rounded">
                       <span className="text-muted-foreground text-xs">Custo:</span>
+                      {/* ✅ Custo do dia com taxa histórica da entry */}
                       <span className="font-medium text-green-600">
-                        {(selectedEntry.totalHoras * currentRate).toFixed(2)} €
+                        {(selectedEntry.totalHoras * resolveEntryTaxa(selectedEntry, currentRate)).toFixed(2)} €
                       </span>
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Serviços */}
               <div className="space-y-3">
                 <h3 className="font-semibold flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
@@ -355,51 +299,32 @@ export function CollaboratorCalendarView({
                       <CardContent className="space-y-3">
                         {service.descricao && (
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Descrição:
-                            </p>
-                            <p className="text-sm whitespace-pre-line">
-                              {service.descricao}
-                            </p>
+                            <p className="text-xs text-muted-foreground mb-1">Descrição:</p>
+                            <p className="text-sm whitespace-pre-line">{service.descricao}</p>
                           </div>
                         )}
-
                         {service.totalHoras && (
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">
-                              Horas neste serviço:
-                            </p>
-                            <Badge variant="secondary" className="text-sm">
-                              {service.totalHoras}h
-                            </Badge>
+                            <p className="text-xs text-muted-foreground mb-1">Horas neste serviço:</p>
+                            <Badge variant="secondary" className="text-sm">{service.totalHoras}h</Badge>
                           </div>
                         )}
-
                         {service.equipa && service.equipa.length > 0 && (
                           <div>
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Equipa:
-                            </p>
+                            <p className="text-xs text-muted-foreground mb-2">Equipa:</p>
                             <div className="flex flex-wrap gap-1">
                               {service.equipa.map((member: string) => (
-                                <Badge key={member} variant="outline">
-                                  {member}
-                                </Badge>
+                                <Badge key={member} variant="outline">{member}</Badge>
                               ))}
                             </div>
                           </div>
                         )}
-
                         {service.materiais && service.materiais.length > 0 && (
                           <div>
-                            <p className="text-xs text-muted-foreground mb-2">
-                              Materiais:
-                            </p>
+                            <p className="text-xs text-muted-foreground mb-2">Materiais:</p>
                             <div className="flex flex-wrap gap-1">
                               {service.materiais.map((material: string, i: number) => (
-                                <Badge key={i} variant="secondary">
-                                  {material}
-                                </Badge>
+                                <Badge key={i} variant="secondary">{material}</Badge>
                               ))}
                             </div>
                           </div>
