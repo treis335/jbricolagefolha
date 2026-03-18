@@ -41,18 +41,16 @@ export function calculateHours(
   const dayOfWeek = new Date(date).getDay() // 0 = Sunday, 6 = Saturday
 
   if (dayOfWeek === 0) {
-    // Sunday: all extra
+    // Domingo: tudo extra
     return { normalHoras: 0, extraHoras: totalHoras }
   }
 
   if (dayOfWeek === 6) {
-    // Saturday: first 5 normal
-    const normalHoras = Math.min(totalHoras, 5)
-    const extraHoras = Math.max(0, totalHoras - 5)
-    return { normalHoras, extraHoras }
+    // Sábado: tudo extra
+    return { normalHoras: 0, extraHoras: totalHoras }
   }
 
-  // Mon-Fri: first 8 normal
+  // Seg-Sex: primeiras 8h normais
   const normalHoras = Math.min(totalHoras, 8)
   const extraHoras = Math.max(0, totalHoras - 8)
   return { normalHoras, extraHoras }

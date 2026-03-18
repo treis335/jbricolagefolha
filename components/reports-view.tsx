@@ -1,7 +1,7 @@
 //reports-view.tsx
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -10,18 +10,43 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   Clock, ChevronLeft, ChevronRight, FileDown,
   TrendingUp, Users, Package, CalendarDays,
-  Hammer, Euro, BarChart3,
+  Hammer, Euro, BarChart3, CalendarRange,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
-import type { DayEntry } from "@/lib/types"
+import { useAuth } from "@/lib/AuthProvider"
+import { db } from "@/lib/firebase"
+import { doc, getDoc } from "firebase/firestore"
+import { type DayEntry, calculateHours } from "@/lib/types"
 import { getNomesColaboradores } from "@/lib/colaboradores"
 
 type Period = "daily" | "weekly" | "monthly"
 
 export function ReportsView() {
-  const { data } = useWorkTracker()
+  const { data, paidDates } = useWorkTracker()
+  const { user } = useAuth()
   const [period, setPeriod] = useState<Period>("weekly")
   const [currentDate, setCurrentDate] = useState(new Date())
+  const [username, setUsername] = useState<string>("Colaborador")
+
+  // Busca o username do Firestore (campo gravado pelo AuthProvider)
+  useEffect(() => {
+    if (!user) return
+    getDoc(doc(db, "users", user.uid))
+      .then((snap) => {
+        if (snap.exists()) {
+          const nome =
+            snap.data()?.username ??
+            snap.data()?.name ??
+            user.displayName ??
+            user.email ??
+            "Colaborador"
+          setUsername(nome)
+        }
+      })
+      .catch(() => {
+        setUsername(user.displayName ?? user.email ?? "Colaborador")
+      })
+  }, [user])
 
   const { startDate, endDate, rangeLabel } = useMemo(() => {
     const today = new Date(currentDate)
@@ -65,11 +90,11 @@ export function ReportsView() {
     let totalNormais = 0, totalExtras = 0, totalHoras = 0, valorTotal = 0
     filteredEntries.forEach((e) => {
       const horas = e.totalHoras ?? 0
-      // ✅ Usa a taxa gravada na entry; fallback para a taxa atual dos settings
       const taxa = e.taxaHoraria ?? data.settings.taxaHoraria ?? 0
       totalHoras += horas
-      totalNormais += e.normalHoras ?? 0
-      totalExtras += e.extraHoras ?? 0
+      const { normalHoras, extraHoras } = calculateHours(e.date, horas)
+      totalNormais += normalHoras
+      totalExtras += extraHoras
       valorTotal += horas * taxa
     })
     return { totalNormais, totalExtras, totalHoras, valorTotal }
@@ -115,6 +140,7 @@ export function ReportsView() {
     return date.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
   }
 
+  // ── PDF: Relatório de trabalho ────────────────────────────────────────────
   const exportPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf")
     const autoTable = (await import("jspdf-autotable")).default
@@ -123,19 +149,22 @@ export function ReportsView() {
     const ml = 10, mr = 16
 
     const drawHeader = () => {
-      try { doc.addImage("/apple-icon.png", "PNG", ml, 11, 20, 20) } catch (_) {}
-      doc.setFontSize(14); doc.setFont("helvetica", "bold")
-      doc.text(`Relatório ${period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"}`, pageWidth / 2, 17, { align: "center" })
-      doc.setFontSize(9); doc.setFont("helvetica", "normal")
-      doc.text(rangeLabel, pageWidth / 2, 24, { align: "center" })
+      try { doc.addImage("/apple-icon.png", "PNG", ml, 8, 18, 18) } catch (_) {}
+      doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(25, 25, 25)
+      doc.text(`Relatório ${period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"}`, pageWidth / 2, 14, { align: "center" })
+      doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(90, 90, 90)
+      doc.text(rangeLabel, pageWidth / 2, 20, { align: "center" })
+      doc.setFontSize(9); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 80, 150)
+      doc.text(username, pageWidth / 2, 26, { align: "center" })
+      doc.setDrawColor(210, 210, 210); doc.setLineWidth(0.25)
+      doc.line(ml, 30, pageWidth - mr, 30)
+      doc.setTextColor(25, 25, 25)
     }
 
     const tableBody: string[][] = []
     filteredEntries.forEach((entry) => {
       const totalH = entry.totalHoras ?? 0
-      const taxa = entry.taxaHoraria ?? data.settings.taxaHoraria ?? 0
-      const valorDia = (totalH * taxa).toFixed(2)
-      const dataLabel = `${formatDate(entry.date, true)} – ${totalH}h (${valorDia}€)`
+      const dataLabel = `${formatDate(entry.date, true)}\n${totalH}h`
       if (entry.services && entry.services.length > 0) {
         entry.services.forEach((s, i) => {
           let desc = s.descricao || "-"
@@ -158,12 +187,12 @@ export function ReportsView() {
 
     autoTable(doc, {
       startY: 38,
-      head: [["Data / Valor", "Obra / Descrição", "Equipa", "Materiais"]],
+      head: [["Data", "Obra / Descrição", "Equipa", "Materiais"]],
       body: tableBody,
       theme: "grid",
       styles: { fontSize: 9.5, cellPadding: 4, overflow: "linebreak" },
       headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "center" },
-      columnStyles: { 0: { cellWidth: 55 }, 1: { cellWidth: 105 }, 2: { cellWidth: 55 }, 3: { cellWidth: 60 } },
+      columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 115 }, 2: { cellWidth: 55 }, 3: { cellWidth: 60 } },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { top: 38, left: ml, right: mr },
       didParseCell: (d) => {
@@ -174,15 +203,6 @@ export function ReportsView() {
       },
       didDrawPage: drawHeader,
     })
-
-    const finalY = (doc as any).lastAutoTable?.finalY + 12 || 110
-    doc.setFontSize(11); doc.setFont("helvetica", "bold")
-    doc.text("RESUMO DO PERÍODO", ml, finalY)
-    doc.setFontSize(9.5); doc.setFont("helvetica", "normal")
-    doc.text(
-      `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total: ${totals.totalHoras}h   |   Valor: ${formatCurrency(totals.valorTotal)}`,
-      ml, finalY + 8
-    )
 
     if (horasPorColaborador.length > 0) {
       doc.addPage(); drawHeader()
@@ -202,7 +222,259 @@ export function ReportsView() {
     const pages = (doc as any).internal.getNumberOfPages()
     for (let i = 1; i <= pages; i++) { doc.setPage(i); drawHeader() }
     doc.save(`relatorio-${period}-${startDate}.pdf`)
-  }, [filteredEntries, totals, period, rangeLabel, startDate, horasPorColaborador, data.settings.taxaHoraria])
+  }, [filteredEntries, period, rangeLabel, startDate, horasPorColaborador, username])
+
+  // ── PDF: Mapa de Horas — sempre 1 página, legível ─────────────────────────
+  const exportMapaMensal = useCallback(async () => {
+    const { jsPDF } = await import("jspdf")
+    const autoTable = (await import("jspdf-autotable")).default
+
+    const fmtEur = (v: number) =>
+      new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v)
+
+    const nomeUser = username
+
+    // Intervalo de datas conforme período
+    const allEntries = Array.isArray(data.entries) ? data.entries : []
+    const periodEntries = allEntries.filter((e) => e?.date && e.date >= startDate && e.date <= endDate)
+    const start = new Date(startDate)
+    const end   = new Date(endDate)
+    const entryMap = new Map(periodEntries.map((e) => [e.date, e]))
+
+    const periodTitle =
+      period === "daily"  ? "Mapa Diário de Horas"
+      : period === "weekly" ? "Mapa Semanal de Horas"
+      : "Mapa Mensal de Horas"
+
+    const fileSlug =
+      period === "daily"  ? `diario-${startDate}`
+      : period === "weekly" ? `semanal-${startDate}`
+      : `mensal-${startDate.slice(0, 7)}`
+
+    // ── Portrait A4 ───────────────────────────────────────────────────────
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+    const pageWidth  = doc.internal.pageSize.getWidth()   // 210mm
+    const pageHeight = doc.internal.pageSize.getHeight()  // 297mm
+
+    // Margem lateral — deixa mais espaço e fica mais elegante
+    const sideMargin = 20
+    const tableWidth = pageWidth - sideMargin * 2  // 170mm
+    const headerH    = 38  // altura reservada para o cabeçalho
+    const footerH    = 12  // altura reservada para o rodapé
+
+    // ── drawHeader ────────────────────────────────────────────────────────
+    const drawHeader = () => {
+      try { doc.addImage("/apple-icon.png", "PNG", sideMargin, 9, 14, 14) } catch (_) {}
+      doc.setFontSize(15); doc.setFont("helvetica", "bold"); doc.setTextColor(25, 25, 25)
+      doc.text(periodTitle, pageWidth / 2, 16, { align: "center" })
+      doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(90, 90, 90)
+      doc.text(rangeLabel, pageWidth / 2, 23, { align: "center" })
+      doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.setTextColor(30, 80, 150)
+      doc.text(nomeUser, pageWidth / 2, 30, { align: "center" })
+      doc.setDrawColor(200, 200, 200); doc.setLineWidth(0.3)
+      doc.line(sideMargin, 34, pageWidth - sideMargin, 34)
+      doc.setTextColor(25, 25, 25)
+    }
+
+    drawHeader()
+
+    // ── Construir linhas ──────────────────────────────────────────────────
+    const weekDayNames = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    const tableBody: any[][] = []
+    let totalHoras = 0, totalValor = 0, diasTrabalhados = 0, diasPagos = 0
+    const taxasUsadas = new Set<number>()
+
+    // Cores
+    const bgWeekend : [number,number,number] = [245, 245, 247]
+    const bgWorked  : [number,number,number] = [240, 249, 244]
+    const bgAbsent  : [number,number,number] = [255, 251, 235]
+    const bgEmpty   : [number,number,number] = [255, 255, 255]
+    const textMuted : [number,number,number] = [165, 165, 165]
+    const textNormal: [number,number,number] = [40,  40,  40 ]
+    const textAmber : [number,number,number] = [160, 90,  0  ]
+    const textGreen : [number,number,number] = [22,  101, 52 ]
+    const textRed   : [number,number,number] = [200, 40,  40 ]
+
+    // Para a coluna de pagamento precisamos saber qual pagamento quitou cada dia
+    // Reconstruímos o FIFO localmente para obter a data do pagamento por dia
+    const sortedEntries = [...(Array.isArray(data.entries) ? data.entries : [])]
+      .sort((a, b) => a.date.localeCompare(b.date))
+    const sortedPayments = [...(Array.isArray(data.payments) ? data.payments : [])]
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(p => ({ ...p, remainingValor: p.valor }))
+
+    // Mapa: dateStr → data do pagamento que quitou esse dia
+    const paidByDate = new Map<string, string>()
+    let payIdx = 0
+    for (const entry of sortedEntries) {
+      if (!paidDates.has(entry.date)) continue
+      const taxa = entry.taxaHoraria ?? data.settings.taxaHoraria ?? 0
+      let restante = (entry.totalHoras ?? 0) * taxa
+      while (restante > 0.009 && payIdx < sortedPayments.length) {
+        const pag = sortedPayments[payIdx]
+        const quitar = Math.min(restante, pag.remainingValor)
+        restante -= quitar
+        sortedPayments[payIdx] = { ...pag, remainingValor: pag.remainingValor - quitar }
+        // O pagamento que contribuiu mais para este dia é o que registamos
+        if (!paidByDate.has(entry.date)) paidByDate.set(entry.date, pag.date)
+        if (sortedPayments[payIdx].remainingValor < 0.009) payIdx++
+      }
+    }
+
+    const cur = new Date(start)
+    while (cur <= end) {
+      const dateStr   = cur.toISOString().split("T")[0]
+      const dayOfWeek = cur.getDay()
+      const wdIdx     = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+
+      const entry    = entryMap.get(dateStr)
+      const taxa     = entry ? (entry.taxaHoraria ?? data.settings.taxaHoraria ?? 0) : (data.settings.taxaHoraria ?? 0)
+      const horas    = entry != null ? (entry.totalHoras ?? 0) : null
+      const valor    = horas !== null && horas > 0 ? horas * taxa : null
+      const isPaid   = paidDates.has(dateStr)
+      const payDate  = paidByDate.get(dateStr)
+
+      if (horas !== null && horas > 0) {
+        totalHoras += horas
+        totalValor += valor ?? 0
+        diasTrabalhados++
+        taxasUsadas.add(taxa)
+        if (isPaid) diasPagos++
+      }
+
+      const dayNum   = String(cur.getDate()).padStart(2, "0")
+      const dateCell = period === "monthly"
+        ? dayNum
+        : `${dayNum} ${cur.toLocaleDateString("pt-PT", { month: "short" })}`
+
+      const horasCell = horas === null
+        ? (isWeekend ? "—" : "")
+        : horas === 0 ? "Ausência" : `${horas}h`
+
+      const taxaCell  = horas !== null && horas > 0 ? `${taxa.toFixed(2)}€` : ""
+      const valorCell = valor !== null ? fmtEur(valor) : ""
+
+      // Coluna de pagamento — mostra estado para todos os dias com horas > 0
+      const pagoCell = horas === null || horas === 0
+        ? ""
+        : isPaid
+          ? `✓ ${payDate ? new Date(payDate).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) : "Pago"}`
+          : "✗ Não pago"
+
+      const pagoTextColor: [number,number,number] = isPaid && horas !== null && horas > 0 ? textGreen : horas !== null && horas > 0 ? textRed : textMuted
+      const bgPago: [number,number,number] = isPaid && horas !== null && horas > 0
+        ? [235, 250, 240]
+        : !isPaid && horas !== null && horas > 0
+          ? [255, 243, 243]
+          : isWeekend ? bgWeekend : bgEmpty
+
+      const rowFill = isWeekend ? bgWeekend
+        : horas !== null && horas > 0 ? bgWorked
+        : horas === 0 ? bgAbsent
+        : bgEmpty
+
+      tableBody.push([
+        { content: dateCell,            styles: { halign: "center" as const, fontStyle: "bold" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : textNormal } },
+        { content: weekDayNames[wdIdx], styles: { halign: "center" as const,                             fillColor: rowFill, textColor: isWeekend ? textMuted : textNormal } },
+        { content: horasCell,           styles: { halign: "center" as const,
+            fontStyle: horas !== null && horas > 0 ? "bold" as const : "normal" as const,
+            fillColor: rowFill,
+            textColor: horas === 0 ? textAmber : horas === null && !isWeekend ? textRed : isWeekend ? textMuted : textNormal,
+        }},
+        { content: taxaCell,            styles: { halign: "center" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : [90,90,90] as [number,number,number] } },
+        { content: valorCell,           styles: { halign: "right" as const,
+            fontStyle: horas !== null && horas > 0 ? "bold" as const : "normal" as const,
+            fillColor: rowFill,
+            textColor: horas !== null && horas > 0 ? textGreen : textMuted,
+        }},
+        { content: pagoCell,            styles: { halign: "center" as const,
+            fontStyle: isPaid ? "bold" as const : "normal" as const,
+            fillColor: bgPago,
+            textColor: pagoTextColor,
+        }},
+      ])
+
+      cur.setDate(cur.getDate() + 1)
+    }
+
+    // ── Linha TOTAL ───────────────────────────────────────────────────────
+    const totalFill: [number,number,number] = [25, 70, 140]
+    const white    : [number,number,number] = [255, 255, 255]
+    tableBody.push([
+      { content: "TOTAL", colSpan: 2, styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
+      { content: `${totalHoras}h`,   styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
+      { content: "",                 styles: { fillColor: totalFill } },
+      { content: fmtEur(totalValor), styles: { fontStyle: "bold" as const, halign: "right"  as const, fillColor: totalFill, textColor: white } },
+      { content: `${diasPagos}/${diasTrabalhados}`, styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
+    ])
+
+    // ── Cálculo dinâmico para caber sempre em 1 página ────────────────────
+    const available = pageHeight - headerH - footerH
+    const totalRows = tableBody.length + 1
+    const rowH = Math.min(9, Math.max(5.5, available / totalRows))
+    const fs   = Math.min(11, Math.max(8, rowH * 0.72))
+    const cp   = Math.max(1.2, (rowH - fs * 0.352) / 2)
+
+    // Larguras das colunas — somam tableWidth (170mm)
+    // Col pagamento: 32mm fixo; restantes dividem o que sobra
+    const col0 = period === "monthly" ? 18 : 26
+    const col1 = 18
+    const col2 = 26
+    const col3 = 26
+    const col5 = 36  // pagamento
+    const col4 = tableWidth - col0 - col1 - col2 - col3 - col5
+
+    autoTable(doc, {
+      startY: headerH,
+      head: [[
+        { content: "Data",      styles: { halign: "center" as const } },
+        { content: "Dia",       styles: { halign: "center" as const } },
+        { content: "Horas",     styles: { halign: "center" as const } },
+        { content: "Taxa/h",    styles: { halign: "center" as const } },
+        { content: "Valor",     styles: { halign: "right"  as const } },
+        { content: "Pagamento", styles: { halign: "center" as const } },
+      ]],
+      body: tableBody,
+      theme: "grid",
+      styles: { fontSize: fs, cellPadding: cp, lineColor: [215, 215, 215], lineWidth: 0.2 },
+      headStyles: { fillColor: totalFill, textColor: 255, fontStyle: "bold", fontSize: fs, cellPadding: cp + 0.4 },
+      columnStyles: {
+        0: { cellWidth: col0 },
+        1: { cellWidth: col1 },
+        2: { cellWidth: col2 },
+        3: { cellWidth: col3 },
+        4: { cellWidth: col4 },
+        5: { cellWidth: col5 },
+      },
+      margin: { top: headerH, left: sideMargin, right: sideMargin },
+    })
+
+    // ── Rodapé ────────────────────────────────────────────────────────────
+    const finalY = (doc as any).lastAutoTable?.finalY ?? pageHeight - footerH
+    doc.setFontSize(7.5); doc.setFont("helvetica", "normal"); doc.setTextColor(150, 150, 150)
+
+    const taxasArr = Array.from(taxasUsadas).sort((a, b) => a - b)
+    const taxaNote = taxasArr.length > 1
+      ? `Taxas: ${taxasArr.map(t => `${t.toFixed(2)}€/h`).join(", ")}`
+      : taxasArr.length === 1
+        ? `Taxa: ${taxasArr[0].toFixed(2)}€/h`
+        : `Taxa: ${data.settings.taxaHoraria}€/h`
+
+    doc.text(
+      [
+        `${diasTrabalhados} dias trabalhados`,
+        `${diasPagos} pagos`,
+        taxaNote,
+        `Gerado em ${new Date().toLocaleDateString("pt-PT")}`,
+      ].join("   ·   "),
+      pageWidth / 2,
+      finalY + 7,
+      { align: "center" }
+    )
+
+    doc.save(`mapa-${fileSlug}.pdf`)
+  }, [period, startDate, endDate, rangeLabel, data.entries, data.payments, data.settings.taxaHoraria, paidDates, username])
 
   const hasEntries = filteredEntries.length > 0
 
@@ -355,14 +627,27 @@ export function ReportsView() {
                 </Card>
               )}
 
-              <Button
-                onClick={exportPDF}
-                className="w-full h-12 md:h-14 text-base font-semibold bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 shadow-md"
-                size="lg"
-              >
-                <FileDown className="h-5 w-5 mr-2" />
-                Exportar PDF
-              </Button>
+              {/* ── Botões de exportação ── */}
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Button
+                  onClick={exportPDF}
+                  className="w-full h-12 md:h-14 text-base font-semibold bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 shadow-md"
+                  size="lg"
+                >
+                  <FileDown className="h-5 w-5 mr-2" />
+                  Exportar Relatório PDF
+                </Button>
+
+                <Button
+                  onClick={exportMapaMensal}
+                  variant="outline"
+                  className="w-full h-12 md:h-14 text-base font-semibold border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:border-emerald-500 dark:hover:bg-emerald-950/30 shadow-md"
+                  size="lg"
+                >
+                  <CalendarRange className="h-5 w-5 mr-2" />
+                  Mapa de Horas PDF
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -385,7 +670,6 @@ function EntryCard({
 }) {
   const hasServices = Array.isArray(entry.services) && entry.services.length > 0
   const totalHoras = entry.totalHoras ?? 0
-  // ✅ Usa a taxa gravada na entry; fallback para a taxa atual
   const taxa = entry.taxaHoraria ?? defaultTaxaHoraria
   const valor = totalHoras * taxa
 
@@ -393,11 +677,10 @@ function EntryCard({
     <Card className="overflow-hidden border border-border/70 bg-card shadow-sm hover:shadow-md transition-shadow duration-200">
       <div className="flex items-center justify-between px-4 md:px-5 py-3 md:py-3.5 bg-muted/30 border-b border-border/50">
         <p className="text-sm md:text-base font-semibold capitalize">{formatDate(entry.date, false)}</p>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
           <Badge variant="secondary" className="font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-950/40 border-0 text-xs">
             {totalHoras}h
           </Badge>
-          {/* ✅ Mostra a taxa se for diferente da atual */}
           {entry.taxaHoraria && entry.taxaHoraria !== defaultTaxaHoraria && (
             <Badge variant="outline" className="text-xs text-muted-foreground border-dashed">
               {entry.taxaHoraria}€/h
@@ -422,7 +705,15 @@ function EntryCard({
                   )}
                 </div>
               )}
-              {s.descricao && <p className="text-sm text-muted-foreground leading-relaxed pl-5">{s.descricao}</p>}
+              {s.descricao && (
+                <div className="text-sm text-muted-foreground leading-relaxed pl-5 space-y-0.5">
+                  {s.descricao.split(".").map((linha, i, arr) => {
+                    const t = linha.trim()
+                    if (!t) return null
+                    return <p key={i}>{t}{i < arr.length - 1 && arr[i + 1].trim() ? "." : ""}</p>
+                  })}
+                </div>
+              )}
               <div className="pl-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {(s.equipa ?? []).length > 0 && (
                   <span className="flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{(s.equipa ?? []).join(", ")}</span>
@@ -435,7 +726,15 @@ function EntryCard({
           ))
         ) : (
           <div className="px-4 md:px-5 py-3 md:py-3.5 space-y-1.5">
-            {entry.descricao && <p className="text-sm text-muted-foreground leading-relaxed">{entry.descricao}</p>}
+            {entry.descricao && (
+              <div className="text-sm text-muted-foreground leading-relaxed space-y-0.5">
+                {entry.descricao.split(".").map((linha, i, arr) => {
+                  const t = linha.trim()
+                  if (!t) return null
+                  return <p key={i}>{t}{i < arr.length - 1 && arr[i + 1].trim() ? "." : ""}</p>
+                })}
+              </div>
+            )}
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
               {(entry.equipa ?? []).length > 0 && (
                 <span className="flex items-center gap-1"><Users className="h-3 w-3 shrink-0" />{(entry.equipa ?? []).join(", ")}</span>

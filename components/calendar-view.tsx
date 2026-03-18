@@ -20,7 +20,7 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
     () =>
       new Map(
         data.entries
-          .filter((e) => typeof e.totalHoras === "number" && e.totalHoras > 0)
+          .filter((e) => typeof e.totalHoras === "number" && e.totalHoras >= 0)
           .map((e) => [e.date, e.totalHoras])
       ),
     [data.entries]
@@ -121,9 +121,7 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                 key={day}
                 className={cn(
                   "text-center text-[10px] md:text-xs font-bold py-2 uppercase tracking-widest select-none",
-                  i >= 5
-                    ? "text-muted-foreground/40"
-                    : "text-muted-foreground/60"
+                  i >= 5 ? "text-muted-foreground/40" : "text-muted-foreground/60"
                 )}
               >
                 {day}
@@ -140,9 +138,13 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
               const dateStr = date.toISOString().split("T")[0]
               const hasEntry = entryMap.has(dateStr)
               const totalHoras = entryMap.get(dateStr)
+              const isZeroHours = hasEntry && totalHoras === 0
               const isPaid = paidDates.has(dateStr)
               const isToday = dateStr === today
               const isWeekend = date.getDay() === 0 || date.getDay() === 6
+              const isPast = dateStr < today
+              // Dias úteis passados sem qualquer registo → X vermelho
+              const isMissingWorkday = isPast && !isToday && !hasEntry && !isWeekend
               const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
 
               return (
@@ -150,48 +152,86 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                   key={uniqueKey}
                   onClick={() => onSelectDate(date)}
                   className={cn(
-                    // Base shape
                     "aspect-square flex flex-col items-center justify-center rounded-xl md:rounded-2xl",
-                    "relative select-none group transition-all duration-150",
+                    "relative select-none group transition-all duration-150 overflow-hidden",
                     "active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                    // Every day has a visible border — this is the key change
                     "border",
-                    // Empty days — subtle border, light bg
                     !hasEntry && !isToday && "border-border/50 bg-card hover:bg-muted/60 hover:border-border",
-                    // Weekend extra dimming
                     !hasEntry && isWeekend && "opacity-40",
-                    // Days WITH entry — stronger border + slightly different bg
-                    hasEntry && !isToday && "border-border bg-card hover:bg-muted/40 shadow-sm",
-                    // Today — primary ring + colored bg
+                    hasEntry && !isToday && !isZeroHours && "border-border bg-card hover:bg-muted/40 shadow-sm",
+                    isZeroHours && !isToday && "border-amber-400/50 bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-50/60 dark:hover:bg-amber-950/30",
                     isToday && "border-primary/50 bg-primary/5 hover:bg-primary/10 ring-2 ring-primary/40 ring-offset-1 ring-offset-background shadow-sm",
                   )}
                 >
-                  {/* Day number */}
+                  {/* ── X amarelo torrado — ausência registada (0h) ── */}
+                  {isZeroHours && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+                      style={{
+                        fontSize: "clamp(1.8rem, 6vw, 2.6rem)",
+                        fontWeight: 900,
+                        color: "rgba(180, 120, 0, 0.30)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </span>
+                  )}
+
+                  {/* ── X vermelho — dia útil passado sem registo ── */}
+                  {isMissingWorkday && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
+                      style={{
+                        fontSize: "clamp(1.8rem, 6vw, 2.6rem)",
+                        fontWeight: 900,
+                        color: "rgba(220, 38, 38, 0.20)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      ✕
+                    </span>
+                  )}
+
+                  {/* Número do dia */}
                   <span
                     className={cn(
-                      "text-sm md:text-base leading-none transition-colors",
+                      "relative z-10 text-sm md:text-base leading-none transition-colors",
                       isToday
                         ? "font-bold text-primary"
-                        : hasEntry
-                          ? "font-semibold text-foreground"
-                          : "font-normal text-foreground/50"
+                        : isZeroHours
+                          ? "font-semibold text-amber-800/70 dark:text-amber-400/70"
+                          : hasEntry
+                            ? "font-semibold text-foreground"
+                            : isMissingWorkday
+                              ? "font-normal text-foreground/35"
+                              : "font-normal text-foreground/50"
                     )}
                   >
                     {date.getDate()}
                   </span>
 
-                  {/* Hours label — always visible */}
+                  {/* Horas — visível para todas as entradas incluindo 0h */}
                   {hasEntry && (
-                    <span className="text-[9px] md:text-[10px] leading-none mt-0.5 md:mt-1 text-muted-foreground font-semibold tabular-nums">
+                    <span
+                      className={cn(
+                        "relative z-10 text-[9px] md:text-[10px] leading-none mt-0.5 md:mt-1 font-semibold tabular-nums",
+                        isZeroHours
+                          ? "text-amber-700/55 dark:text-amber-400/50"
+                          : "text-muted-foreground"
+                      )}
+                    >
                       {totalHoras}h
                     </span>
                   )}
 
-                  {/* Status dot — top-left corner */}
-                  {hasEntry && (
+                  {/* Ponto de status — só para dias com horas > 0 */}
+                  {hasEntry && !isZeroHours && (
                     <span
                       className={cn(
-                        "absolute top-1.5 left-1.5 md:top-2 md:left-2 rounded-full",
+                        "absolute top-1.5 left-1.5 md:top-2 md:left-2 rounded-full z-10",
                         "w-1.5 h-1.5 md:w-2 md:h-2",
                         "transition-transform duration-150 group-hover:scale-125",
                         isPaid ? "bg-emerald-500" : "bg-amber-400"
@@ -205,20 +245,28 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
         </div>
       </div>
 
-      {/* ── Legend ── */}
+      {/* ── Legenda ── */}
       <div className="px-5 py-3 border-t bg-card">
-        <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground">
-          <span className="flex items-center gap-2">
+        <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground flex-wrap">
+          <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" />
             Pago
           </span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" />
             Não pago
           </span>
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full ring-2 ring-primary/60 bg-primary/10" />
             Hoje
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="font-black leading-none" style={{ color: "rgba(180,120,0,0.55)", fontSize: "0.85rem" }}>✕</span>
+            Ausência
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="font-black leading-none" style={{ color: "rgba(220,38,38,0.45)", fontSize: "0.85rem" }}>✕</span>
+            Sem registo
           </span>
         </div>
       </div>
