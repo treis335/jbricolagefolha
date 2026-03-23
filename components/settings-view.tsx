@@ -21,6 +21,45 @@ import { db } from "@/lib/firebase"
 import { uploadFotoObra } from "@/lib/obras-service"
 import { cn } from "@/lib/utils"
 
+// ── Camera Permission ─────────────────────────────────────────────────────────
+
+type CameraPermission = "unknown" | "granted" | "denied" | "requesting"
+
+function useCameraPermission() {
+  const [permission, setPermission] = useState<CameraPermission>("unknown")
+
+  // Verifica o estado atual da permissão via Permissions API (não suportada em todos os browsers)
+  useEffect(() => {
+    if (!navigator.permissions) return
+    navigator.permissions.query({ name: "camera" as PermissionName })
+      .then(status => {
+        setPermission(status.state === "granted" ? "granted" : status.state === "denied" ? "denied" : "unknown")
+        status.onchange = () => {
+          setPermission(status.state === "granted" ? "granted" : status.state === "denied" ? "denied" : "unknown")
+        }
+      })
+      .catch(() => {}) // alguns browsers não suportam query de câmara
+  }, [])
+
+  // Pede permissão explicitamente — mostra o popup nativo do browser/iOS
+  const requestPermission = async (): Promise<boolean> => {
+    setPermission("requesting")
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+      // Para o stream imediatamente — só queríamos a permissão
+      stream.getTracks().forEach(t => t.stop())
+      setPermission("granted")
+      return true
+    } catch (err: any) {
+      // NotAllowedError = utilizador recusou ou permissão já negada
+      setPermission("denied")
+      return false
+    }
+  }
+
+  return { permission, requestPermission }
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface UserProfile {
@@ -51,6 +90,9 @@ function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string;
   if (fotoUrl) {
     return (
       <img
+        // ✅ FIX: key força o React a remontar o <img> quando o URL muda,
+        // evitando que o browser sirva a versão em cache da foto anterior.
+        key={fotoUrl}
         src={fotoUrl}
         alt={nome}
         className={cn(dim, "rounded-3xl object-cover ring-2 ring-white/10 shadow-xl")}
@@ -324,10 +366,11 @@ export function SettingsView() {
   const [savingUsername, setSavingUsername] = useState(false)
   const [copiedUid, setCopiedUid] = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const selfieInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [showPhotoOptions, setShowPhotoOptions] = useState(false)
+  const { permission: cameraPermission, requestPermission: requestCameraPermission } = useCameraPermission()
   const [textoColado, setTextoColado] = useState("")
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
@@ -369,12 +412,17 @@ export function SettingsView() {
     setUploadingPhoto(true)
     setUploadProgress(0)
     try {
+      // ✅ FIX: inclui timestamp no ID para garantir que o Cloudinary gera
+      // sempre um URL novo, evitando que o browser sirva a foto em cache.
+      const uploadId = `perfil_${user.uid}_${Date.now()}`
       const { url, publicId } = await uploadFotoObra(
         file,
-        `perfil_${user.uid}`,
+        uploadId,
         (p) => setUploadProgress(p)
       )
       await setDoc(doc(db, "users", user.uid), { fotoUrl: url, fotoPublicId: publicId }, { merge: true })
+      // ✅ Atualiza o state com o URL novo — o key={fotoUrl} no Avatar
+      // garante que o <img> é remontado e a foto nova é exibida.
       setProfile(prev => ({ ...prev, fotoUrl: url }))
     } catch (err) {
       console.error("Erro ao carregar foto", err)
@@ -546,17 +594,65 @@ export function SettingsView() {
                           <p className="text-center text-sm font-bold text-muted-foreground pb-3 pt-1">
                             Alterar foto de perfil
                           </p>
+
+                          {/* Banner de estado da permissão */}
+                          {cameraPermission === "denied" && (
+                            <div className="mx-4 mb-3 flex items-start gap-2.5 px-3.5 py-3 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200/50 dark:border-red-800/50 text-xs text-red-700 dark:text-red-300">
+                              <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5 text-red-500" />
+                              <span className="font-medium">Permissão da câmara negada. Vai às <strong>definições do browser</strong> para permitir o acesso.</span>
+                            </div>
+                          )}
+                          {cameraPermission === "unknown" && (
+                            <div className="mx-4 mb-3 flex items-start gap-2.5 px-3.5 py-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50 text-xs text-blue-700 dark:text-blue-300">
+                              <Camera className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-500" />
+                              <span className="font-medium">Toca em <strong>Tirar selfie</strong> para autorizar o acesso à câmara.</span>
+                            </div>
+                          )}
                           <div className="grid grid-cols-2 gap-3 px-4 pb-5">
                             <button
-                              onClick={() => { setShowPhotoOptions(false); setTimeout(() => selfieInputRef.current?.click(), 100) }}
-                              className="flex flex-col items-center gap-3 py-5 px-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-all active:scale-95 group"
+                              onClick={async () => {
+                                // Se a permissão já foi negada, mostra mensagem — não podemos forçar
+                                if (cameraPermission === "denied") {
+                                  alert("Permissão da câmara negada. Vai às definições do browser para a ativar.")
+                                  return
+                                }
+                                // Se não sabemos o estado ou ainda não foi pedida, pede agora
+                                // Isto mostra o popup nativo do browser/iOS
+                                if (cameraPermission !== "granted") {
+                                  const ok = await requestCameraPermission()
+                                  if (!ok) return // utilizador recusou
+                                }
+                                // Permissão garantida — fecha o sheet e abre a câmara
+                                setShowPhotoOptions(false)
+                                setTimeout(() => selfieInputRef.current?.click(), 150)
+                              }}
+                              className="flex flex-col items-center gap-3 py-5 px-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-all active:scale-95 group disabled:opacity-50"
                             >
-                              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 group-active:scale-95 transition-transform">
-                                <Camera className="h-6 w-6 text-white" />
+                              <div className={cn(
+                                "w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transition-all group-active:scale-95",
+                                cameraPermission === "denied"
+                                  ? "bg-slate-400"
+                                  : "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-blue-500/30"
+                              )}>
+                                {cameraPermission === "requesting"
+                                  ? <Loader2 className="h-6 w-6 text-white animate-spin" />
+                                  : <Camera className="h-6 w-6 text-white" />
+                                }
                               </div>
                               <div className="text-center">
-                                <p className="text-sm font-bold text-blue-700 dark:text-blue-300">Tirar selfie</p>
-                                <p className="text-[11px] text-blue-500/70 mt-0.5">Câmara frontal</p>
+                                <p className="text-sm font-bold text-blue-700 dark:text-blue-300">
+                                  {cameraPermission === "denied" ? "Câmara bloqueada" : "Tirar selfie"}
+                                </p>
+                                <p className="text-[11px] text-blue-500/70 mt-0.5">
+                                  {cameraPermission === "denied"
+                                    ? "Ativa nas definições"
+                                    : cameraPermission === "requesting"
+                                      ? "A pedir permissão…"
+                                      : cameraPermission === "granted"
+                                        ? "Câmara autorizada"
+                                        : "Toca para autorizar"
+                                  }
+                                </p>
                               </div>
                             </button>
                             <button
