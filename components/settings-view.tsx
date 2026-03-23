@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/AuthProvider"
 import { MigrateLegacyDataButton } from "@/components/MigrateLegacyDataButton"
 import { doc, getDoc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { uploadFotoObra } from "@/lib/obras-service"
 import { cn } from "@/lib/utils"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -316,6 +317,7 @@ export function SettingsView() {
   const [profile, setProfile] = useState<UserProfile>(PROFILE_DEFAULTS)
   const [loadingProfile, setLoadingProfile] = useState(true)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
 
   const [isEditingUsername, setIsEditingUsername] = useState(false)
   const [editedUsername, setEditedUsername] = useState("")
@@ -365,16 +367,21 @@ export function SettingsView() {
   const handlePhotoUpload = async (file: File) => {
     if (!user?.uid) return
     setUploadingPhoto(true)
+    setUploadProgress(0)
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const r = new FileReader()
-        r.onload = e => resolve(e.target?.result as string)
-        r.onerror = reject
-        r.readAsDataURL(file)
-      })
-      await saveField("fotoUrl", base64)
-    } catch { console.error("Erro ao carregar foto") }
-    finally { setUploadingPhoto(false) }
+      const { url, publicId } = await uploadFotoObra(
+        file,
+        `perfil_${user.uid}`,
+        (p) => setUploadProgress(p)
+      )
+      await setDoc(doc(db, "users", user.uid), { fotoUrl: url, fotoPublicId: publicId }, { merge: true })
+      setProfile(prev => ({ ...prev, fotoUrl: url }))
+    } catch (err) {
+      console.error("Erro ao carregar foto", err)
+    } finally {
+      setUploadingPhoto(false)
+      setUploadProgress(0)
+    }
   }
 
   // ── Username ──────────────────────────────────────────────────────────────
@@ -481,21 +488,38 @@ export function SettingsView() {
                   <div className="px-4 py-5 flex items-center gap-4 border-b border-border/20">
                     <div className="relative shrink-0">
                       <Avatar fotoUrl={profile.fotoUrl} nome={displayName} size="lg" />
+                      {/* Upload progress ring overlay */}
+                      {uploadingPhoto && (
+                        <div className="absolute inset-0 rounded-3xl bg-black/50 flex flex-col items-center justify-center gap-1">
+                          <Loader2 className="h-5 w-5 text-white animate-spin" />
+                          <span className="text-[10px] font-bold text-white">{uploadProgress}%</span>
+                        </div>
+                      )}
                       <button
                         type="button"
-                        onClick={() => setShowPhotoOptions(true)}
+                        onClick={() => !uploadingPhoto && setShowPhotoOptions(true)}
                         disabled={uploadingPhoto}
                         className="absolute -bottom-1 -right-1 w-8 h-8 rounded-2xl bg-blue-600 hover:bg-blue-500 border-2 border-background flex items-center justify-center transition-all shadow-md active:scale-90 disabled:opacity-60"
                       >
-                        {uploadingPhoto
-                          ? <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
-                          : <Camera className="h-3.5 w-3.5 text-white" />
-                        }
+                        <Camera className="h-3.5 w-3.5 text-white" />
                       </button>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-base font-bold truncate">{displayName}</p>
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">{user.email || "—"}</p>
+                      {uploadingPhoto
+                        ? (
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 rounded-full transition-all duration-200"
+                                style={{ width: `${uploadProgress}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] font-semibold text-blue-500 tabular-nums shrink-0">{uploadProgress}%</span>
+                          </div>
+                        )
+                        : <p className="text-xs text-muted-foreground truncate mt-0.5">{user.email || "—"}</p>
+                      }
                     </div>
                     {/* Hidden inputs */}
                     <input ref={selfieInputRef} type="file" accept="image/*" capture="user" className="hidden"
