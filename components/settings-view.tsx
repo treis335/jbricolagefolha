@@ -359,7 +359,10 @@ export function SettingsView() {
     e.target.value = "" // reset para permitir re-selecionar o mesmo ficheiro
     if (!file || !user?.uid) return
 
+    // ✅ Fecha o sheet DEPOIS de capturar o ficheiro — nunca antes.
+    // Se fecharmos antes, o Android pode remontar o DOM e perder o evento.
     setShowPhotoOptions(false)
+
     setUploadingPhoto(true)
     setUploadProgress(0)
     try {
@@ -443,6 +446,30 @@ export function SettingsView() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
+    <>
+      {/*
+        ✅ INPUTS DE FOTO — fora de qualquer condicional e fora do ScrollArea.
+        Ficam sempre montados no DOM. Em Android, o onChange só dispara se o
+        elemento ainda existir quando o utilizador confirma a foto na câmara.
+        Se estiverem dentro de um bloco condicional (como {showPhotoOptions && ...}
+        ou {user ? ...}), o Android destrói-os antes do evento chegar.
+      */}
+      <input
+        id="foto-perfil-selfie"
+        type="file"
+        accept="image/*"
+        capture="user"
+        className="sr-only"
+        onChange={handleFileChosen}
+      />
+      <input
+        id="foto-perfil-galeria"
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={handleFileChosen}
+      />
+
     <ScrollArea className="h-full">
       <div className="min-h-full bg-gradient-to-b from-slate-50 to-slate-100/50 dark:from-slate-950 dark:to-slate-900">
         <div className="pb-28 md:pb-16 max-w-xl mx-auto">
@@ -514,32 +541,7 @@ export function SettingsView() {
                     </div>
                   </div>
 
-                  {/* ─────────────────────────────────────────────────────────
-                    PHOTO OPTIONS BOTTOM SHEET
-                    
-                    Os dois inputs de foto ficam SEMPRE no DOM (fora do sheet),
-                    para garantir que existem quando os labels são clicados.
-                    Cada botão é um <label htmlFor="..."> que aponta para o
-                    seu <input>. O toque no label abre o picker nativamente
-                    em iOS/Android sem nenhum .click() ou setTimeout.
-                  ───────────────────────────────────────────────────────── */}
-
-                  {/* Inputs sempre presentes no DOM */}
-                  <input
-                    id="foto-perfil-selfie"
-                    type="file"
-                    accept="image/*"
-                    capture="user"
-                    className="sr-only"
-                    onChange={handleFileChosen}
-                  />
-                  <input
-                    id="foto-perfil-galeria"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handleFileChosen}
-                  />
+                  {/* inputs de foto são renderizados fora — ver abaixo do ScrollArea */}
 
                   {showPhotoOptions && (
                     <>
@@ -851,6 +853,7 @@ export function SettingsView() {
         </div>
       </div>
     </ScrollArea>
+    </>
   )
 }
 
