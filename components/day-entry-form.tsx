@@ -213,7 +213,6 @@ function ObraPicker({ open, onClose, onSelect }: ObraPickerProps) {
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-10 h-11 rounded-xl bg-muted/40 border-border/40 focus-visible:ring-primary/20 text-sm"
-                autoFocus
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -703,7 +702,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     }
     setServices(prev => [...prev, ns]); setActiveServiceId(ns.id)
     setManualInputServiceId(null); setNewMaterialInput("")
-    setTimeout(() => setShowObraPicker(true), 50)
   }
 
   const handleRemoveService = (id: string) => {
@@ -949,7 +947,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 onChange={e => updateService(s.id, { obraNome: e.target.value })}
                                 placeholder="ex: Reabilitação Casa Sr. António"
                                 className="h-11 bg-background border-border/45 rounded-xl text-sm focus-visible:ring-primary/20"
-                                autoFocus
                               />
                               {s.obraNome.trim() !== "" && (
                                 <button type="button" onClick={() => { setActiveServiceId(s.id); setShowObraPicker(true) }}
@@ -1180,7 +1177,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             <div className="relative">
               <Users className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/45 pointer-events-none" />
               <Input placeholder="Filtrar..." value={teamFilter} onChange={e => setTeamFilter(e.target.value)}
-                className="pl-10 h-11 rounded-xl bg-muted/40 border-border/40 focus-visible:ring-primary/20 text-sm" autoFocus />
+                className="pl-10 h-11 rounded-xl bg-muted/40 border-border/40 focus-visible:ring-primary/20 text-sm" />
             </div>
             {tempEquipa.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
