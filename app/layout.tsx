@@ -1,4 +1,3 @@
-
 ////app/layout.tsx
 import React from "react"
 import type { Metadata, Viewport } from "next"
@@ -43,14 +42,24 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-PT">
+      {/* Adicione aqui o <head> com o CSS do Leaflet via CDN */}
+      <head>
+        <link
+          rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+          crossOrigin=""
+        />
+      </head>
+
       <body className={`${geist.className} antialiased`}>
-       <AuthProvider>
-        <WorkTrackerProvider>          
+        <AuthProvider>
+          <WorkTrackerProvider>
             <Header />
             <div className="pt-16">{children}</div>
-            <Analytics />         
-        </WorkTrackerProvider>
-         </AuthProvider>
+            <Analytics />
+          </WorkTrackerProvider>
+        </AuthProvider>
       </body>
     </html>
   )
