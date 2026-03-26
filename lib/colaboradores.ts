@@ -34,7 +34,7 @@ export const COLABORADORES: Colaborador[] = [
     ativo: true,
   },
   { 
-    nome: "Filipe",
+    nome: "Felipe",
     // uid: "firebase-uid-filipe",
     ativo: true,
   },
@@ -56,7 +56,7 @@ export const COLABORADORES: Colaborador[] = [
   { 
     nome: "Rafael",
     // uid: "firebase-uid-rafael",
-    ativo: true,
+    ativo: false,
   },
   { 
     nome: "Sibul",
@@ -74,7 +74,7 @@ export const COLABORADORES: Colaborador[] = [
     ativo: true,
   },
   { 
-    nome: "Dario",
+    nome: "Dário",
     // uid: "firebase-uid-dario",
     ativo: true,
   },
@@ -85,6 +85,21 @@ export const COLABORADORES: Colaborador[] = [
   },
   { 
     nome: "Silvio",
+    // uid: "firebase-uid-silvio",
+    ativo: true,
+  },
+  { 
+    nome: "João Oliveira",
+    // uid: "firebase-uid-silvio",
+    ativo: true,
+  },
+  { 
+    nome: "João Santos (Beja)",
+    // uid: "firebase-uid-silvio",
+    ativo: true,
+  },
+  { 
+    nome: "JOÃO REIS",
     // uid: "firebase-uid-silvio",
     ativo: true,
   },
