@@ -1,20 +1,38 @@
 // components/admin/admin-dashboard-view.tsx
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Users, Clock, Euro, TrendingUp, LayoutDashboard,
-  Activity, RefreshCw, ArrowUpRight, AlertTriangle,
-  CheckCircle2, ChevronRight, Zap,
+  Users, Clock, Euro, TrendingUp, ChevronLeft, ChevronRight,
+  RefreshCw, AlertTriangle, CheckCircle2, ArrowUpRight, Zap,
+  Activity, LayoutDashboard,
 } from "lucide-react"
 import { useCollaborators } from "@/hooks/useCollaborators"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-// ─── tiny bar-chart — no external dep ───────────────────────────────────────
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+function Sparkline({ values, color = "#3b82f6" }: { values: number[]; color?: string }) {
+  if (values.length < 2) return null
+  const max = Math.max(...values, 1)
+  const w = 80, h = 28
+  const pts = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w
+    const y = h - (v / max) * h
+    return `${x},${y}`
+  }).join(" ")
+  return (
+    <svg width={w} height={h} className="shrink-0 opacity-70">
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8"
+        strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+// ─── Mini bar chart ───────────────────────────────────────────────────────────
 function MiniBarChart({ data }: { data: { label: string; value: number; color?: string }[] }) {
   const max = Math.max(...data.map(d => d.value), 1)
   return (
@@ -37,40 +55,70 @@ function MiniBarChart({ data }: { data: { label: string; value: number; color?: 
   )
 }
 
-// ─── sparkline svg ───────────────────────────────────────────────────────────
-function Sparkline({ values, color = "#3b82f6" }: { values: number[]; color?: string }) {
-  if (values.length < 2) return null
-  const max = Math.max(...values, 1)
-  const w = 80, h = 28
-  const pts = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w
-    const y = h - (v / max) * h
-    return `${x},${y}`
-  }).join(" ")
+// ─── Month Navigator ──────────────────────────────────────────────────────────
+function MonthNavigator({
+  month, year, onChange,
+}: {
+  month: number; year: number
+  onChange: (month: number, year: number) => void
+}) {
+  const now = new Date()
+  const isCurrentMonth = month === now.getMonth() && year === now.getFullYear()
+
+  const go = (dir: -1 | 1) => {
+    let m = month + dir
+    let y = year
+    if (m < 0) { m = 11; y-- }
+    if (m > 11) { m = 0; y++ }
+    onChange(m, y)
+  }
+
+  const label = new Date(year, month, 1).toLocaleDateString("pt-PT", {
+    month: "long", year: "numeric",
+  })
+
   return (
-    <svg width={w} height={h} className="shrink-0 opacity-70">
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
+    <div className="flex items-center gap-1">
+      <button
+        onClick={() => go(-1)}
+        className="w-8 h-8 rounded-xl border border-border/50 bg-background hover:bg-muted flex items-center justify-center transition-colors"
+      >
+        <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+      </button>
+      <div className="flex items-center gap-2 px-3 h-8 rounded-xl border border-border/50 bg-background min-w-[160px] justify-center">
+        <span className="text-sm font-semibold capitalize">{label}</span>
+        {isCurrentMonth && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">hoje</span>
+        )}
+      </div>
+      <button
+        onClick={() => go(1)}
+        disabled={isCurrentMonth}
+        className="w-8 h-8 rounded-xl border border-border/50 bg-background hover:bg-muted flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </button>
+    </div>
   )
 }
 
-// ─── KPI card ────────────────────────────────────────────────────────────────
+// ─── KPI Card (estilo v1: accent colorido por card) ───────────────────────────
+const ACCENTS = {
+  blue:    { bg: "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",         iconBg: "bg-blue-100 dark:bg-blue-900/50",    text: "text-blue-700 dark:text-blue-300",    spark: "#3b82f6" },
+  purple:  { bg: "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800", iconBg: "bg-purple-100 dark:bg-purple-900/50", text: "text-purple-700 dark:text-purple-300", spark: "#a855f7" },
+  emerald: { bg: "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800", iconBg: "bg-emerald-100 dark:bg-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", spark: "#10b981" },
+  orange:  { bg: "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800", iconBg: "bg-orange-100 dark:bg-orange-900/50", text: "text-orange-700 dark:text-orange-300",  spark: "#f97316" },
+} as const
+
+type AccentKey = keyof typeof ACCENTS
+
 function KpiCard({
-  icon, label, value, sub, trend, sparkValues, accent,
-  onClick,
+  icon, label, value, sub, sparkValues, accent, onClick,
 }: {
   icon: React.ReactNode; label: string; value: string; sub: string
-  trend?: { value: number; positive?: boolean }
-  sparkValues?: number[]; accent: string; onClick?: () => void
+  sparkValues?: number[]; accent: AccentKey; onClick?: () => void
 }) {
-  const accents: Record<string, { bg: string; iconBg: string; text: string; spark: string }> = {
-    blue:    { bg: "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800",       iconBg: "bg-blue-100 dark:bg-blue-900/50",    text: "text-blue-700 dark:text-blue-300",    spark: "#3b82f6" },
-    purple:  { bg: "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800", iconBg: "bg-purple-100 dark:bg-purple-900/50", text: "text-purple-700 dark:text-purple-300", spark: "#a855f7" },
-    emerald: { bg: "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800", iconBg: "bg-emerald-100 dark:bg-emerald-900/50", text: "text-emerald-700 dark:text-emerald-300", spark: "#10b981" },
-    orange:  { bg: "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800", iconBg: "bg-orange-100 dark:bg-orange-900/50", text: "text-orange-700 dark:text-orange-300", spark: "#f97316" },
-  }
-  const a = accents[accent] ?? accents.blue
-
+  const a = ACCENTS[accent]
   return (
     <div
       onClick={onClick}
@@ -90,30 +138,18 @@ function KpiCard({
       </div>
       <p className={cn("text-2xl md:text-3xl font-bold tracking-tight", a.text)}>{value}</p>
       <p className="text-xs font-semibold text-muted-foreground mt-0.5">{label}</p>
-      <div className="flex items-center justify-between mt-2">
-        <p className="text-xs text-muted-foreground">{sub}</p>
-        {trend && (
-          <span className={cn(
-            "text-[10px] font-bold px-1.5 py-0.5 rounded-md",
-            trend.positive !== false
-              ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400"
-              : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-          )}>
-            {trend.value > 0 ? "+" : ""}{trend.value}%
-          </span>
-        )}
-      </div>
+      <p className="text-xs text-muted-foreground mt-2">{sub}</p>
     </div>
   )
 }
 
-// ─── collaborator row ─────────────────────────────────────────────────────────
+// ─── Collaborator row (estilo v1: rank badge colorido + barra colorida) ────────
 function CollabRow({
   collab, rank, maxHours, onClick,
 }: {
   collab: any; rank: number; maxHours: number; onClick: () => void
 }) {
-  const pct = maxHours > 0 ? (collab.totalHoursThisMonth / maxHours) * 100 : 0
+  const pct = maxHours > 0 ? (collab._monthHours / maxHours) * 100 : 0
   const rankColors = [
     "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400",
     "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
@@ -136,9 +172,9 @@ function CollabRow({
         <div className="flex items-center justify-between mb-1.5">
           <p className="font-semibold text-sm truncate">{collab.name}</p>
           <div className="flex items-center gap-3 shrink-0 ml-2">
-            <span className="text-sm font-bold tabular-nums">{collab.totalHoursThisMonth.toFixed(1)}h</span>
+            <span className="text-sm font-bold tabular-nums">{collab._monthHours.toFixed(1)}h</span>
             <span className="text-xs text-muted-foreground hidden md:block tabular-nums">
-              {collab.totalCostThisMonth.toFixed(0)} €
+              {collab._monthCost.toFixed(0)} €
             </span>
           </div>
         </div>
@@ -154,7 +190,7 @@ function CollabRow({
   )
 }
 
-// ─── status pill ──────────────────────────────────────────────────────────────
+// ─── Status pill (estilo v1) ──────────────────────────────────────────────────
 function StatusPill({ label, count, color }: { label: string; count: number; color: string }) {
   return (
     <div className={cn("flex items-center justify-between px-3.5 py-2.5 rounded-xl border", color)}>
@@ -164,77 +200,99 @@ function StatusPill({ label, count, color }: { label: string; count: number; col
   )
 }
 
-// ─── main ─────────────────────────────────────────────────────────────────────
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export function AdminDashboardView() {
   const { collaborators, loading, error, refetch } = useCollaborators()
   const router = useRouter()
-  const now = new Date()
 
-  // ── derived stats ──
+  const now = new Date()
+  const [selectedMonth, setSelectedMonth] = useState(now.getMonth())
+  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
+
+  const monthKey = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`
+  const monthLabel = new Date(selectedYear, selectedMonth, 1).toLocaleDateString("pt-PT", {
+    month: "long", year: "numeric",
+  })
+
   const stats = useMemo(() => {
-    const active = collaborators.filter(c => c.totalHoursThisMonth > 0)
-    const inactive = collaborators.filter(c => c.totalHoursThisMonth === 0)
-    const totalHoursThisMonth = collaborators.reduce((s, c) => s + c.totalHoursThisMonth, 0)
-    const totalCostThisMonth = collaborators.reduce((s, c) => s + c.totalCostThisMonth, 0)
+    if (!collaborators.length) return null
+
+    const withMonthData = collaborators.map(c => {
+      let monthHours = 0, monthCost = 0
+      c.entries.forEach((e: any) => {
+        if ((e.date || "").startsWith(monthKey)) {
+          const h = e.totalHoras || 0
+          const taxa = typeof e.taxaHoraria === "number" && e.taxaHoraria > 0
+            ? e.taxaHoraria : c.currentRate
+          monthHours += h
+          monthCost += h * taxa
+        }
+      })
+      return { ...c, _monthHours: monthHours, _monthCost: monthCost }
+    })
+
+    const active = withMonthData.filter(c => c._monthHours > 0)
+    const inactive = withMonthData.filter(c => c._monthHours === 0)
+    const totalHours = withMonthData.reduce((s, c) => s + c._monthHours, 0)
+    const totalCost = withMonthData.reduce((s, c) => s + c._monthCost, 0)
     const totalHoursAllTime = collaborators.reduce((s, c) => s + c.totalHoursAllTime, 0)
     const avgRate = collaborators.length > 0
       ? collaborators.reduce((s, c) => s + c.currentRate, 0) / collaborators.length
       : 0
+    const noRate = collaborators.filter(c => !c.currentRate || c.currentRate === 0)
 
-    // hours distribution across collaborators (for bar chart)
-    const topCollabs = [...collaborators]
-      .sort((a, b) => b.totalHoursThisMonth - a.totalHoursThisMonth)
+    // sparkline: últimos 6 meses até ao mês selecionado
+    const sparkHours: number[] = []
+    const sparkCost: number[] = []
+    for (let i = 5; i >= 0; i--) {
+      let m = selectedMonth - i
+      let y = selectedYear
+      while (m < 0) { m += 12; y-- }
+      const k = `${y}-${String(m + 1).padStart(2, "0")}`
+      let h = 0, cost = 0
+      collaborators.forEach(c => {
+        c.entries.forEach((e: any) => {
+          if ((e.date || "").startsWith(k)) {
+            const eh = e.totalHoras || 0
+            const taxa = typeof e.taxaHoraria === "number" && e.taxaHoraria > 0
+              ? e.taxaHoraria : c.currentRate
+            h += eh
+            cost += eh * taxa
+          }
+        })
+      })
+      sparkHours.push(h)
+      sparkCost.push(cost)
+    }
+
+    const topCollabs = [...withMonthData]
+      .sort((a, b) => b._monthHours - a._monthHours)
       .slice(0, 6)
 
-    // month-over-month sparkline from entries
-    const monthMap = new Map<string, number>()
-    collaborators.forEach(c => {
-      c.entries.forEach((e: any) => {
-        const m = (e.date || "").slice(0, 7)
-        if (m) monthMap.set(m, (monthMap.get(m) ?? 0) + (e.totalHoras || 0))
-      })
-    })
-    const sortedMonths = Array.from(monthMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).slice(-6)
-    const sparkHours = sortedMonths.map(([, v]) => v)
-
-    const costMonthMap = new Map<string, number>()
-    collaborators.forEach(c => {
-      c.entries.forEach((e: any) => {
-        const m = (e.date || "").slice(0, 7)
-        if (m) {
-          const taxa = typeof e.taxaHoraria === "number" && e.taxaHoraria > 0
-            ? e.taxaHoraria : c.currentRate
-          costMonthMap.set(m, (costMonthMap.get(m) ?? 0) + (e.totalHoras || 0) * taxa)
-        }
-      })
-    })
-    const sortedCostMonths = Array.from(costMonthMap.entries()).sort((a, b) => a[0].localeCompare(b[0])).slice(-6)
-    const sparkCost = sortedCostMonths.map(([, v]) => v)
-
-    // bar chart data: top collab hours
-    const barData = topCollabs.map(c => ({
-      label: c.name.split(" ")[0],
-      value: c.totalHoursThisMonth,
-    }))
-
-    // collaborators with no rate set
-    const noRate = collaborators.filter(c => !c.currentRate || c.currentRate === 0)
+    const barData = topCollabs
+      .filter(c => c._monthHours > 0)
+      .map((c, i) => ({
+        label: c.name.split(" ")[0],
+        value: c._monthHours,
+        color: i === 0 ? "bg-yellow-400" : i === 1 ? "bg-slate-400" : i === 2 ? "bg-orange-400" : undefined,
+      }))
 
     return {
       total: collaborators.length,
       active: active.length,
       inactive: inactive.length,
-      totalHoursThisMonth,
-      totalCostThisMonth,
+      totalHours,
+      totalCost,
       totalHoursAllTime,
       avgRate,
-      topCollabs,
       sparkHours,
       sparkCost,
+      topCollabs,
       barData,
       noRate,
+      withMonthData,
     }
-  }, [collaborators])
+  }, [collaborators, monthKey, selectedMonth, selectedYear])
 
   if (loading) {
     return (
@@ -263,7 +321,7 @@ export function AdminDashboardView() {
     )
   }
 
-  const monthLabel = now.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
+  if (!stats) return null
 
   return (
     <ScrollArea className="h-full">
@@ -282,13 +340,19 @@ export function AdminDashboardView() {
               </p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={refetch} disabled={loading} className="self-start sm:self-auto">
-            <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
-            Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <MonthNavigator
+              month={selectedMonth}
+              year={selectedYear}
+              onChange={(m, y) => { setSelectedMonth(m); setSelectedYear(y) }}
+            />
+            <Button variant="outline" size="sm" onClick={refetch} disabled={loading}>
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
+          </div>
         </div>
 
-        {/* ── Alerts ── */}
+        {/* ── Alert ── */}
         {stats.noRate.length > 0 && (
           <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
             <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
@@ -301,8 +365,7 @@ export function AdminDashboardView() {
               </p>
             </div>
             <Button
-              size="sm"
-              variant="outline"
+              size="sm" variant="outline"
               className="shrink-0 border-amber-300 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-950/40 h-8 text-xs"
               onClick={() => router.push("/admin?tab=collaborators")}
             >
@@ -314,44 +377,43 @@ export function AdminDashboardView() {
         {/* ── KPI Grid ── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
           <KpiCard
-            accent="blue"
-            icon={<Users className="h-4 w-4" />}
-            label="Colaboradores"
-            value={String(stats.total)}
-            sub={`${stats.active} ativos este mês`}
-            sparkValues={[stats.total, stats.total, stats.active, stats.active]}
-            onClick={() => router.push("/admin?tab=collaborators")}
-          />
-          <KpiCard
             accent="purple"
             icon={<Clock className="h-4 w-4" />}
             label="Horas (Mês)"
-            value={`${stats.totalHoursThisMonth.toFixed(1)}h`}
-            sub={`${stats.totalHoursAllTime.toFixed(0)}h histórico total`}
+            value={`${stats.totalHours.toFixed(1)}h`}
+            sub={`${stats.active} colaborador${stats.active !== 1 ? "es" : ""} ativo${stats.active !== 1 ? "s" : ""}`}
             sparkValues={stats.sparkHours}
           />
           <KpiCard
             accent="emerald"
             icon={<Euro className="h-4 w-4" />}
             label="Custo (Mês)"
-            value={`${stats.totalCostThisMonth.toFixed(0)} €`}
+            value={`${stats.totalCost.toFixed(0)} €`}
             sub="Taxa histórica por entrada"
             sparkValues={stats.sparkCost}
             onClick={() => router.push("/admin?tab=finance")}
+          />
+          <KpiCard
+            accent="blue"
+            icon={<Users className="h-4 w-4" />}
+            label="Colaboradores"
+            value={String(stats.total)}
+            sub={`${stats.inactive} inativo${stats.inactive !== 1 ? "s" : ""} este mês`}
+            onClick={() => router.push("/admin?tab=collaborators")}
           />
           <KpiCard
             accent="orange"
             icon={<TrendingUp className="h-4 w-4" />}
             label="Taxa Média"
             value={`${stats.avgRate.toFixed(2)} €/h`}
-            sub={`${stats.inactive} inativos este mês`}
+            sub={`${stats.totalHoursAllTime.toFixed(0)}h histórico total`}
           />
         </div>
 
         {/* ── Main grid ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
 
-          {/* Top collaborators */}
+          {/* Top colaboradores */}
           <div className="md:col-span-2 rounded-2xl border bg-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b">
               <div>
@@ -369,24 +431,23 @@ export function AdminDashboardView() {
                 Ver todos <ArrowUpRight className="h-3.5 w-3.5" />
               </Button>
             </div>
-
             <div className="p-4 space-y-1">
-              {stats.topCollabs.filter(c => c.totalHoursThisMonth > 0).length === 0 ? (
+              {stats.topCollabs.filter(c => c._monthHours > 0).length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
                   <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center mb-3">
                     <Users className="h-5 w-5 text-muted-foreground" />
                   </div>
-                  <p className="text-sm text-muted-foreground">Nenhum colaborador trabalhou este mês</p>
+                  <p className="text-sm text-muted-foreground">Nenhum registo em {monthLabel}</p>
                 </div>
               ) : (
                 stats.topCollabs
-                  .filter(c => c.totalHoursThisMonth > 0)
+                  .filter(c => c._monthHours > 0)
                   .map((collab, i) => (
                     <CollabRow
                       key={collab.id}
                       collab={collab}
                       rank={i}
-                      maxHours={stats.topCollabs[0]?.totalHoursThisMonth ?? 1}
+                      maxHours={stats.topCollabs[0]?._monthHours ?? 1}
                       onClick={() => router.push(`/admin/collaborator/${collab.id}`)}
                     />
                   ))
@@ -394,7 +455,7 @@ export function AdminDashboardView() {
             </div>
           </div>
 
-          {/* Right column */}
+          {/* Coluna direita */}
           <div className="space-y-4">
 
             {/* Distribuição */}
@@ -407,15 +468,10 @@ export function AdminDashboardView() {
                 <p className="text-xs text-muted-foreground mt-0.5">Top 6 por horas este mês</p>
               </div>
               <div className="px-5 py-4">
-                {stats.barData.every(d => d.value === 0) ? (
+                {stats.barData.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">Sem dados</p>
                 ) : (
-                  <MiniBarChart
-                    data={stats.barData.map((d, i) => ({
-                      ...d,
-                      color: i === 0 ? "bg-yellow-400" : i === 1 ? "bg-slate-400" : i === 2 ? "bg-orange-400" : undefined,
-                    }))}
-                  />
+                  <MiniBarChart data={stats.barData} />
                 )}
               </div>
             </div>
@@ -449,7 +505,7 @@ export function AdminDashboardView() {
               </div>
             </div>
 
-            {/* Stats rápidos */}
+            {/* Resumo global */}
             <div className="rounded-2xl border bg-card overflow-hidden">
               <div className="px-5 py-4 border-b">
                 <p className="font-bold text-sm">Resumo Global</p>
@@ -458,11 +514,11 @@ export function AdminDashboardView() {
                 {[
                   { label: "Total horas histórico", value: `${stats.totalHoursAllTime.toFixed(0)}h` },
                   { label: "Taxa média / hora",     value: `${stats.avgRate.toFixed(2)} €/h` },
-                  { label: "Custo médio / collab",  value: stats.active > 0 ? `${(stats.totalCostThisMonth / stats.active).toFixed(0)} €` : "—" },
+                  { label: "Custo médio / ativo",   value: stats.active > 0 ? `${(stats.totalCost / stats.active).toFixed(0)} €` : "—" },
                 ].map(row => (
                   <div key={row.label} className="flex justify-between items-center px-5 py-3">
                     <span className="text-xs text-muted-foreground">{row.label}</span>
-                    <span className="text-sm font-bold">{row.value}</span>
+                    <span className="text-sm font-bold tabular-nums">{row.value}</span>
                   </div>
                 ))}
               </div>
@@ -470,7 +526,7 @@ export function AdminDashboardView() {
           </div>
         </div>
 
-        {/* ── Quick access: all collaborators ── */}
+        {/* ── Acesso Rápido ── */}
         {collaborators.length > 0 && (
           <div className="rounded-2xl border bg-card overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b">
@@ -487,9 +543,9 @@ export function AdminDashboardView() {
               </Button>
             </div>
             <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2">
-              {collaborators.map(c => {
+              {stats.withMonthData.map((c: any) => {
                 const initials = c.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()
-                const isActive = c.totalHoursThisMonth > 0
+                const isActive = c._monthHours > 0
                 return (
                   <button
                     key={c.id}
@@ -507,10 +563,10 @@ export function AdminDashboardView() {
                     <div className="text-center">
                       <p className="text-xs font-semibold truncate w-full">{c.name.split(" ")[0]}</p>
                       <p className={cn(
-                        "text-[10px]",
+                        "text-[10px] tabular-nums",
                         isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"
                       )}>
-                        {isActive ? `${c.totalHoursThisMonth.toFixed(0)}h` : "inativo"}
+                        {isActive ? `${c._monthHours.toFixed(0)}h` : "inativo"}
                       </p>
                     </div>
                   </button>
@@ -520,11 +576,11 @@ export function AdminDashboardView() {
           </div>
         )}
 
-        {/* ── Info banner ── */}
+        {/* ── Footer ── */}
         <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
           <CheckCircle2 className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
           <p className="text-sm text-blue-900 dark:text-blue-200">
-            <strong>Dados em tempo real.</strong> Todos os valores refletem o mês atual ({monthLabel}) e são calculados com a taxa histórica de cada entrada.
+            <strong>Dados em tempo real.</strong> Todos os valores refletem o mês selecionado ({monthLabel}) e são calculados com a taxa histórica de cada entrada.
           </p>
         </div>
 

@@ -8,7 +8,6 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { VisuallyHidden } from "@radix-ui/react-visually-hidden"
 import { formatLocalDate } from "@/lib/date-utils"
 
 interface CollaboratorCalendarViewProps {
@@ -65,20 +64,18 @@ function EntryDetail({
 
   return (
     <div className="flex flex-col h-full min-h-0 sm:max-h-[85dvh]">
-      {/* ── Hero Header ─────────────────────────────────────────────────── */}
+      {/* ── Hero Header ── */}
       <div className={cn(
         "relative px-6 pt-6 pb-7 overflow-hidden shrink-0",
         isAbsence
           ? "bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500"
           : "bg-gradient-to-br from-primary via-primary/90 to-primary/80"
       )}>
-        {/* Decorative rings */}
         <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full border-2 border-white/10 pointer-events-none" />
         <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full border border-white/10 pointer-events-none" />
         <div className="absolute top-1/2 -right-20 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
 
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
@@ -87,13 +84,11 @@ function EntryDetail({
           <X className="h-4 w-4 text-white" />
         </button>
 
-        {/* Date pill */}
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 border border-white/20 mb-4">
           <Calendar className="h-3 w-3 text-white/80" />
           <span className="text-xs font-semibold text-white capitalize tracking-wide">{dateLabel}</span>
         </div>
 
-        {/* Main info row */}
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-white/60 text-[11px] font-semibold uppercase tracking-widest mb-1.5">
@@ -123,7 +118,6 @@ function EntryDetail({
           )}
         </div>
 
-        {/* Hours pills */}
         {!isAbsence && (
           <div className="flex flex-wrap gap-2 mt-5">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 border border-white/20">
@@ -140,12 +134,10 @@ function EntryDetail({
         )}
       </div>
 
-      {/* ── Scrollable body ───────────────────────────────────────────────── */}
+      {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto bg-slate-50/60">
         {services.length > 0 && (
           <div className="px-5 pt-5 pb-4 space-y-4">
-
-            {/* Section header */}
             <div className="flex items-center gap-2.5">
               <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center">
                 <Briefcase className="h-3.5 w-3.5 text-primary" />
@@ -155,12 +147,8 @@ function EntryDetail({
               </p>
             </div>
 
-            {/* Service cards */}
             {services.map((svc: any, idx: number) => (
-              <div
-                key={svc.id || idx}
-                className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm"
-              >
+              <div key={svc.id || idx} className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
                 {svc.obraNome ? (
                   <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 bg-slate-50">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -260,7 +248,7 @@ function EntryDetail({
         <div className="h-2" />
       </div>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
+      {/* ── Footer ── */}
       <div className="shrink-0 px-5 py-4 border-t border-slate-100 bg-white pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <button
           onClick={onClose}
@@ -517,7 +505,6 @@ export function CollaboratorCalendarView({
           </div>
         </div>
 
-        {/* Stats sidebar */}
         <div className="w-48 shrink-0 space-y-2.5 pt-7">
           <div className="rounded-xl border bg-card divide-y overflow-hidden">
             {[
@@ -546,29 +533,24 @@ export function CollaboratorCalendarView({
         </div>
       </div>
 
-      {/* ── Dialog centrado — substitui o Sheet ── */}
+      {/* ── Dialog ── */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent
           className={cn(
             "p-0 gap-0 border-0 shadow-2xl overflow-hidden",
-            // Mobile: ecrã completo
             "max-sm:fixed max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:right-0 max-sm:bottom-0",
             "max-sm:translate-x-0 max-sm:translate-y-0",
             "max-sm:rounded-none max-sm:w-full max-sm:h-full max-sm:max-h-full max-sm:max-w-full",
-            // Desktop: modal centrado (comportamento padrão do Dialog do shadcn)
             "sm:w-[520px] sm:max-w-[90vw] sm:max-h-[85dvh] sm:rounded-3xl",
-            // Esconde o X padrão do shadcn DialogContent
             "[&>button]:hidden",
           )}
         >
-          {/* Título acessível (invisível — o título visual está no hero) */}
-          <VisuallyHidden asChild>
-            <DialogTitle>
-              {selectedEntry
-                ? `Detalhe do dia ${selectedDateLabel} — ${collaboratorName}`
-                : "Detalhe do dia"}
-            </DialogTitle>
-          </VisuallyHidden>
+          {/* Título acessível via sr-only */}
+          <DialogTitle className="sr-only">
+            {selectedEntry
+              ? `Detalhe do dia ${selectedDateLabel} — ${collaboratorName}`
+              : "Detalhe do dia"}
+          </DialogTitle>
 
           {selectedEntry ? (
             <EntryDetail
