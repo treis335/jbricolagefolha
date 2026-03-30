@@ -4,6 +4,7 @@
 
 import { createContext, useContext, useEffect, useState, useRef, type ReactNode } from "react"
 import { useAuth } from "@/lib/AuthProvider"
+import { formatLocalDate } from "@/lib/date-utils"
 import {
   type AppData,
   type DayEntry,
@@ -224,11 +225,11 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
   const getEntry = (date: string) => data.entries.find((e) => e.date === date)
 
   const getPreviousDayEntry = (date: string) => {
-    const previousDate = new Date(date)
-    previousDate.setDate(previousDate.getDate() - 1)
-    const previousDateStr = previousDate.toISOString().split("T")[0]
-    return data.entries.find((e) => e.date === previousDateStr)
-  }
+  const previousDate = new Date(date)
+  previousDate.setDate(previousDate.getDate() - 1)
+  const previousDateStr = formatLocalDate(previousDate)
+  return data.entries.find((e) => e.date === previousDateStr)
+}
 
   const addPayment = (payment: { date: string; valor: number; metodo: PaymentMethod }) => {
     const newPayment: Payment = { ...payment, id: uuidv4() }

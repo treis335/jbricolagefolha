@@ -1,12 +1,14 @@
-// components/admin/collaborator-reports-view.tsx (VERSÃO MELHORADA com PDF)
+// components/admin/collaborator-reports-view.tsx
 "use client"
 
 import { useState, useMemo, useCallback } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, FileDown, Calendar, Clock } from "lucide-react"
+import {
+  ChevronLeft, ChevronRight, FileDown, Calendar,
+  Clock, TrendingUp, Zap, Euro, Building2,
+} from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface CollaboratorReportsViewProps {
   collaborator: {
@@ -20,10 +22,8 @@ interface CollaboratorReportsViewProps {
 
 type Period = "daily" | "weekly" | "monthly"
 
-// ✅ Helper: resolve a taxa de uma entry com todos os fallbacks
 function resolveEntryTaxa(entry: any, currentRate: number): number {
-  if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0)
-    return entry.taxaHoraria
+  if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0) return entry.taxaHoraria
   if (Array.isArray(entry.services) && entry.services.length > 0) {
     const s0Taxa = entry.services[0]?.taxaHoraria
     if (typeof s0Taxa === "number" && s0Taxa > 0) return s0Taxa
@@ -31,151 +31,98 @@ function resolveEntryTaxa(entry: any, currentRate: number): number {
   return currentRate
 }
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(value)
+
+const formatDateWithWeekday = (dateStr: string) =>
+  new Date(dateStr).toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "2-digit" })
+
 export function CollaboratorReportsView({ collaborator }: CollaboratorReportsViewProps) {
   const [period, setPeriod] = useState<Period>("monthly")
   const [currentDate, setCurrentDate] = useState(new Date())
 
   const { startDate, endDate, rangeLabel } = useMemo(() => {
     const today = new Date(currentDate)
-    let start: Date
-    let end: Date
-    let label: string
-
+    let start: Date, end: Date, label: string
     switch (period) {
       case "daily":
-        start = new Date(today)
-        end = new Date(today)
-        label = today.toLocaleDateString("pt-PT", {
-          weekday: "long", day: "numeric", month: "long", year: "numeric",
-        })
+        start = end = new Date(today)
+        label = today.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
         break
       case "weekly": {
-        const dayOfWeek = today.getDay()
-        const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
-        start = new Date(today)
-        start.setDate(today.getDate() + diffToMonday)
-        end = new Date(start)
-        end.setDate(start.getDate() + 6)
-        label = `${start.toLocaleDateString("pt-PT", { day: "numeric", month: "long" })} - ${end.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}`
+        const diff = today.getDay() === 0 ? -6 : 1 - today.getDay()
+        start = new Date(today); start.setDate(today.getDate() + diff)
+        end = new Date(start); end.setDate(start.getDate() + 6)
+        label = `${start.toLocaleDateString("pt-PT", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}`
         break
       }
-      case "monthly":
+      default:
         start = new Date(today.getFullYear(), today.getMonth(), 1)
         end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
         label = today.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
-        break
     }
-
-    return {
-      startDate: start.toISOString().split("T")[0],
-      endDate: end.toISOString().split("T")[0],
-      rangeLabel: label,
-    }
+    return { startDate: start.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0], rangeLabel: label }
   }, [period, currentDate])
 
-  const filteredEntries = useMemo(() => {
-    return collaborator.entries
-      .filter((entry) => entry?.date && entry.date >= startDate && entry.date <= endDate)
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-  }, [collaborator.entries, startDate, endDate])
+  const filteredEntries = useMemo(() =>
+    collaborator.entries
+      .filter(e => e?.date && e.date >= startDate && e.date <= endDate)
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
+    [collaborator.entries, startDate, endDate]
+  )
 
-  // ✅ Totais calculados com taxa histórica por entry
   const totals = useMemo(() => {
-    let totalNormais = 0
-    let totalExtras = 0
-    let totalHoras = 0
-    let valorTotal = 0
-
-    filteredEntries.forEach((entry) => {
-      const horas = entry.totalHoras ?? 0
-      totalHoras += horas
-      totalNormais += entry.normalHoras ?? 0
-      totalExtras += entry.extraHoras ?? 0
-      valorTotal += horas * resolveEntryTaxa(entry, collaborator.currentRate)
+    let totalNormais = 0, totalExtras = 0, totalHoras = 0, valorTotal = 0
+    filteredEntries.forEach(e => {
+      const h = e.totalHoras ?? 0
+      totalHoras += h
+      totalNormais += e.normalHoras ?? 0
+      totalExtras += e.extraHoras ?? 0
+      valorTotal += h * resolveEntryTaxa(e, collaborator.currentRate)
     })
-
     return { totalNormais, totalExtras, totalHoras, valorTotal }
   }, [filteredEntries, collaborator.currentRate])
 
-  const navigate = (direction: "prev" | "next") => {
-    setCurrentDate((prev) => {
-      const newDate = new Date(prev)
-      if (period === "daily") newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1))
-      else if (period === "weekly") newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7))
-      else newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1))
-      return newDate
+  const navigate = (dir: "prev" | "next") => {
+    setCurrentDate(prev => {
+      const d = new Date(prev)
+      if (period === "daily") d.setDate(d.getDate() + (dir === "next" ? 1 : -1))
+      else if (period === "weekly") d.setDate(d.getDate() + (dir === "next" ? 7 : -7))
+      else d.setMonth(d.getMonth() + (dir === "next" ? 1 : -1))
+      return d
     })
   }
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(value)
-
-  const formatDateWithWeekday = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString("pt-PT", { weekday: "short", day: "2-digit", month: "2-digit" })
 
   const exportPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf")
     const autoTable = (await import("jspdf-autotable")).default
-
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
-
     const pageWidth = doc.internal.pageSize.getWidth()
-    const marginLeft = 10
-    const marginRight = 16
-    const marginTop = 12
-
     const periodLabel = period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"
 
     const drawHeader = () => {
-      try {
-        doc.addImage("/apple-icon.png", "PNG", marginLeft, marginTop - 1, 20, 20)
-      } catch (e) {
-        console.log("Logo não encontrado, continuando sem logo")
-      }
-
-      doc.setFontSize(14)
-      doc.setFont("helvetica", "bold")
-      doc.text(`Relatório ${periodLabel} - ${collaborator.name}`, pageWidth / 2, marginTop + 5, { align: "center" })
-
-      doc.setFontSize(9)
-      doc.setFont("helvetica", "normal")
-      doc.text(rangeLabel, pageWidth / 2, marginTop + 12, { align: "center" })
+      try { doc.addImage("/apple-icon.png", "PNG", 10, 11, 20, 20) } catch {}
+      doc.setFontSize(14); doc.setFont("helvetica", "bold")
+      doc.text(`Relatório ${periodLabel} - ${collaborator.name}`, pageWidth / 2, 17, { align: "center" })
+      doc.setFontSize(9); doc.setFont("helvetica", "normal")
+      doc.text(rangeLabel, pageWidth / 2, 24, { align: "center" })
     }
 
     const tableBody: string[][] = []
-
-    filteredEntries.forEach((entry) => {
-      const totalHoras = entry.totalHoras ?? 0
-      // ✅ Taxa histórica por entry no PDF
-      const entryTaxa = resolveEntryTaxa(entry, collaborator.currentRate)
-      const entryCusto = (totalHoras * entryTaxa).toFixed(2) + " €"
-      const dataComHoras = `${formatDateWithWeekday(entry.date)} – ${totalHoras}h`
-
-      if (entry.services && entry.services.length > 0) {
-        entry.services.forEach((s: any, index: number) => {
-          const isFirst = index === 0
-          let descricaoFormatada = s.descricao || "-"
-          if (s.totalHoras !== undefined && s.totalHoras > 0) {
-            descricaoFormatada = `(${s.totalHoras}h) - ${descricaoFormatada}`
-          }
-
-          tableBody.push([
-            isFirst ? dataComHoras : "",
-            `${s.obraNome ? s.obraNome + " - " : ""}${descricaoFormatada}`,
-            (s.equipa ?? []).length > 0 ? (s.equipa ?? []).join(", ") : "Solo",
-            (s.materiais ?? []).length > 0 ? (s.materiais ?? []).join(", ") : "-",
-            // ✅ Custo por dia só na primeira linha da entry
-            isFirst ? entryCusto : "",
-          ])
+    filteredEntries.forEach(entry => {
+      const h = entry.totalHoras ?? 0
+      const taxa = resolveEntryTaxa(entry, collaborator.currentRate)
+      const custo = (h * taxa).toFixed(2) + " €"
+      const dataLabel = `${formatDateWithWeekday(entry.date)} – ${h}h`
+      if (entry.services?.length > 0) {
+        entry.services.forEach((s: any, i: number) => {
+          const desc = s.totalHoras ? `(${s.totalHoras}h) - ${s.descricao || "-"}` : s.descricao || "-"
+          tableBody.push([i === 0 ? dataLabel : "", `${s.obraNome ? s.obraNome + " - " : ""}${desc}`,
+            (s.equipa ?? []).join(", ") || "Solo", (s.materiais ?? []).join(", ") || "-", i === 0 ? custo : ""])
         })
       } else {
-        tableBody.push([
-          dataComHoras,
-          entry.descricao || "-",
-          (entry.equipa ?? []).length > 0 ? (entry.equipa ?? []).join(", ") : "Solo",
-          (entry.materiais ?? []).length > 0 ? (entry.materiais ?? []).join(", ") : "-",
-          entryCusto,
-        ])
+        tableBody.push([dataLabel, entry.descricao || "-",
+          (entry.equipa ?? []).join(", ") || "Solo", (entry.materiais ?? []).join(", ") || "-", custo])
       }
     })
 
@@ -184,198 +131,191 @@ export function CollaboratorReportsView({ collaborator }: CollaboratorReportsVie
       head: [["Data", "Obra / Descrição", "Equipa", "Materiais", "Custo"]],
       body: tableBody,
       theme: "grid",
-      styles: {
-        fontSize: 9.5,
-        cellPadding: 4,
-        lineWidth: 0.1,
-        overflow: "linebreak",
-      },
-      headStyles: {
-        fillColor: [41, 128, 185],
-        textColor: 255,
-        fontStyle: "bold",
-        halign: "center",
-      },
-      columnStyles: {
-        0: { cellWidth: 45, halign: "left" },
-        1: { cellWidth: 100, halign: "left" },
-        2: { cellWidth: 50, halign: "left" },
-        3: { cellWidth: 55, halign: "left" },
-        4: { cellWidth: 25, halign: "right" },
-      },
+      styles: { fontSize: 9.5, cellPadding: 4, lineWidth: 0.1, overflow: "linebreak" },
+      headStyles: { fillColor: [41, 128, 185], textColor: 255, fontStyle: "bold", halign: "center" },
+      columnStyles: { 0: { cellWidth: 45 }, 1: { cellWidth: 100 }, 2: { cellWidth: 50 }, 3: { cellWidth: 55 }, 4: { cellWidth: 25, halign: "right" } },
       alternateRowStyles: { fillColor: [248, 248, 248] },
-      margin: { top: 38, left: marginLeft, right: marginRight },
+      margin: { top: 38, left: 10, right: 16 },
       didParseCell: (data: any) => {
-        if (
-          data.section === "body" &&
-          data.column.index === 0 &&
-          data.cell.text?.[0] !== ""
-        ) {
-          data.cell.styles.fillColor = [220, 230, 241]
-          data.cell.styles.fontStyle = "bold"
+        if (data.section === "body" && data.column.index === 0 && data.cell.text?.[0] !== "") {
+          data.cell.styles.fillColor = [220, 230, 241]; data.cell.styles.fontStyle = "bold"
         }
       },
       didDrawPage: drawHeader,
     })
 
     const finalY = (doc as any).lastAutoTable?.finalY + 15 || 110
-
-    doc.setFontSize(12)
-    doc.setFont("helvetica", "bold")
-    doc.text("RESUMO DO PERÍODO", marginLeft, finalY)
-
-    doc.setFontSize(9.5)
-    doc.setFont("helvetica", "normal")
-    doc.text(
-      `Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total de Horas: ${totals.totalHoras}h`,
-      marginLeft, finalY + 8
-    )
-    // ✅ Valor total com taxa histórica, taxa atual mostrada como referência
-    doc.text(
-      `Taxa Atual: ${collaborator.currentRate.toFixed(2)} €/h   |   Valor Total (taxa histórica): ${totals.valorTotal.toFixed(2)} €`,
-      marginLeft, finalY + 14
-    )
-
-    const filename = `relatorio-${collaborator.name.replace(/\s+/g, "-")}-${period}-${startDate}.pdf`
-    doc.save(filename)
+    doc.setFontSize(12); doc.setFont("helvetica", "bold"); doc.text("RESUMO DO PERÍODO", 10, finalY)
+    doc.setFontSize(9.5); doc.setFont("helvetica", "normal")
+    doc.text(`Horas Normais: ${totals.totalNormais}h   |   Horas Extras: ${totals.totalExtras}h   |   Total: ${totals.totalHoras}h`, 10, finalY + 8)
+    doc.text(`Taxa Atual: ${collaborator.currentRate.toFixed(2)} €/h   |   Valor Total: ${totals.valorTotal.toFixed(2)} €`, 10, finalY + 14)
+    doc.save(`relatorio-${collaborator.name.replace(/\s+/g, "-")}-${period}-${startDate}.pdf`)
   }, [filteredEntries, totals, period, rangeLabel, startDate, collaborator])
 
-  const hasEntries = filteredEntries.length > 0
+  const PERIODS: { value: Period; label: string }[] = [
+    { value: "daily", label: "Diário" },
+    { value: "weekly", label: "Semanal" },
+    { value: "monthly", label: "Mensal" },
+  ]
 
   return (
-    <div className="space-y-6">
-      {/* Seletor de Período */}
-      <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
-        <TabsList className="w-full grid grid-cols-3 h-10">
-          <TabsTrigger value="daily" className="text-sm">Diário</TabsTrigger>
-          <TabsTrigger value="weekly" className="text-sm">Semanal</TabsTrigger>
-          <TabsTrigger value="monthly" className="text-sm">Mensal</TabsTrigger>
-        </TabsList>
-      </Tabs>
+    <div className="space-y-4">
 
-      {/* Navegação de Período */}
-      <div className="flex items-center justify-between px-4 py-3 border rounded-lg bg-card">
-        <Button variant="ghost" size="icon" onClick={() => navigate("prev")}>
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <h3 className="text-base font-medium text-center flex-1 px-2 capitalize">{rangeLabel}</h3>
-        <Button variant="ghost" size="icon" onClick={() => navigate("next")}>
-          <ChevronRight className="h-5 w-5" />
-        </Button>
+      {/* ── Period selector + nav + export ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Period tabs */}
+        <div className="flex items-center rounded-xl bg-muted/60 p-1 gap-0.5">
+          {PERIODS.map(p => (
+            <button
+              key={p.value}
+              onClick={() => setPeriod(p.value)}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+                period === p.value
+                  ? "bg-background shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Nav */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => navigate("prev")}
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
+          </button>
+          <span className="text-sm font-medium capitalize min-w-[140px] text-center">{rangeLabel}</span>
+          <button
+            onClick={() => navigate("next")}
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* Export */}
+        {filteredEntries.length > 0 && (
+          <button
+            onClick={exportPDF}
+            className="ml-auto flex items-center gap-1.5 px-3 h-8 rounded-lg border bg-card text-xs font-medium hover:bg-muted transition-colors text-foreground shrink-0"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            Exportar PDF
+          </button>
+        )}
       </div>
 
-      {hasEntries ? (
+      {filteredEntries.length > 0 ? (
         <>
-          {/* Cards de Resumo */}
-          <div className="grid grid-cols-2 gap-4">
-            <Card>
-              <CardContent className="p-5 text-center">
-                <div className="flex items-center justify-center gap-2 text-muted-foreground text-sm mb-1">
-                  <Clock className="h-4 w-4" />
-                  Horas Normais
+          {/* ── Stats row ── */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Normais",  value: `${totals.totalNormais}`,  unit: "h", icon: Clock,     color: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-950/20" },
+              { label: "Extras",   value: `${totals.totalExtras}`,   unit: "h", icon: Zap,       color: "text-amber-600 dark:text-amber-400",  bg: "bg-amber-50 dark:bg-amber-950/20" },
+              { label: "Total",    value: `${totals.totalHoras}`,    unit: "h", icon: TrendingUp, color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/20" },
+              { label: "Custo",    value: formatCurrency(totals.valorTotal), unit: "", icon: Euro, color: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-50 dark:bg-emerald-950/20" },
+            ].map(({ label, value, unit, icon: Icon, color, bg }) => (
+              <div key={label} className={`rounded-xl border-0 p-4 ${bg}`}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Icon className={`h-3.5 w-3.5 ${color}`} />
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
                 </div>
-                <p className="text-3xl font-bold">{totals.totalNormais}h</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-destructive/30">
-              <CardContent className="p-5 text-center">
-                <div className="flex items-center justify-center gap-2 text-destructive text-sm mb-1">
-                  <Clock className="h-4 w-4" />
-                  Horas Extras
-                </div>
-                <p className="text-3xl font-bold text-destructive">{totals.totalExtras}h</p>
-              </CardContent>
-            </Card>
+                <p className={`text-xl font-bold tracking-tight ${color}`}>
+                  {value}{unit && <span className="text-sm font-normal ml-0.5 opacity-70">{unit}</span>}
+                </p>
+              </div>
+            ))}
           </div>
 
-          {/* Valor Total */}
-          <Card className="bg-primary/5 border-primary/30">
-            <CardContent className="p-6 text-center">
-              <p className="text-primary text-sm mb-1">Valor Total do Período</p>
-              {/* ✅ Valor com taxa histórica */}
-              <p className="text-4xl font-bold text-primary">
-                {formatCurrency(totals.valorTotal)}
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                {totals.totalHoras}h · taxa histórica por registo
-              </p>
-            </CardContent>
-          </Card>
+          {/* ── Entries list ── */}
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Registos
+              </h3>
+              <Badge variant="secondary" className="text-xs ml-auto">{filteredEntries.length}</Badge>
+            </div>
 
-          {/* Lista de Entradas */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Registos Detalhados ({filteredEntries.length})
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            <div className="divide-y">
               {filteredEntries.map((entry, idx) => {
-                const entryTaxa = resolveEntryTaxa(entry, collaborator.currentRate)
+                const taxa = resolveEntryTaxa(entry, collaborator.currentRate)
+                const custo = entry.totalHoras * taxa
+                const showTaxa = taxa !== collaborator.currentRate
+
                 return (
-                  <div key={idx} className="p-4 bg-muted rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {new Date(entry.date).toLocaleDateString("pt-PT", {
-                          weekday: "long", day: "numeric", month: "short",
-                        })}
-                      </span>
-                      <Badge className="text-sm">{entry.totalHoras}h</Badge>
+                  <div key={idx} className="px-4 py-3.5 hover:bg-muted/30 transition-colors">
+                    {/* Entry header */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold capitalize">
+                          {new Date(entry.date + "T12:00:00").toLocaleDateString("pt-PT", {
+                            weekday: "long", day: "numeric", month: "short",
+                          })}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">{entry.totalHoras}h</Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-right">
+                        <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                          {formatCurrency(custo)}
+                        </span>
+                        {showTaxa && (
+                          <span className="text-[10px] text-muted-foreground">{taxa.toFixed(2)} €/h</span>
+                        )}
+                      </div>
                     </div>
 
-                    {entry.services && entry.services.length > 0 ? (
-                      <div className="space-y-2">
-                        {entry.services.map((s: any, sidx: number) => (
-                          <div key={sidx} className="text-sm border-l-2 border-primary/30 pl-3">
-                            <p className="font-medium">{s.obraNome}</p>
-                            {s.descricao && (
-                              <p className="text-muted-foreground text-xs mt-1">{s.descricao}</p>
-                            )}
+                    {/* Hours breakdown */}
+                    <div className="flex items-center gap-3 mb-2.5 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />{entry.normalHoras || 0}h normais
+                      </span>
+                      {(entry.extraHoras || 0) > 0 && (
+                        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                          <Zap className="h-3 w-3" />{entry.extraHoras}h extras
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Services */}
+                    {entry.services?.length > 0 ? (
+                      <div className="space-y-1.5">
+                        {entry.services.map((s: any, si: number) => (
+                          <div key={si} className="flex items-start gap-2 pl-2 border-l-2 border-primary/20">
+                            <Building2 className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <span className="text-xs font-medium">{s.obraNome || `Serviço ${si + 1}`}</span>
+                              {s.totalHoras && (
+                                <span className="text-[10px] text-muted-foreground ml-1.5">({s.totalHoras}h)</span>
+                              )}
+                              {s.descricao && (
+                                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-2">{s.descricao}</p>
+                              )}
+                            </div>
                           </div>
                         ))}
                       </div>
-                    ) : (
-                      entry.descricao && (
-                        <p className="text-sm text-muted-foreground">{entry.descricao}</p>
-                      )
-                    )}
-
-                    <div className="flex gap-4 text-xs text-muted-foreground">
-                      <span>Normal: {entry.normalHoras || 0}h</span>
-                      <span>•</span>
-                      <span>Extra: {entry.extraHoras || 0}h</span>
-                      <span>•</span>
-                      {/* ✅ Custo do dia com taxa histórica da entry */}
-                      <span className="text-green-600">
-                        {formatCurrency(entry.totalHoras * entryTaxa)}
-                      </span>
-                      {entryTaxa !== collaborator.currentRate && (
-                        <>
-                          <span>•</span>
-                          <span className="text-muted-foreground/60">{entryTaxa.toFixed(2)} €/h</span>
-                        </>
-                      )}
-                    </div>
+                    ) : entry.descricao ? (
+                      <p className="text-xs text-muted-foreground pl-2 border-l-2 border-muted">{entry.descricao}</p>
+                    ) : null}
                   </div>
                 )
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </div>
 
-          {/* Botão Exportar */}
-          <Button onClick={exportPDF} className="w-full h-12 text-base" size="lg">
-            <FileDown className="h-5 w-5 mr-2" />
-            Exportar Relatório PDF
-          </Button>
         </>
       ) : (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            Nenhum registo encontrado neste período
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-dashed py-16 text-center">
+          <Calendar className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">Sem registos neste período</p>
+          <p className="text-xs text-muted-foreground/60 mt-1">Tenta navegar para outro período</p>
+        </div>
       )}
     </div>
   )

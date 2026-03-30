@@ -1,9 +1,8 @@
 // components/admin/collaborator-overview.tsx
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Briefcase } from "lucide-react"
+import { Calendar, Clock, Briefcase, Mail, AtSign, User, TrendingUp, BarChart2, CalendarDays } from "lucide-react"
 import { CollaboratorRateManager, type RateHistoryEntry } from "./collaborator-rate-manager"
 
 interface CollaboratorOverviewProps {
@@ -34,11 +33,8 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
     ? new Date(Math.max(...collaborator.entries.map((e: any) => new Date(e.date).getTime())))
     : null
 
-  // ✅ Custo total usando a taxa histórica de cada entry (fallback para taxa atual)
   const totalCostAllTime = collaborator.entries.reduce((sum: number, e: any) => {
-    const taxa = (typeof e.taxaHoraria === "number" && e.taxaHoraria > 0)
-      ? e.taxaHoraria
-      : collaborator.currentRate
+    const taxa = (typeof e.taxaHoraria === "number" && e.taxaHoraria > 0) ? e.taxaHoraria : collaborator.currentRate
     return sum + (e.totalHoras || 0) * taxa
   }, 0)
 
@@ -51,17 +47,15 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
         return year === now.getFullYear() && month - 1 === now.getMonth()
       })
       .reduce((sum: number, e: any) => {
-        const taxa = (typeof e.taxaHoraria === "number" && e.taxaHoraria > 0)
-          ? e.taxaHoraria
-          : collaborator.currentRate
+        const taxa = (typeof e.taxaHoraria === "number" && e.taxaHoraria > 0) ? e.taxaHoraria : collaborator.currentRate
         return sum + (e.totalHoras || 0) * taxa
       }, 0)
   })()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
 
-      {/* ── Taxa Horária + Histórico ── */}
+      {/* ── Taxa Horária ── */}
       <CollaboratorRateManager
         collaboratorId={collaborator.id}
         collaboratorName={collaborator.name}
@@ -70,106 +64,103 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
         onRateUpdated={onRateUpdated ?? (() => {})}
       />
 
-      {/* ── Informações Pessoais ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Briefcase className="h-4 w-4" />
-            Informação do Colaborador
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {[
-            { label: "Nome Completo", value: collaborator.name },
-            { label: "Username", value: `@${collaborator.username || "—"}` },
-            { label: "Email", value: collaborator.email },
-          ].map(row => (
-            <div key={row.label} className="flex justify-between items-center p-3 bg-muted rounded-lg gap-3">
-              <span className="text-sm text-muted-foreground shrink-0">{row.label}:</span>
-              <span className="font-medium text-sm text-right break-all">{row.value}</span>
-            </div>
-          ))}
-          <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-            <span className="text-sm text-muted-foreground">Tipo:</span>
-            <Badge variant="outline">{collaborator.role}</Badge>
-          </div>
-          {collaborator.migrated && (
-            <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-              <span className="text-sm text-muted-foreground">Status:</span>
-              <Badge variant="secondary">Migrado</Badge>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* ── Desktop: 2 col grid / Mobile: stack ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
 
-      {/* ── Estatísticas de Trabalho ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            Estatísticas de Trabalho
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        {/* ── Informação Pessoal ── */}
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+            <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Colaborador</h3>
+          </div>
+          <div className="divide-y">
             {[
-              { label: "Horas Este Mês", value: `${collaborator.totalHoursThisMonth.toFixed(1)}h`, theme: "blue" },
-              { label: "Total Horas",    value: `${collaborator.totalHoursAllTime.toFixed(1)}h`,   theme: "purple" },
-              { label: "Dias Trabalhados", value: totalDaysWorked.toString(),                       theme: "green" },
-              { label: "Média Horas/Dia", value: `${averageHoursPerDay.toFixed(1)}h`,              theme: "amber" },
-            ].map(({ label, value, theme }) => {
-              const themes: Record<string, string> = {
-                blue:   "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400",
-                purple: "bg-purple-50 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400",
-                green:  "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 text-green-600 dark:text-green-400",
-                amber:  "bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400",
-              }
-              return (
-                <div key={label} className={`p-4 rounded-lg border ${themes[theme]}`}>
-                  <p className="text-xs opacity-80 mb-1">{label}</p>
-                  <p className="text-2xl font-bold">{value}</p>
-                </div>
-              )
-            })}
-          </div>
-          {lastWorkDate && (
-            <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-              <span className="text-sm text-muted-foreground">Último Dia Trabalhado:</span>
-              <span className="font-medium text-sm">
-                {lastWorkDate.toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}
-              </span>
+              { icon: User,   label: "Nome",     value: collaborator.name },
+              { icon: AtSign, label: "Username", value: collaborator.username ? `@${collaborator.username}` : "—" },
+              { icon: Mail,   label: "Email",    value: collaborator.email || "—" },
+            ].map(({ icon: Icon, label, value }) => (
+              <div key={label} className="flex items-center gap-3 px-4 py-2.5">
+                <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground w-16 shrink-0">{label}</span>
+                <span className="text-xs font-medium text-foreground truncate flex-1 text-right">{value}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-3 px-4 py-2.5">
+              <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="text-xs text-muted-foreground w-16 shrink-0">Tipo</span>
+              <div className="flex-1 flex justify-end gap-1.5 flex-wrap">
+                <Badge variant="outline" className="text-xs">
+                  {collaborator.role === "admin" ? "Administrador" : "Colaborador"}
+                </Badge>
+                {collaborator.migrated && <Badge variant="secondary" className="text-xs">Migrado</Badge>}
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            {lastWorkDate && (
+              <div className="flex items-center gap-3 px-4 py-2.5">
+                <CalendarDays className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground w-16 shrink-0">Última vez</span>
+                <span className="text-xs font-medium text-foreground text-right flex-1">
+                  {lastWorkDate.toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
 
-      {/* ── Análise Financeira ── */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Calendar className="h-4 w-4" />
-            Análise Financeira
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Custo Este Mês</p>
-              <p className="text-xl font-bold">{totalCostThisMonth.toFixed(2)} €</p>
-              <p className="text-[10px] text-muted-foreground mt-1">taxa histórica/entrada</p>
-            </div>
-            <div className="p-4 bg-muted rounded-lg">
-              <p className="text-xs text-muted-foreground mb-1">Custo Total</p>
-              <p className="text-xl font-bold">{totalCostAllTime.toFixed(2)} €</p>
-              <p className="text-[10px] text-muted-foreground mt-1">taxa histórica/entrada</p>
-            </div>
+        {/* ── Estatísticas ── */}
+        <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trabalho</h3>
           </div>
-          <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-            <span className="text-sm text-muted-foreground">Total de Registos:</span>
-            <span className="text-2xl font-bold">{collaborator.entries.length}</span>
+          <div className="grid grid-cols-2 divide-x divide-y">
+            {[
+              { label: "Horas este mês", value: `${collaborator.totalHoursThisMonth.toFixed(1)}`, unit: "h", color: "text-blue-600 dark:text-blue-400" },
+              { label: "Total horas",    value: `${collaborator.totalHoursAllTime.toFixed(1)}`,   unit: "h", color: "text-violet-600 dark:text-violet-400" },
+              { label: "Dias trabalhados", value: `${totalDaysWorked}`,                           unit: "d", color: "text-emerald-600 dark:text-emerald-400" },
+              { label: "Média por dia",  value: `${averageHoursPerDay.toFixed(1)}`,              unit: "h", color: "text-amber-600 dark:text-amber-400" },
+            ].map(({ label, value, unit, color }) => (
+              <div key={label} className="px-4 py-3.5 flex flex-col gap-1">
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
+                <p className={`text-xl font-bold tracking-tight ${color}`}>
+                  {value}<span className="text-sm font-normal ml-0.5 opacity-70">{unit}</span>
+                </p>
+              </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
+          <div className="border-t px-4 py-2.5 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <BarChart2 className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Total de registos</span>
+            </div>
+            <span className="text-xs font-semibold">{collaborator.entries.length}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Financeiro ── */}
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
+          <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Análise Financeira</h3>
+          <span className="ml-auto text-[10px] text-muted-foreground">taxa histórica por entrada</span>
+        </div>
+        <div className="grid grid-cols-2 divide-x">
+          <div className="px-5 py-4">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Custo este mês</p>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {totalCostThisMonth.toFixed(2)}<span className="text-sm font-normal text-muted-foreground ml-1">€</span>
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Custo total</p>
+            <p className="text-2xl font-bold tracking-tight text-foreground">
+              {totalCostAllTime.toFixed(2)}<span className="text-sm font-normal text-muted-foreground ml-1">€</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
     </div>
   )
 }

@@ -1,4 +1,3 @@
-//calendar-view.tsx
 "use client"
 
 import { useState, useMemo } from "react"
@@ -6,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { cn } from "@/lib/utils"
+import { formatLocalDate } from "@/lib/date-utils"   // ← Importante
 
 interface CalendarViewProps {
   onSelectDate: (date: Date) => void
@@ -52,22 +52,40 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
   const formatMonthYear = (date: Date) =>
     date.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
 
+  // ====================== CALENDÁRIO CORRIGIDO ======================
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear()
     const month = currentMonth.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    let startDayOfWeek = firstDay.getDay() - 1
-    if (startDayOfWeek < 0) startDayOfWeek = 6
+
+    const firstOfMonth = new Date(year, month, 1)
+    const lastOfMonth = new Date(year, month + 1, 0)
+
+    // Semana começa na Segunda-feira (cálculo estável)
+    const startOffset = firstOfMonth.getDay() === 0 ? 6 : firstOfMonth.getDay() - 1
+
     const days: Array<{ date: Date; index: number } | null> = []
-    for (let i = 0; i < startDayOfWeek; i++) days.push(null)
-    for (let d = 1; d <= lastDay.getDate(); d++)
-      days.push({ date: new Date(year, month, d), index: startDayOfWeek + d - 1 })
+
+    // Dias vazios no início
+    for (let i = 0; i < startOffset; i++) {
+      days.push(null)
+    }
+
+    // Dias do mês
+    for (let d = 1; d <= lastOfMonth.getDate(); d++) {
+      days.push({
+        date: new Date(year, month, d),
+        index: startOffset + d - 1
+      })
+    }
+
     return days
   }, [currentMonth])
 
   const weekDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
-  const today = new Date().toISOString().split("T")[0]
+
+  // Usando o helper consistente
+  const today = formatLocalDate(new Date())
+
   const isCurrentMonth =
     currentMonth.getFullYear() === new Date().getFullYear() &&
     currentMonth.getMonth() === new Date().getMonth()
@@ -135,7 +153,8 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
               if (!dayObj) return <div key={`empty-${index}`} className="aspect-square" />
 
               const { date } = dayObj
-              const dateStr = date.toISOString().split("T")[0]
+              const dateStr = formatLocalDate(date)        // ← Aqui está a correção principal
+
               const hasEntry = entryMap.has(dateStr)
               const totalHoras = entryMap.get(dateStr)
               const isZeroHours = hasEntry && totalHoras === 0
@@ -143,8 +162,8 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
               const isToday = dateStr === today
               const isWeekend = date.getDay() === 0 || date.getDay() === 6
               const isPast = dateStr < today
-              // Dias úteis passados sem qualquer registo → X vermelho
               const isMissingWorkday = isPast && !isToday && !hasEntry && !isWeekend
+
               const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
 
               return (
@@ -163,33 +182,23 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                     isToday && "border-primary/50 bg-primary/5 hover:bg-primary/10 ring-2 ring-primary/40 ring-offset-1 ring-offset-background shadow-sm",
                   )}
                 >
-                  {/* ── X amarelo torrado — ausência registada (0h) ── */}
+                  {/* X amarelo - Ausência (0h) */}
                   {isZeroHours && (
                     <span
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
-                      style={{
-                        fontSize: "clamp(1.8rem, 6vw, 2.6rem)",
-                        fontWeight: 900,
-                        color: "rgba(180, 120, 0, 0.30)",
-                        lineHeight: 1,
-                      }}
+                      style={{ fontSize: "clamp(1.8rem, 6vw, 2.6rem)", fontWeight: 900, color: "rgba(180, 120, 0, 0.30)", lineHeight: 1 }}
                     >
                       ✕
                     </span>
                   )}
 
-                  {/* ── X vermelho — dia útil passado sem registo ── */}
+                  {/* X vermelho - Dia útil sem registo */}
                   {isMissingWorkday && (
                     <span
                       aria-hidden="true"
                       className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
-                      style={{
-                        fontSize: "clamp(1.8rem, 6vw, 2.6rem)",
-                        fontWeight: 900,
-                        color: "rgba(220, 38, 38, 0.20)",
-                        lineHeight: 1,
-                      }}
+                      style={{ fontSize: "clamp(1.8rem, 6vw, 2.6rem)", fontWeight: 900, color: "rgba(220, 38, 38, 0.20)", lineHeight: 1 }}
                     >
                       ✕
                     </span>
@@ -213,26 +222,23 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                     {date.getDate()}
                   </span>
 
-                  {/* Horas — visível para todas as entradas incluindo 0h */}
+                  {/* Horas */}
                   {hasEntry && (
                     <span
                       className={cn(
                         "relative z-10 text-[9px] md:text-[10px] leading-none mt-0.5 md:mt-1 font-semibold tabular-nums",
-                        isZeroHours
-                          ? "text-amber-700/55 dark:text-amber-400/50"
-                          : "text-muted-foreground"
+                        isZeroHours ? "text-amber-700/55 dark:text-amber-400/50" : "text-muted-foreground"
                       )}
                     >
                       {totalHoras}h
                     </span>
                   )}
 
-                  {/* Ponto de status — só para dias com horas > 0 */}
+                  {/* Ponto de status */}
                   {hasEntry && !isZeroHours && (
                     <span
                       className={cn(
-                        "absolute top-1.5 left-1.5 md:top-2 md:left-2 rounded-full z-10",
-                        "w-1.5 h-1.5 md:w-2 md:h-2",
+                        "absolute top-1.5 left-1.5 md:top-2 md:left-2 rounded-full z-10 w-1.5 h-1.5 md:w-2 md:h-2",
                         "transition-transform duration-150 group-hover:scale-125",
                         isPaid ? "bg-emerald-500" : "bg-amber-400"
                       )}
@@ -245,33 +251,28 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
         </div>
       </div>
 
-      {/* ── Legenda ── */}
+      {/* Legenda */}
       <div className="px-5 py-3 border-t bg-card">
         <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" />
-            Pago
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-sm" /> Pago
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" />
-            Não pago
+            <span className="w-2 h-2 rounded-full bg-amber-400 shadow-sm" /> Não pago
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full ring-2 ring-primary/60 bg-primary/10" />
-            Hoje
+            <span className="w-2 h-2 rounded-full ring-2 ring-primary/60 bg-primary/10" /> Hoje
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="font-black leading-none" style={{ color: "rgba(180,120,0,0.55)", fontSize: "0.85rem" }}>✕</span>
-            Ausência
+            <span className="font-black leading-none" style={{ color: "rgba(180,120,0,0.55)", fontSize: "0.85rem" }}>✕</span> Ausência
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="font-black leading-none" style={{ color: "rgba(220,38,38,0.45)", fontSize: "0.85rem" }}>✕</span>
-            Sem registo
+            <span className="font-black leading-none" style={{ color: "rgba(220,38,38,0.45)", fontSize: "0.85rem" }}>✕</span> Sem registo
           </span>
         </div>
       </div>
 
-      {/* ── FAB ── */}
+      {/* FAB */}
       <Button
         onClick={onAddToday}
         size="lg"
@@ -284,21 +285,13 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
   )
 }
 
-// ── Stat Cell ────────────────────────────────────────────────────────────────
-function StatCell({
-  value,
-  label,
-  color,
-}: {
-  value: string
-  label: string
-  color: "default" | "blue" | "green" | "amber"
-}) {
+// StatCell (mantido igual)
+function StatCell({ value, label, color }: { value: string; label: string; color: "default" | "blue" | "green" | "amber" }) {
   const colors = {
     default: "text-foreground",
-    blue:    "text-blue-600 dark:text-blue-400",
-    green:   "text-emerald-600 dark:text-emerald-400",
-    amber:   "text-amber-500 dark:text-amber-400",
+    blue: "text-blue-600 dark:text-blue-400",
+    green: "text-emerald-600 dark:text-emerald-400",
+    amber: "text-amber-500 dark:text-amber-400",
   }
 
   return (

@@ -32,27 +32,7 @@ export const COLABORADORES: Colaborador[] = [
     nome: "Agostinho",
     // uid: "firebase-uid-agostinho", // Preencher quando criar conta
     ativo: true,
-  },
-  { 
-    nome: "Felipe",
-    // uid: "firebase-uid-filipe",
-    ativo: true,
-  },
-  { 
-    nome: "Frederico",
-    // uid: "firebase-uid-frederico",
-    ativo: true,
-  },
-  { 
-    nome: "Joel",
-    // uid: "firebase-uid-joel",
-    ativo: true,
-  },
-  { 
-    nome: "Leonardo",
-    // uid: "firebase-uid-leonardo",
-    ativo: true,
-  },
+  },  
   { 
     nome: "Rafael",
     // uid: "firebase-uid-rafael",
@@ -62,12 +42,7 @@ export const COLABORADORES: Colaborador[] = [
     nome: "Sibul",
     // uid: "firebase-uid-sibul",
     ativo: true,
-  },
-  { 
-    nome: "Tiago",
-    // uid: "firebase-uid-tiago",
-    ativo: true,
-  },
+  }, 
   { 
     nome: "Zé Vermelha",
     // uid: "firebase-uid-ze",
@@ -77,17 +52,7 @@ export const COLABORADORES: Colaborador[] = [
     nome: "Dário",
     // uid: "firebase-uid-dario",
     ativo: true,
-  },
-  { 
-    nome: "Guilherme",
-    // uid: "firebase-uid-guilherme",
-    ativo: true,
-  },
-  { 
-    nome: "Silvio",
-    // uid: "firebase-uid-silvio",
-    ativo: true,
-  },
+  },  
   { 
     nome: "João Oliveira",
     // uid: "firebase-uid-silvio",
@@ -97,12 +62,7 @@ export const COLABORADORES: Colaborador[] = [
     nome: "João Santos (Beja)",
     // uid: "firebase-uid-silvio",
     ativo: true,
-  },
-  { 
-    nome: "JOÃO REIS",
-    // uid: "firebase-uid-silvio",
-    ativo: true,
-  },
+  }, 
 ]
 
 // ============================================================================

@@ -6,10 +6,11 @@ import { v4 as uuidv4 } from "uuid"
 export interface Service {
   id: string
   obraNome: string
+  obraId?:string
   descricao: string
   equipa: string[]
   materiais: string[]
-  totalHoras?: number
+  totalHoras?: number 
 }
 
 // Tipo principal do dia
