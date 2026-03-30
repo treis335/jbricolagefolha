@@ -80,7 +80,7 @@ interface Collaborator {
 function normalizeEquipe(equipa: any): string[] {
   if (!equipa) return []
   if (Array.isArray(equipa)) {
-    return equipa.map(item => 
+    return equipa.map(item =>
       typeof item === "string" ? item : (item?.nome || String(item))
     )
   }
@@ -621,8 +621,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
 
- // const dateStr = date ? date.toISOString().split("T")[0] : ""
- const dateStr = date ? formatLocalDate(date) : ""
+  // const dateStr = date ? date.toISOString().split("T")[0] : ""
+  const dateStr = date ? formatLocalDate(date) : ""
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
@@ -717,22 +717,23 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }, [teamFilter, allCollaborators])
 
   const openTeamSelector = () => {
-    const current: Collaborator[] = []
+  const current: Collaborator[] = []
 
-    if (activeService?.equipaUids && activeService.equipaUids.length > 0) {
-      activeService.equipaUids.forEach((uid, i) => {
-        current.push({ uid, nome: activeService.equipa[i] || "", isLegacy: false })
+  if (activeService?.equipa) {
+    activeService.equipa.forEach((nome, i) => {
+      const uid = activeService.equipaUids?.[i] ?? null
+      current.push({
+        uid: uid || null,
+        nome,
+        isLegacy: !uid,
       })
-    } else if (activeService?.equipa) {
-      activeService.equipa.forEach(nome => {
-        current.push({ uid: null, nome, isLegacy: true })
-      })
-    }
-
-    setTempEquipa(current)
-    setTeamFilter("")
-    setShowTeamDialog(true)
+    })
   }
+
+  setTempEquipa(current)
+  setTeamFilter("")
+  setShowTeamDialog(true)
+}
 
   const toggleTempMember = (collab: Collaborator) => {
     setTempEquipa(prev =>
@@ -836,8 +837,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const handleSave = () => {
     if (!date || services.length === 0) return
 
-    const taxa = existingEntry 
-      ? (resolveExistingTaxa(existingEntry) ?? data.settings.taxaHoraria) 
+    const taxa = existingEntry
+      ? (resolveExistingTaxa(existingEntry) ?? data.settings.taxaHoraria)
       : data.settings.taxaHoraria
 
     addEntry({
@@ -884,9 +885,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${
-                      isEditing ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                    }`}>
+                    <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${isEditing ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      }`}>
                       {isEditing ? "Editar registo" : "Novo registo"}
                     </span>
                     {isWeekend && (
@@ -1076,11 +1076,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 return (
                                   <span
                                     key={`${nome}-${index}`}
-                                    className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${
-                                      isLegacy
+                                    className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${isLegacy
                                         ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
                                         : "bg-primary/7 border-primary/15 text-primary"
-                                    }`}
+                                      }`}
                                   >
                                     {nome}
                                     {isLegacy && <span className="text-[9px] opacity-70 ml-0.5">(manual)</span>}
@@ -1232,11 +1231,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             {tempEquipa.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {tempEquipa.map(member => (
-                  <span key={member.nome} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${
-                    member.isLegacy
+                  <span key={member.nome} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${member.isLegacy
                       ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
                       : "bg-primary/10 border-primary/18 text-primary"
-                  }`}>
+                    }`}>
                     {member.nome}
                     {member.isLegacy && <span className="text-[9px] opacity-70">(manual)</span>}
                     <button type="button" onClick={() => toggleTempMember(member)} className="w-4 h-4 rounded-full hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center ml-0.5">
@@ -1253,15 +1251,16 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               <div className="py-12 text-center text-sm text-muted-foreground/60">Nenhum resultado encontrado</div>
             ) : (
               colaboradoresFiltrados.map((collab) => {
-                const isSelected = tempEquipa.some(m => m.nome === collab.nome)
+                const isSelected = collab.uid
+                  ? tempEquipa.some(m => m.uid === collab.uid)
+                  : tempEquipa.some(m => m.nome === collab.nome)
                 return (
                   <button
                     key={collab.nome}
                     type="button"
                     onClick={() => toggleTempMember(collab)}
-                    className={`w-full text-left px-5 py-3.5 flex justify-between items-center transition-colors border-b border-border/10 last:border-0 ${
-                      isSelected ? "bg-primary/5 text-primary font-semibold" : "hover:bg-muted/25 text-foreground"
-                    }`}
+                    className={`w-full text-left px-5 py-3.5 flex justify-between items-center transition-colors border-b border-border/10 last:border-0 ${isSelected ? "bg-primary/5 text-primary font-semibold" : "hover:bg-muted/25 text-foreground"
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{collab.nome}</span>

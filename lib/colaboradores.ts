@@ -52,15 +52,9 @@ export const COLABORADORES: Colaborador[] = [
     nome: "Dário",
     // uid: "firebase-uid-dario",
     ativo: true,
-  },  
+  },    
   { 
-    nome: "João Oliveira",
-    // uid: "firebase-uid-silvio",
-    ativo: true,
-  },
-  { 
-    nome: "João Santos (Beja)",
-    // uid: "firebase-uid-silvio",
+    nome: "João Santos (Beja)",    
     ativo: true,
   }, 
 ]

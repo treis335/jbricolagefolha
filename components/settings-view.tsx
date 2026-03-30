@@ -24,6 +24,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { uploadFotoObra } from "@/lib/obras-service"
 import { cn } from "@/lib/utils"
+import { syncCollaboratorName } from "@/hooks/useActiveCollaborators"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -684,13 +685,30 @@ export function SettingsView() {
 
   // ── Username ──────────────────────────────────────────────────────────────
 
-  const handleSaveUsername = async () => {
-    if (!user?.uid || !editedUsername.trim()) return
-    setSavingUsername(true)
-    try { await saveField("username", editedUsername.trim()); setIsEditingUsername(false) }
-    catch { alert("Erro ao guardar o nome.") }
-    finally { setSavingUsername(false) }
+ const handleSaveUsername = async () => {
+  if (!user?.uid || !editedUsername.trim()) return
+  setSavingUsername(true)
+  try {
+    const novoNome = editedUsername.trim()
+
+    // 1. Guardar o novo username no perfil do próprio user
+    await saveField("username", novoNome)
+
+    // 2. Propagar o nome a todos os registos de equipa em background
+    syncCollaboratorName(user.uid, novoNome)
+      .then(({ updated, errors }) => {
+        if (updated > 0) console.log(`✅ Nome propagado a ${updated} documento(s).`)
+        if (errors > 0) console.warn(`⚠️ ${errors} erro(s) ao propagar nome.`)
+      })
+      .catch(console.error)
+
+    setIsEditingUsername(false)
+  } catch {
+    alert("Erro ao guardar o nome.")
+  } finally {
+    setSavingUsername(false)
   }
+}
 
   const handleCopyUid = () => {
     if (!user?.uid) return

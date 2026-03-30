@@ -12,6 +12,9 @@
  * - Busca array de entries completo (para relatórios)
  * - Retorna estado de loading e erro
  * - Fornece função refetch para atualizar dados
+ *
+ * ✅ NOME: usa sempre `username` (campo editável pelo user nas Definições).
+ *    Fallback para `name` (campo legado) e depois "Sem nome".
  */
 
 import { useState, useEffect } from "react"
@@ -20,8 +23,12 @@ import { db } from "@/lib/firebase"
 
 export interface Collaborator {
   id: string
+  /** Nome resolvido — sempre `username` se existir, senão `name` legado */
   name: string
+  /** Campo raw do Firestore — nome editável pelo user nas Definições */
   username: string
+  /** Campo raw legado — usado apenas como fallback */
+  legacyName: string
   email: string
   currentRate: number
   totalHoursThisMonth: number
@@ -29,7 +36,6 @@ export interface Collaborator {
   role: string
   createdAt: any
   migrated?: boolean
-  // ✅ NOVO: soft-disable — false = conta suspensa, dados preservados
   ativo: boolean
   entries: any[]
   payments: Array<{
@@ -48,7 +54,6 @@ interface UseCollaboratorsReturn {
   refetch: () => Promise<void>
 }
 
-// Helper: resolve a taxa de uma entry com todos os fallbacks possíveis
 function resolveEntryTaxa(entry: any, currentRate: number): number {
   if (typeof entry.taxaHoraria === "number" && entry.taxaHoraria > 0)
     return entry.taxaHoraria
@@ -57,6 +62,16 @@ function resolveEntryTaxa(entry: any, currentRate: number): number {
     if (typeof s0Taxa === "number" && s0Taxa > 0) return s0Taxa
   }
   return currentRate
+}
+
+/**
+ * Resolve o nome de exibição de um user.
+ * Prioridade: username (editável pelo user) → name (legado) → "Sem nome"
+ */
+function resolveDisplayName(userData: any): string {
+  const username = (userData.username || "").trim()
+  const name = (userData.name || "").trim()
+  return username || name || "Sem nome"
 }
 
 export function useCollaborators(): UseCollaboratorsReturn {
@@ -89,9 +104,10 @@ export function useCollaborators(): UseCollaboratorsReturn {
 
         const entries = userData.workData?.entries || []
         const currentRate = userData.workData?.settings?.taxaHoraria || 0
-
-        // ✅ ativo: true por defeito — colaboradores existentes sem o campo continuam ativos
         const ativo: boolean = userData.ativo !== false
+
+        // ✅ Nome resolvido: username primeiro, depois name legado
+        const displayName = resolveDisplayName(userData)
 
         let totalHoursThisMonth = 0
         let totalHoursAllTime = 0
@@ -126,8 +142,9 @@ export function useCollaborators(): UseCollaboratorsReturn {
 
         collabsData.push({
           id: userId,
-          name: userData.name || userData.username || "Sem nome",
+          name: displayName,           // ✅ sempre username se existir
           username: userData.username || "",
+          legacyName: userData.name || "",
           email: userData.email || "",
           currentRate,
           totalHoursThisMonth,
@@ -142,14 +159,13 @@ export function useCollaborators(): UseCollaboratorsReturn {
         })
 
         console.log(
-          `${ativo ? "✅" : "🔴"} ${userData.name}: ${totalHoursThisMonth.toFixed(1)}h este mês, custo ${totalCostThisMonth.toFixed(2)}€, ativo: ${ativo}`
+          `${ativo ? "✅" : "🔴"} ${displayName} (uid: ${userId}): ${totalHoursThisMonth.toFixed(1)}h este mês, custo ${totalCostThisMonth.toFixed(2)}€, ativo: ${ativo}`
         )
       }
 
-      // Ativos primeiro, depois inativos; dentro de cada grupo, por nome
       collabsData.sort((a, b) => {
         if (a.ativo !== b.ativo) return a.ativo ? -1 : 1
-        return a.name.localeCompare(b.name)
+        return a.name.localeCompare(b.name, "pt")
       })
 
       setCollaborators(collabsData)
