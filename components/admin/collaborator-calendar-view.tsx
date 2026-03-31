@@ -1,3 +1,5 @@
+// collaborator-calendar-view.tsx
+
 "use client"
 
 import { useState, useMemo } from "react"
@@ -279,13 +281,11 @@ export function CollaboratorCalendarView({
     return map
   }, [entries])
 
-  const handleMonthChange = (dir: "prev" | "next") => {
-    setCurrentMonth(prev => {
-      const d = new Date(prev)
-      d.setMonth(d.getMonth() + (dir === "next" ? 1 : -1))
-      return d
-    })
-  }
+ const handleMonthChange = (dir: "prev" | "next") => {
+  setCurrentMonth(prev =>
+    new Date(prev.getFullYear(), prev.getMonth() + (dir === "next" ? 1 : -1), 1)
+  )
+}
 
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear()

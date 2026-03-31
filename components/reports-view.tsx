@@ -122,15 +122,18 @@ export function ReportsView() {
   }, [filteredEntries])
 
   const navigate = (direction: "prev" | "next") => {
-    setCurrentDate((prev) => {
-      const d = new Date(prev)
-      const delta = direction === "next" ? 1 : -1
-      if (period === "daily") d.setDate(d.getDate() + delta)
-      else if (period === "weekly") d.setDate(d.getDate() + delta * 7)
-      else d.setMonth(d.getMonth() + delta)
-      return d
-    })
-  }
+  setCurrentDate((prev) => {
+    const delta = direction === "next" ? 1 : -1
+    if (period === "daily") {
+      const d = new Date(prev); d.setDate(d.getDate() + delta); return d
+    }
+    if (period === "weekly") {
+      const d = new Date(prev); d.setDate(d.getDate() + delta * 7); return d
+    }
+    // monthly — ancorar no dia 1
+    return new Date(prev.getFullYear(), prev.getMonth() + delta, 1)
+  })
+}
 
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(v)
