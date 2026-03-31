@@ -10,6 +10,8 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+import { formatLocalDate } from "@/lib/date-utils"
+
 interface CollaboratorReportsViewProps {
   collaborator: {
     id: string
@@ -61,7 +63,8 @@ export function CollaboratorReportsView({ collaborator }: CollaboratorReportsVie
         end = new Date(today.getFullYear(), today.getMonth() + 1, 0)
         label = today.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
     }
-    return { startDate: start.toISOString().split("T")[0], endDate: end.toISOString().split("T")[0], rangeLabel: label }
+   return { startDate: formatLocalDate(start), endDate: formatLocalDate(end), rangeLabel: label }
+
   }, [period, currentDate])
 
   const filteredEntries = useMemo(() =>
@@ -83,15 +86,19 @@ export function CollaboratorReportsView({ collaborator }: CollaboratorReportsVie
     return { totalNormais, totalExtras, totalHoras, valorTotal }
   }, [filteredEntries, collaborator.currentRate])
 
-  const navigate = (dir: "prev" | "next") => {
-    setCurrentDate(prev => {
-      const d = new Date(prev)
-      if (period === "daily") d.setDate(d.getDate() + (dir === "next" ? 1 : -1))
-      else if (period === "weekly") d.setDate(d.getDate() + (dir === "next" ? 7 : -7))
-      else d.setMonth(d.getMonth() + (dir === "next" ? 1 : -1))
-      return d
-    })
-  }
+ const navigate = (dir: "prev" | "next") => {
+  setCurrentDate(prev => {
+    const delta = dir === "next" ? 1 : -1
+    if (period === "daily") {
+      const d = new Date(prev); d.setDate(d.getDate() + delta); return d
+    }
+    if (period === "weekly") {
+      const d = new Date(prev); d.setDate(d.getDate() + delta * 7); return d
+    }
+    // monthly — ancorar no dia 1
+    return new Date(prev.getFullYear(), prev.getMonth() + delta, 1)
+  })
+}
 
   const exportPDF = useCallback(async () => {
     const { jsPDF } = await import("jspdf")

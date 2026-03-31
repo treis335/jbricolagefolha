@@ -411,14 +411,22 @@ export function CollaboratorCalendarView({
               )}>
                 {date.getDate()}
               </span>
-              {!compact && hasEntry && !isAbsence && entry.totalHoras > 0 && (
-                <span className="text-[10px] font-semibold text-primary/80 mt-0.5 leading-none">
-                  {entry.totalHoras}h
-                </span>
-              )}
-              {!compact && isAbsence && (
-                <span className="text-[10px] font-semibold text-amber-600/60 mt-0.5 leading-none">aus.</span>
-              )}
+              {hasEntry && !isAbsence && entry.totalHoras > 0 && (
+  <span className={cn(
+    "font-semibold tabular-nums leading-none",
+    compact ? "text-[9px] text-primary/70 mt-0.5" : "text-[10px] text-primary/80 mt-0.5"
+  )}>
+    {entry.totalHoras}h
+  </span>
+)}
+{isAbsence && (
+  <span className={cn(
+    "font-semibold leading-none",
+    compact ? "text-[9px] text-amber-600/50 mt-0.5" : "text-[10px] text-amber-600/60 mt-0.5"
+  )}>
+    aus.
+  </span>
+)}
             </button>
           )
         })}

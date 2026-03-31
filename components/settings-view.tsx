@@ -1,3 +1,4 @@
+// settings-view.tsx
 "use client"
 
 import { useState, useEffect, useRef } from "react"
@@ -12,10 +13,7 @@ import {
   DatabaseBackup, ChevronRight,
   Phone, CreditCard, Camera, Building2,
   Hash, Loader2, Zap, ZapOff, Settings2, ImageIcon,
-  ShieldAlert,
-  Eye,
-  EyeOff,
-  UserCircle2,
+  Eye, EyeOff, UserCircle2,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -27,16 +25,17 @@ import { cn } from "@/lib/utils"
 import { syncCollaboratorName } from "@/hooks/useActiveCollaborators"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
 interface UserProfile {
   username: string
   telemovel: string
   banco: string
   iban: string
   mbwayAtivo: boolean
-  mbwayTelemovel: string   // número específico do MBway (pode diferir do perfil)
-  mbwayTitular: string     // primeiro + último nome do titular
+  mbwayTelemovel: string
+  mbwayTitular: string
   fotoUrl: string
+  fotoLocked: boolean
+  nomeLocked: boolean
 }
 
 const PROFILE_DEFAULTS: UserProfile = {
@@ -48,61 +47,11 @@ const PROFILE_DEFAULTS: UserProfile = {
   mbwayTelemovel: "",
   mbwayTitular: "",
   fotoUrl: "",
-}
-
-// ── Confirm Edit Dialog ───────────────────────────────────────────────────────
-// Popup de confirmação antes de editar dados bancários já preenchidos
-
-function ConfirmEditDialog({
-  field,
-  onConfirm,
-  onCancel,
-}: {
-  field: string
-  onConfirm: () => void
-  onCancel: () => void
-}) {
-  return (
-    <>
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
-        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          {/* Icon */}
-          <div className="flex justify-center pt-7 pb-4">
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center">
-              <ShieldAlert className="h-7 w-7 text-amber-500" />
-            </div>
-          </div>
-          {/* Text */}
-          <div className="px-6 pb-2 text-center">
-            <p className="text-base font-bold">Alterar {field}?</p>
-            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-              Este campo já tem um valor guardado. Tens a certeza que pretendes modificá-lo?
-            </p>
-          </div>
-          {/* Actions */}
-          <div className="p-5 grid grid-cols-2 gap-3 mt-2">
-            <button
-              onClick={onCancel}
-              className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onConfirm}
-              className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-amber-500/30"
-            >
-              Modificar
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
-  )
+  fotoLocked: false,
+  nomeLocked: false,
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
-
 function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string; size?: "sm" | "lg" }) {
   const initials = nome.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("")
   const dim = size === "lg" ? "w-16 h-16 sm:w-20 sm:h-20" : "w-10 h-10"
@@ -128,8 +77,62 @@ function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string;
   )
 }
 
-// ── PWA Install ───────────────────────────────────────────────────────────────
+// ── Locked Photo Button ───────────────────────────────────────────────────────
+function LockedPhotoButton() {
+  return (
+    <div className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-2xl bg-red-600 border-2 border-background flex items-center justify-center shadow-md">
+      <Lock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
+    </div>
+  )
+}
 
+// ── Confirm Edit Dialog ───────────────────────────────────────────────────────
+function ConfirmEditDialog({
+  field,
+  onConfirm,
+  onCancel,
+}: {
+  field: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
+        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="flex justify-center pt-7 pb-4">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center">
+              <AlertCircle className="h-7 w-7 text-amber-500" />
+            </div>
+          </div>
+          <div className="px-6 pb-2 text-center">
+            <p className="text-base font-bold">Alterar {field}?</p>
+            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+              Este campo já tem um valor guardado. Tens a certeza que pretendes modificá-lo?
+            </p>
+          </div>
+          <div className="p-5 grid grid-cols-2 gap-3 mt-2">
+            <button
+              onClick={onCancel}
+              className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onConfirm}
+              className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-amber-500/30"
+            >
+              Modificar
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── InstallPWAButton ─────────────────────────────────────────────────────────
 function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
@@ -190,9 +193,7 @@ function InstallPWAButton() {
   )
 }
 
-// ── Editable Field ────────────────────────────────────────────────────────────
-// Lápis sempre visível (cinza escuro), com popup de confirmação se já preenchido
-
+// ── EditableField ─────────────────────────────────────────────────────────────
 function EditableField({
   label, value, placeholder, type = "text", icon, onSave, sensitive, confirmIfFilled,
 }: {
@@ -203,7 +204,7 @@ function EditableField({
   icon?: React.ReactNode
   onSave: (v: string) => Promise<void>
   sensitive?: boolean
-  confirmIfFilled?: boolean   // se true, mostra popup de confirmação quando já há valor
+  confirmIfFilled?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -261,7 +262,7 @@ function EditableField({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 shadow-sm shadow-emerald-500/30 active:scale-95"
+              className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-sm shadow-emerald-500/30"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             </button>
@@ -281,7 +282,6 @@ function EditableField({
             )}>
               {masked || placeholder}
             </p>
-            {/* ✅ Lápis sempre visível, cinza escuro, nunca escondido */}
             <button
               onClick={handleEditClick}
               className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all shrink-0 active:scale-95"
@@ -295,9 +295,7 @@ function EditableField({
   )
 }
 
-// ── MBway Toggle ──────────────────────────────────────────────────────────────
-// Inclui campo de telemóvel próprio — o utilizador pode usar número diferente do perfil
-
+// ── MBwayToggle ───────────────────────────────────────────────────────────────
 function MBwayToggle({
   enabled,
   mbwayTelemovel,
@@ -326,7 +324,6 @@ function MBwayToggle({
   useEffect(() => { if (!editingTel) setDraftTel(mbwayTelemovel) }, [mbwayTelemovel, editingTel])
   useEffect(() => { if (!editingTitular) setDraftTitular(mbwayTitular) }, [mbwayTitular, editingTitular])
 
-  // Pode ativar se tiver IBAN, telemóvel e nome do titular MBway preenchidos
   const canEnable = !!mbwayTelemovel && !!mbwayTitular && !!iban
 
   const handleToggle = async () => {
@@ -350,8 +347,6 @@ function MBwayToggle({
           ? "bg-gradient-to-br from-blue-500/8 to-indigo-500/8 border-blue-400/30"
           : "bg-muted/30 border-border/30"
       )}>
-
-        {/* Header row: ícone + título + toggle */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className={cn(
@@ -378,7 +373,6 @@ function MBwayToggle({
             </div>
           </div>
 
-          {/* Toggle pill */}
           <button
             onClick={handleToggle}
             disabled={saving || (!canEnable && !enabled)}
@@ -400,10 +394,7 @@ function MBwayToggle({
           </button>
         </div>
 
-        {/* ── Campos MBway — sempre visíveis para preencher ── */}
         <div className="mt-3 pt-3 border-t border-border/20 space-y-3">
-
-          {/* Nome do titular */}
           <div>
             <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-2 flex items-center gap-1.5">
               <UserCircle2 className="h-3 w-3 opacity-60" />
@@ -447,7 +438,6 @@ function MBwayToggle({
             )}
           </div>
 
-          {/* Número de telemóvel */}
           <div>
             <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-2 flex items-center gap-1.5">
               <Phone className="h-3 w-3 opacity-60" />
@@ -490,55 +480,13 @@ function MBwayToggle({
               </div>
             )}
           </div>
-
-          {/* Avisos contextuais */}
-          {!iban && (
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <AlertCircle className="h-3 w-3 shrink-0" />
-              Preenche o IBAN para ativar o MBway
-            </p>
-          )}
-          {iban && (!mbwayTelemovel || !mbwayTitular) && !enabled && (
-            <p className="text-[11px] text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
-              <AlertCircle className="h-3 w-3 shrink-0" />
-              {!mbwayTitular ? "Adiciona o nome do titular" : "Adiciona o número de telemóvel"}
-            </p>
-          )}
-          {mbwayTelemovel && mbwayTitular && iban && !enabled && (
-            <p className="text-[11px] text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
-              <Info className="h-3 w-3 shrink-0" />
-              Tudo pronto — ativa o toggle acima
-            </p>
-          )}
         </div>
-
-        {/* Resumo quando ativo */}
-        {enabled && (
-          <div className="mt-3 pt-3 border-t border-blue-400/20 grid grid-cols-3 gap-2">
-            <div className="bg-white/50 dark:bg-white/5 rounded-xl px-2 py-2 min-w-0 col-span-1">
-              <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold mb-0.5">Titular</p>
-              <p className="text-xs font-semibold truncate">{mbwayTitular || "—"}</p>
-            </div>
-            <div className="bg-white/50 dark:bg-white/5 rounded-xl px-2 py-2 min-w-0">
-              <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold mb-0.5">Número</p>
-              <p className="text-xs font-semibold truncate">{mbwayTelemovel || "—"}</p>
-            </div>
-            <div className="bg-white/50 dark:bg-white/5 rounded-xl px-2 py-2 min-w-0">
-              <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold mb-0.5">IBAN</p>
-              <p className="text-xs font-semibold truncate font-mono">
-                {iban ? iban.slice(0, 4) + "···" + iban.slice(-4) : "—"}
-              </p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
 }
 
-// ── Taxa Horária Card ─────────────────────────────────────────────────────────
-// Valor escondido por defeito — revelado ao clicar no olho
-
+// ── TaxaHorariaCard ───────────────────────────────────────────────────────────
 function TaxaHorariaCard({ taxa }: { taxa: number }) {
   const [visible, setVisible] = useState(false)
 
@@ -571,7 +519,6 @@ function TaxaHorariaCard({ taxa }: { taxa: number }) {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          {/* Olho — mostrar/esconder valor */}
           <button
             onClick={() => setVisible(v => !v)}
             className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/40 hover:bg-amber-200 dark:hover:bg-amber-900/50 flex items-center justify-center transition-all active:scale-95"
@@ -582,7 +529,6 @@ function TaxaHorariaCard({ taxa }: { taxa: number }) {
               : <Eye className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-amber-600 dark:text-amber-400" />
             }
           </button>
-          {/* Cadeado — lembrete de que é só-leitura */}
           <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-muted/60 flex items-center justify-center">
             <Lock className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-muted-foreground/40" />
           </div>
@@ -599,8 +545,58 @@ function TaxaHorariaCard({ taxa }: { taxa: number }) {
   )
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── UI Primitives ─────────────────────────────────────────────────────────────
+function Card({
+  icon, gradient, title, children,
+}: {
+  icon: React.ReactNode; gradient: string; title: string; children: React.ReactNode
+}) {
+  return (
+    <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden w-full">
+      <div className="flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 border-b border-border/30">
+        <div className={cn(
+          "w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm",
+          gradient
+        )}>
+          <span className="text-white">{icon}</span>
+        </div>
+        <p className="text-sm font-bold tracking-tight truncate">{title}</p>
+      </div>
+      <div>{children}</div>
+    </div>
+  )
+}
 
+function RowItem({ children }: { children: React.ReactNode }) {
+  return <div className="flex items-center gap-3 px-3 sm:px-4 py-3 sm:py-3.5">{children}</div>
+}
+
+function ActionRow({
+  icon, iconGradient, label, description, onClick,
+}: {
+  icon: React.ReactNode; iconGradient: string; label: string; description: string; onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 text-sm hover:bg-muted/40 transition-colors active:scale-[0.99] group"
+    >
+      <div className={cn(
+        "w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm",
+        iconGradient
+      )}>
+        <span className="text-white">{icon}</span>
+      </div>
+      <div className="flex-1 text-left min-w-0">
+        <p className="font-semibold truncate">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground/30 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+    </button>
+  )
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 export function SettingsView() {
   const { data, importData } = useWorkTracker()
   const { user, logout } = useAuth()
@@ -622,7 +618,6 @@ export function SettingsView() {
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
 
   // ── Load profile ──────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (!user?.uid) { setLoadingProfile(false); return }
     getDoc(doc(db, "users", user.uid))
@@ -638,6 +633,8 @@ export function SettingsView() {
             mbwayTelemovel: d.mbwayTelemovel || d.telemovel || "",
             mbwayTitular: d.mbwayTitular || "",
             fotoUrl: d.fotoUrl || "",
+            fotoLocked: d.fotoLocked ?? false,
+            nomeLocked: d.nomeLocked ?? false,
           })
         }
       })
@@ -646,7 +643,6 @@ export function SettingsView() {
   }, [user?.uid])
 
   // ── Save field ────────────────────────────────────────────────────────────
-
   const saveField = async (field: keyof UserProfile, value: string | boolean) => {
     if (!user?.uid) return
     setProfile(prev => ({ ...prev, [field]: value }))
@@ -654,14 +650,6 @@ export function SettingsView() {
   }
 
   // ── Photo upload ──────────────────────────────────────────────────────────
-  //
-  // INPUTS ficam SEMPRE no DOM (fora de qualquer condicional).
-  // Em Android, o onChange só dispara se o elemento existir quando o
-  // utilizador confirma a foto. Se estiver dentro de {showPhotoOptions && ...}
-  // o Android destrói-o antes do evento chegar.
-  //
-  // Labels apontam para os inputs via htmlFor — sem .click() nem setTimeout.
-
   const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ""
@@ -672,11 +660,12 @@ export function SettingsView() {
     setUploadProgress(0)
     try {
       const uploadId = `perfil_${user.uid}_${Date.now()}`
-      const { url, publicId } = await uploadFotoObra(file, uploadId, p => setUploadProgress(p))
-      await setDoc(doc(db, "users", user.uid), { fotoUrl: url, fotoPublicId: publicId }, { merge: true })
+      const { url } = await uploadFotoObra(file, uploadId, p => setUploadProgress(p))
+      await setDoc(doc(db, "users", user.uid), { fotoUrl: url }, { merge: true })
       setProfile(prev => ({ ...prev, fotoUrl: url }))
     } catch (err) {
       console.error("Erro ao carregar foto", err)
+      alert("Erro ao guardar a foto.")
     } finally {
       setUploadingPhoto(false)
       setUploadProgress(0)
@@ -684,31 +673,20 @@ export function SettingsView() {
   }
 
   // ── Username ──────────────────────────────────────────────────────────────
-
- const handleSaveUsername = async () => {
-  if (!user?.uid || !editedUsername.trim()) return
-  setSavingUsername(true)
-  try {
-    const novoNome = editedUsername.trim()
-
-    // 1. Guardar o novo username no perfil do próprio user
-    await saveField("username", novoNome)
-
-    // 2. Propagar o nome a todos os registos de equipa em background
-    syncCollaboratorName(user.uid, novoNome)
-      .then(({ updated, errors }) => {
-        if (updated > 0) console.log(`✅ Nome propagado a ${updated} documento(s).`)
-        if (errors > 0) console.warn(`⚠️ ${errors} erro(s) ao propagar nome.`)
-      })
-      .catch(console.error)
-
-    setIsEditingUsername(false)
-  } catch {
-    alert("Erro ao guardar o nome.")
-  } finally {
-    setSavingUsername(false)
+  const handleSaveUsername = async () => {
+    if (!user?.uid || !editedUsername.trim()) return
+    setSavingUsername(true)
+    try {
+      const novoNome = editedUsername.trim()
+      await saveField("username", novoNome)
+      syncCollaboratorName(user.uid, novoNome).catch(console.error)
+      setIsEditingUsername(false)
+    } catch {
+      alert("Erro ao guardar o nome.")
+    } finally {
+      setSavingUsername(false)
+    }
   }
-}
 
   const handleCopyUid = () => {
     if (!user?.uid) return
@@ -721,7 +699,6 @@ export function SettingsView() {
   }
 
   // ── Backup ────────────────────────────────────────────────────────────────
-
   const exportarDados = async () => {
     const conteudo = JSON.stringify(data)
     if (!conteudo) { setSyncMessage("Não há dados para exportar."); setSyncSuccess(false); return }
@@ -766,10 +743,9 @@ export function SettingsView() {
     : profile.username || user?.displayName || user?.email?.split("@")[0] || "Utilizador"
 
   // ── Render ────────────────────────────────────────────────────────────────
-
   return (
     <>
-      {/* ── Inputs de foto — SEMPRE no DOM, fora de condicionais ── */}
+      {/* Inputs de foto — SEMPRE no DOM */}
       <input
         id="foto-perfil-selfie"
         type="file"
@@ -788,15 +764,10 @@ export function SettingsView() {
 
       <ScrollArea className="h-full">
         <div className="min-h-full bg-gradient-to-b from-slate-50 to-slate-100/50 dark:from-slate-950 dark:to-slate-900">
-          {/* max-w garante que em tablets não fica demasiado largo; w-full garante que em mobile ocupa tudo */}
           <div className="pb-28 md:pb-16 w-full max-w-xl mx-auto">
 
-            {/* ── Hero ── */}
+            {/* Hero */}
             <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 sm:px-5 pt-8 sm:pt-10 pb-7 sm:pb-8">
-              <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl" />
-                <div className="absolute -bottom-10 -left-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl" />
-              </div>
               <div className="relative flex items-center gap-3 sm:gap-4">
                 <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
                   <Settings2 className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
@@ -808,10 +779,9 @@ export function SettingsView() {
               </div>
             </div>
 
-            {/* ── Cards ── */}
             <div className="space-y-3 sm:space-y-4 px-3 sm:px-4 pt-4 sm:pt-5">
 
-              {/* ── PERFIL ── */}
+              {/* PERFIL */}
               <Card
                 icon={<User className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
                 gradient="from-blue-500 to-indigo-600"
@@ -831,14 +801,18 @@ export function SettingsView() {
                           </div>
                         )}
 
-                        <button
-                          type="button"
-                          onClick={() => !uploadingPhoto && setShowPhotoOptions(true)}
-                          disabled={uploadingPhoto}
-                          className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-2xl bg-blue-600 hover:bg-blue-500 border-2 border-background flex items-center justify-center transition-all shadow-md active:scale-90 disabled:opacity-60"
-                        >
-                          <Camera className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
-                        </button>
+                        {profile.fotoLocked ? (
+                          <LockedPhotoButton />
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => !uploadingPhoto && setShowPhotoOptions(true)}
+                            disabled={uploadingPhoto}
+                            className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-2xl bg-blue-600 hover:bg-blue-500 border-2 border-background flex items-center justify-center transition-all shadow-md active:scale-90 disabled:opacity-60"
+                          >
+                            <Camera className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex-1 min-w-0">
@@ -846,10 +820,7 @@ export function SettingsView() {
                         {uploadingPhoto ? (
                           <div className="flex items-center gap-2 mt-1">
                             <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-500 rounded-full transition-all duration-200"
-                                style={{ width: `${uploadProgress}%` }}
-                              />
+                              <div className="h-full bg-blue-500 rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
                             </div>
                             <span className="text-[10px] font-semibold text-blue-500 tabular-nums shrink-0">{uploadProgress}%</span>
                           </div>
@@ -860,7 +831,7 @@ export function SettingsView() {
                     </div>
 
                     {/* Photo Bottom Sheet */}
-                    {showPhotoOptions && (
+                    {showPhotoOptions && !profile.fotoLocked && (
                       <>
                         <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setShowPhotoOptions(false)} />
                         <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-xl mx-auto px-3 sm:px-4 pb-5 sm:pb-6 animate-in slide-in-from-bottom-4 duration-300">
@@ -908,7 +879,7 @@ export function SettingsView() {
                       </>
                     )}
 
-                    {/* Nome */}
+                    {/* Nome com bloqueio */}
                     <div className="border-b border-border/20 px-3 sm:px-4 py-3">
                       <label className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold flex items-center gap-1.5 mb-2">
                         <User className="h-3 w-3 opacity-60" />Nome
@@ -933,6 +904,15 @@ export function SettingsView() {
                             <X className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </div>
+                      ) : profile.nomeLocked ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium truncate flex-1 min-w-0">
+                            {profile.username || "Sem nome definido"}
+                          </p>
+                          <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-950 flex items-center justify-center">
+                            <Lock className="h-3.5 w-3.5 text-red-500" />
+                          </div>
+                        </div>
                       ) : (
                         <div className="flex items-center justify-between gap-2">
                           <p className={cn("text-sm font-medium truncate flex-1 min-w-0", !profile.username && "text-muted-foreground/40 italic font-normal")}>
@@ -948,7 +928,7 @@ export function SettingsView() {
                       )}
                     </div>
 
-                    {/* Telemovel */}
+                    {/* Telemóvel */}
                     <div className="border-b border-border/20">
                       <EditableField
                         label="Telemovel"
@@ -1004,7 +984,7 @@ export function SettingsView() {
                 )}
               </Card>
 
-              {/* ── INFORMAÇÃO DE PAGAMENTO ── */}
+              {/* INFORMAÇÃO DE PAGAMENTO */}
               {user && (
                 <Card
                   icon={<CreditCard className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
@@ -1055,10 +1035,10 @@ export function SettingsView() {
                 </Card>
               )}
 
-              {/* ── TAXA HORÁRIA ── */}
+              {/* TAXA HORÁRIA */}
               <TaxaHorariaCard taxa={data.settings.taxaHoraria} />
 
-              {/* ── BACKUP & SYNC ── */}
+              {/* BACKUP & SYNC */}
               <Card
                 icon={<DatabaseBackup className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
                 gradient="from-violet-500 to-purple-600"
@@ -1119,7 +1099,7 @@ export function SettingsView() {
                 )}
               </Card>
 
-              {/* ── PWA & Migration ── */}
+              {/* PWA & Migration */}
               <InstallPWAButton />
               <MigrateLegacyDataButton />
 
@@ -1128,57 +1108,5 @@ export function SettingsView() {
         </div>
       </ScrollArea>
     </>
-  )
-}
-
-// ── UI Primitives ─────────────────────────────────────────────────────────────
-
-function Card({
-  icon, gradient, title, children,
-}: {
-  icon: React.ReactNode; gradient: string; title: string; children: React.ReactNode
-}) {
-  return (
-    <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden w-full">
-      <div className="flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 border-b border-border/30">
-        <div className={cn(
-          "w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm",
-          gradient
-        )}>
-          <span className="text-white">{icon}</span>
-        </div>
-        <p className="text-sm font-bold tracking-tight truncate">{title}</p>
-      </div>
-      <div>{children}</div>
-    </div>
-  )
-}
-
-function RowItem({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-3 px-3 sm:px-4 py-3 sm:py-3.5">{children}</div>
-}
-
-function ActionRow({
-  icon, iconGradient, label, description, onClick,
-}: {
-  icon: React.ReactNode; iconGradient: string; label: string; description: string; onClick: () => void
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 text-sm hover:bg-muted/40 transition-colors active:scale-[0.99] group"
-    >
-      <div className={cn(
-        "w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm",
-        iconGradient
-      )}>
-        <span className="text-white">{icon}</span>
-      </div>
-      <div className="flex-1 text-left min-w-0">
-        <p className="font-semibold truncate">{label}</p>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
-      </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/30 shrink-0 group-hover:translate-x-0.5 transition-transform" />
-    </button>
   )
 }

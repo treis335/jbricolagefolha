@@ -2,8 +2,18 @@
 "use client"
 
 import { Badge } from "@/components/ui/badge"
-import { Calendar, Clock, Briefcase, Mail, AtSign, User, TrendingUp, BarChart2, CalendarDays } from "lucide-react"
+import { Calendar, Clock, Briefcase, Mail, AtSign, User, TrendingUp, BarChart2, CalendarDays, ChevronLeft, ChevronRight } from "lucide-react"
 import { CollaboratorRateManager, type RateHistoryEntry } from "./collaborator-rate-manager"
+
+const MONTH_NAMES_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+]
+
+interface SelectedMonth {
+  year: number
+  month: number // 0-indexed
+}
 
 interface CollaboratorOverviewProps {
   collaborator: {
@@ -12,7 +22,6 @@ interface CollaboratorOverviewProps {
     username: string
     email: string
     currentRate: number
-    totalHoursThisMonth: number
     totalHoursAllTime: number
     entries: any[]
     role: string
@@ -21,9 +30,20 @@ interface CollaboratorOverviewProps {
     rateHistory?: RateHistoryEntry[]
   }
   onRateUpdated?: (newRate: number, newHistory: RateHistoryEntry[]) => void
+  selectedMonth: SelectedMonth
+  onPrevMonth: () => void
+  onNextMonth: () => void
+  isCurrentMonth: boolean
 }
 
-export function CollaboratorOverview({ collaborator, onRateUpdated }: CollaboratorOverviewProps) {
+export function CollaboratorOverview({
+  collaborator,
+  onRateUpdated,
+  selectedMonth,
+  onPrevMonth,
+  onNextMonth,
+  isCurrentMonth,
+}: CollaboratorOverviewProps) {
   const totalDaysWorked = new Set(collaborator.entries.map(e => e.date)).size
   const averageHoursPerDay = totalDaysWorked > 0
     ? collaborator.totalHoursAllTime / totalDaysWorked
@@ -38,19 +58,41 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
     return sum + (e.totalHoras || 0) * taxa
   }, 0)
 
-  const totalCostThisMonth = (() => {
-    const now = new Date()
-    return collaborator.entries
-      .filter((e: any) => {
-        if (!e.date) return false
-        const [year, month] = e.date.split("-").map(Number)
-        return year === now.getFullYear() && month - 1 === now.getMonth()
-      })
-      .reduce((sum: number, e: any) => {
-        const taxa = (typeof e.taxaHoraria === "number" && e.taxaHoraria > 0) ? e.taxaHoraria : collaborator.currentRate
-        return sum + (e.totalHoras || 0) * taxa
-      }, 0)
-  })()
+  // Filter by selectedMonth (from parent — same month nav state)
+  const monthEntries = collaborator.entries.filter((e: any) => {
+    if (!e.date) return false
+    const [year, month] = e.date.split("-").map(Number)
+    return year === selectedMonth.year && month - 1 === selectedMonth.month
+  })
+
+  const totalHoursThisMonth = monthEntries.reduce((sum: number, e: any) => sum + (e.totalHoras || 0), 0)
+
+  const totalCostThisMonth = monthEntries.reduce((sum: number, e: any) => {
+    const taxa = (typeof e.taxaHoraria === "number" && e.taxaHoraria > 0) ? e.taxaHoraria : collaborator.currentRate
+    return sum + (e.totalHoras || 0) * taxa
+  }, 0)
+
+  // ── Month Navigator (shared state from parent) ──
+  const MonthNavigator = () => (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={onPrevMonth}
+        className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-90"
+      >
+        <ChevronLeft className="h-3.5 w-3.5" />
+      </button>
+      <span className="text-[10px] font-semibold text-muted-foreground min-w-[100px] text-center">
+        {MONTH_NAMES_PT[selectedMonth.month]} {selectedMonth.year}
+      </span>
+      <button
+        onClick={onNextMonth}
+        disabled={isCurrentMonth}
+        className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-all active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronRight className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  )
 
   return (
     <div className="space-y-5">
@@ -107,18 +149,21 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
           </div>
         </div>
 
-        {/* ── Estatísticas ── */}
+        {/* ── Estatísticas de Trabalho ── */}
         <div className="rounded-xl border bg-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
             <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trabalho</h3>
+            <div className="ml-auto">
+              <MonthNavigator />
+            </div>
           </div>
           <div className="grid grid-cols-2 divide-x divide-y">
             {[
-              { label: "Horas este mês", value: `${collaborator.totalHoursThisMonth.toFixed(1)}`, unit: "h", color: "text-blue-600 dark:text-blue-400" },
-              { label: "Total horas",    value: `${collaborator.totalHoursAllTime.toFixed(1)}`,   unit: "h", color: "text-violet-600 dark:text-violet-400" },
-              { label: "Dias trabalhados", value: `${totalDaysWorked}`,                           unit: "d", color: "text-emerald-600 dark:text-emerald-400" },
-              { label: "Média por dia",  value: `${averageHoursPerDay.toFixed(1)}`,              unit: "h", color: "text-amber-600 dark:text-amber-400" },
+              { label: "Horas este mês",   value: `${totalHoursThisMonth.toFixed(1)}`,   unit: "h", color: "text-blue-600 dark:text-blue-400" },
+              { label: "Total horas",      value: `${collaborator.totalHoursAllTime.toFixed(1)}`, unit: "h", color: "text-violet-600 dark:text-violet-400" },
+              { label: "Dias trabalhados", value: `${totalDaysWorked}`,                  unit: "d", color: "text-emerald-600 dark:text-emerald-400" },
+              { label: "Média por dia",    value: `${averageHoursPerDay.toFixed(1)}`,    unit: "h", color: "text-amber-600 dark:text-amber-400" },
             ].map(({ label, value, unit, color }) => (
               <div key={label} className="px-4 py-3.5 flex flex-col gap-1">
                 <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{label}</p>
@@ -138,12 +183,15 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
         </div>
       </div>
 
-      {/* ── Financeiro ── */}
+      {/* ── Análise Financeira ── */}
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b bg-muted/30">
           <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Análise Financeira</h3>
-          <span className="ml-auto text-[10px] text-muted-foreground">taxa histórica por entrada</span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-[10px] text-muted-foreground hidden sm:inline">taxa histórica por entrada</span>
+            <MonthNavigator />
+          </div>
         </div>
         <div className="grid grid-cols-2 divide-x">
           <div className="px-5 py-4">
@@ -151,12 +199,16 @@ export function CollaboratorOverview({ collaborator, onRateUpdated }: Collaborat
             <p className="text-2xl font-bold tracking-tight text-foreground">
               {totalCostThisMonth.toFixed(2)}<span className="text-sm font-normal text-muted-foreground ml-1">€</span>
             </p>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {MONTH_NAMES_PT[selectedMonth.month]} {selectedMonth.year}
+            </p>
           </div>
           <div className="px-5 py-4">
             <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">Custo total</p>
             <p className="text-2xl font-bold tracking-tight text-foreground">
               {totalCostAllTime.toFixed(2)}<span className="text-sm font-normal text-muted-foreground ml-1">€</span>
             </p>
+            <p className="text-[10px] text-muted-foreground mt-1">acumulado histórico</p>
           </div>
         </div>
       </div>
