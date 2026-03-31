@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useMemo, useCallback, useEffect } from "react"
+import { formatLocalDate } from "@/lib/date-utils"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -73,8 +74,8 @@ export function ReportsView() {
     }
 
     return {
-      startDate: start!.toISOString().split("T")[0],
-      endDate: end!.toISOString().split("T")[0],
+      startDate: formatLocalDate(start!),
+      endDate: formatLocalDate(end!),
       rangeLabel: label!,
     }
   }, [period, currentDate])
@@ -105,10 +106,10 @@ export function ReportsView() {
     const horas: Record<string, number> = {}
     filteredEntries.forEach((entry) => {
       const nomesUnicos = new Set<string>()
-      ;(entry.equipa ?? []).forEach((n) => typeof n === "string" && nomesUnicos.add(n.trim()))
-      ;(entry.services ?? []).forEach((s) =>
-        (s.equipa ?? []).forEach((n) => typeof n === "string" && nomesUnicos.add(n.trim()))
-      )
+        ; (entry.equipa ?? []).forEach((n) => typeof n === "string" && nomesUnicos.add(n.trim()))
+        ; (entry.services ?? []).forEach((s) =>
+          (s.equipa ?? []).forEach((n) => typeof n === "string" && nomesUnicos.add(n.trim()))
+        )
       const h = entry.totalHoras ?? 0
       nomesUnicos.forEach((nome) => {
         if (nomesOficiais.has(nome)) horas[nome] = (horas[nome] || 0) + h
@@ -149,7 +150,7 @@ export function ReportsView() {
     const ml = 10, mr = 16
 
     const drawHeader = () => {
-      try { doc.addImage("/apple-icon.png", "PNG", ml, 8, 18, 18) } catch (_) {}
+      try { doc.addImage("/apple-icon.png", "PNG", ml, 8, 18, 18) } catch (_) { }
       doc.setFontSize(14); doc.setFont("helvetica", "bold"); doc.setTextColor(25, 25, 25)
       doc.text(`Relatório ${period === "daily" ? "Diário" : period === "weekly" ? "Semanal" : "Mensal"}`, pageWidth / 2, 14, { align: "center" })
       doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(90, 90, 90)
@@ -238,33 +239,33 @@ export function ReportsView() {
     const allEntries = Array.isArray(data.entries) ? data.entries : []
     const periodEntries = allEntries.filter((e) => e?.date && e.date >= startDate && e.date <= endDate)
     const start = new Date(startDate)
-    const end   = new Date(endDate)
+    const end = new Date(endDate)
     const entryMap = new Map(periodEntries.map((e) => [e.date, e]))
 
     const periodTitle =
-      period === "daily"  ? "Mapa Diário de Horas"
-      : period === "weekly" ? "Mapa Semanal de Horas"
-      : "Mapa Mensal de Horas"
+      period === "daily" ? "Mapa Diário de Horas"
+        : period === "weekly" ? "Mapa Semanal de Horas"
+          : "Mapa Mensal de Horas"
 
     const fileSlug =
-      period === "daily"  ? `diario-${startDate}`
-      : period === "weekly" ? `semanal-${startDate}`
-      : `mensal-${startDate.slice(0, 7)}`
+      period === "daily" ? `diario-${startDate}`
+        : period === "weekly" ? `semanal-${startDate}`
+          : `mensal-${startDate.slice(0, 7)}`
 
     // ── Portrait A4 ───────────────────────────────────────────────────────
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
-    const pageWidth  = doc.internal.pageSize.getWidth()   // 210mm
+    const pageWidth = doc.internal.pageSize.getWidth()   // 210mm
     const pageHeight = doc.internal.pageSize.getHeight()  // 297mm
 
     // Margem lateral — deixa mais espaço e fica mais elegante
     const sideMargin = 20
     const tableWidth = pageWidth - sideMargin * 2  // 170mm
-    const headerH    = 38  // altura reservada para o cabeçalho
-    const footerH    = 12  // altura reservada para o rodapé
+    const headerH = 38  // altura reservada para o cabeçalho
+    const footerH = 12  // altura reservada para o rodapé
 
     // ── drawHeader ────────────────────────────────────────────────────────
     const drawHeader = () => {
-      try { doc.addImage("/apple-icon.png", "PNG", sideMargin, 9, 14, 14) } catch (_) {}
+      try { doc.addImage("/apple-icon.png", "PNG", sideMargin, 9, 14, 14) } catch (_) { }
       doc.setFontSize(15); doc.setFont("helvetica", "bold"); doc.setTextColor(25, 25, 25)
       doc.text(periodTitle, pageWidth / 2, 16, { align: "center" })
       doc.setFontSize(10); doc.setFont("helvetica", "normal"); doc.setTextColor(90, 90, 90)
@@ -285,15 +286,15 @@ export function ReportsView() {
     const taxasUsadas = new Set<number>()
 
     // Cores
-    const bgWeekend : [number,number,number] = [245, 245, 247]
-    const bgWorked  : [number,number,number] = [240, 249, 244]
-    const bgAbsent  : [number,number,number] = [255, 251, 235]
-    const bgEmpty   : [number,number,number] = [255, 255, 255]
-    const textMuted : [number,number,number] = [165, 165, 165]
-    const textNormal: [number,number,number] = [40,  40,  40 ]
-    const textAmber : [number,number,number] = [160, 90,  0  ]
-    const textGreen : [number,number,number] = [22,  101, 52 ]
-    const textRed   : [number,number,number] = [200, 40,  40 ]
+    const bgWeekend: [number, number, number] = [245, 245, 247]
+    const bgWorked: [number, number, number] = [240, 249, 244]
+    const bgAbsent: [number, number, number] = [255, 251, 235]
+    const bgEmpty: [number, number, number] = [255, 255, 255]
+    const textMuted: [number, number, number] = [165, 165, 165]
+    const textNormal: [number, number, number] = [40, 40, 40]
+    const textAmber: [number, number, number] = [160, 90, 0]
+    const textGreen: [number, number, number] = [22, 101, 52]
+    const textRed: [number, number, number] = [200, 40, 40]
 
     // Para a coluna de pagamento precisamos saber qual pagamento quitou cada dia
     // Reconstruímos o FIFO localmente para obter a data do pagamento por dia
@@ -323,17 +324,17 @@ export function ReportsView() {
 
     const cur = new Date(start)
     while (cur <= end) {
-      const dateStr   = cur.toISOString().split("T")[0]
+      const dateStr = formatLocalDate(cur)
       const dayOfWeek = cur.getDay()
-      const wdIdx     = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+      const wdIdx = dayOfWeek === 0 ? 6 : dayOfWeek - 1
       const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
 
-      const entry    = entryMap.get(dateStr)
-      const taxa     = entry ? (entry.taxaHoraria ?? data.settings.taxaHoraria ?? 0) : (data.settings.taxaHoraria ?? 0)
-      const horas    = entry != null ? (entry.totalHoras ?? 0) : null
-      const valor    = horas !== null && horas > 0 ? horas * taxa : null
-      const isPaid   = paidDates.has(dateStr)
-      const payDate  = paidByDate.get(dateStr)
+      const entry = entryMap.get(dateStr)
+      const taxa = entry ? (entry.taxaHoraria ?? data.settings.taxaHoraria ?? 0) : (data.settings.taxaHoraria ?? 0)
+      const horas = entry != null ? (entry.totalHoras ?? 0) : null
+      const valor = horas !== null && horas > 0 ? horas * taxa : null
+      const isPaid = paidDates.has(dateStr)
+      const payDate = paidByDate.get(dateStr)
 
       if (horas !== null && horas > 0) {
         totalHoras += horas
@@ -343,7 +344,7 @@ export function ReportsView() {
         if (isPaid) diasPagos++
       }
 
-      const dayNum   = String(cur.getDate()).padStart(2, "0")
+      const dayNum = String(cur.getDate()).padStart(2, "0")
       const dateCell = period === "monthly"
         ? dayNum
         : `${dayNum} ${cur.toLocaleDateString("pt-PT", { month: "short" })}`
@@ -352,7 +353,7 @@ export function ReportsView() {
         ? (isWeekend ? "—" : "")
         : horas === 0 ? "Ausência" : `${horas}h`
 
-      const taxaCell  = horas !== null && horas > 0 ? `${taxa.toFixed(2)}€` : ""
+      const taxaCell = horas !== null && horas > 0 ? `${taxa.toFixed(2)}€` : ""
       const valorCell = valor !== null ? fmtEur(valor) : ""
 
       // Coluna de pagamento — mostra estado para todos os dias com horas > 0
@@ -362,8 +363,8 @@ export function ReportsView() {
           ? `✓ ${payDate ? new Date(payDate).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit" }) : "Pago"}`
           : "✗ Não pago"
 
-      const pagoTextColor: [number,number,number] = isPaid && horas !== null && horas > 0 ? textGreen : horas !== null && horas > 0 ? textRed : textMuted
-      const bgPago: [number,number,number] = isPaid && horas !== null && horas > 0
+      const pagoTextColor: [number, number, number] = isPaid && horas !== null && horas > 0 ? textGreen : horas !== null && horas > 0 ? textRed : textMuted
+      const bgPago: [number, number, number] = isPaid && horas !== null && horas > 0
         ? [235, 250, 240]
         : !isPaid && horas !== null && horas > 0
           ? [255, 243, 243]
@@ -371,41 +372,50 @@ export function ReportsView() {
 
       const rowFill = isWeekend ? bgWeekend
         : horas !== null && horas > 0 ? bgWorked
-        : horas === 0 ? bgAbsent
-        : bgEmpty
+          : horas === 0 ? bgAbsent
+            : bgEmpty
 
       tableBody.push([
-        { content: dateCell,            styles: { halign: "center" as const, fontStyle: "bold" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : textNormal } },
-        { content: weekDayNames[wdIdx], styles: { halign: "center" as const,                             fillColor: rowFill, textColor: isWeekend ? textMuted : textNormal } },
-        { content: horasCell,           styles: { halign: "center" as const,
+        { content: dateCell, styles: { halign: "center" as const, fontStyle: "bold" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : textNormal } },
+        { content: weekDayNames[wdIdx], styles: { halign: "center" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : textNormal } },
+        {
+          content: horasCell, styles: {
+            halign: "center" as const,
             fontStyle: horas !== null && horas > 0 ? "bold" as const : "normal" as const,
             fillColor: rowFill,
             textColor: horas === 0 ? textAmber : horas === null && !isWeekend ? textRed : isWeekend ? textMuted : textNormal,
-        }},
-        { content: taxaCell,            styles: { halign: "center" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : [90,90,90] as [number,number,number] } },
-        { content: valorCell,           styles: { halign: "right" as const,
+          }
+        },
+        { content: taxaCell, styles: { halign: "center" as const, fillColor: rowFill, textColor: isWeekend ? textMuted : [90, 90, 90] as [number, number, number] } },
+        {
+          content: valorCell, styles: {
+            halign: "right" as const,
             fontStyle: horas !== null && horas > 0 ? "bold" as const : "normal" as const,
             fillColor: rowFill,
             textColor: horas !== null && horas > 0 ? textGreen : textMuted,
-        }},
-        { content: pagoCell,            styles: { halign: "center" as const,
+          }
+        },
+        {
+          content: pagoCell, styles: {
+            halign: "center" as const,
             fontStyle: isPaid ? "bold" as const : "normal" as const,
             fillColor: bgPago,
             textColor: pagoTextColor,
-        }},
+          }
+        },
       ])
 
       cur.setDate(cur.getDate() + 1)
     }
 
     // ── Linha TOTAL ───────────────────────────────────────────────────────
-    const totalFill: [number,number,number] = [25, 70, 140]
-    const white    : [number,number,number] = [255, 255, 255]
+    const totalFill: [number, number, number] = [25, 70, 140]
+    const white: [number, number, number] = [255, 255, 255]
     tableBody.push([
       { content: "TOTAL", colSpan: 2, styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
-      { content: `${totalHoras}h`,   styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
-      { content: "",                 styles: { fillColor: totalFill } },
-      { content: fmtEur(totalValor), styles: { fontStyle: "bold" as const, halign: "right"  as const, fillColor: totalFill, textColor: white } },
+      { content: `${totalHoras}h`, styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
+      { content: "", styles: { fillColor: totalFill } },
+      { content: fmtEur(totalValor), styles: { fontStyle: "bold" as const, halign: "right" as const, fillColor: totalFill, textColor: white } },
       { content: `${diasPagos}/${diasTrabalhados}`, styles: { fontStyle: "bold" as const, halign: "center" as const, fillColor: totalFill, textColor: white } },
     ])
 
@@ -413,8 +423,8 @@ export function ReportsView() {
     const available = pageHeight - headerH - footerH
     const totalRows = tableBody.length + 1
     const rowH = Math.min(9, Math.max(5.5, available / totalRows))
-    const fs   = Math.min(11, Math.max(8, rowH * 0.72))
-    const cp   = Math.max(1.2, (rowH - fs * 0.352) / 2)
+    const fs = Math.min(11, Math.max(8, rowH * 0.72))
+    const cp = Math.max(1.2, (rowH - fs * 0.352) / 2)
 
     // Larguras das colunas — somam tableWidth (170mm)
     // Col pagamento: 32mm fixo; restantes dividem o que sobra
@@ -428,11 +438,11 @@ export function ReportsView() {
     autoTable(doc, {
       startY: headerH,
       head: [[
-        { content: "Data",      styles: { halign: "center" as const } },
-        { content: "Dia",       styles: { halign: "center" as const } },
-        { content: "Horas",     styles: { halign: "center" as const } },
-        { content: "Taxa/h",    styles: { halign: "center" as const } },
-        { content: "Valor",     styles: { halign: "right"  as const } },
+        { content: "Data", styles: { halign: "center" as const } },
+        { content: "Dia", styles: { halign: "center" as const } },
+        { content: "Horas", styles: { halign: "center" as const } },
+        { content: "Taxa/h", styles: { halign: "center" as const } },
+        { content: "Valor", styles: { halign: "right" as const } },
         { content: "Pagamento", styles: { halign: "center" as const } },
       ]],
       body: tableBody,

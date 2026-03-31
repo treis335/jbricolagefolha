@@ -41,13 +41,11 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
     return { totalHoras, diasTrabalhados, diasPagos }
   }, [currentMonth, data.entries, paidDates])
 
-  const handleMonthChange = (direction: "prev" | "next") => {
-    setCurrentMonth((prev) => {
-      const d = new Date(prev)
-      d.setMonth(d.getMonth() + (direction === "next" ? 1 : -1))
-      return d
-    })
-  }
+const handleMonthChange = (direction: "prev" | "next") => {
+  setCurrentMonth((prev) => {
+    return new Date(prev.getFullYear(), prev.getMonth() + (direction === "next" ? 1 : -1), 1)
+  })
+}
 
   const formatMonthYear = (date: Date) =>
     date.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
