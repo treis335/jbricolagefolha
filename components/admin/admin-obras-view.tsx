@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from "react"
 import { useAuth } from "@/lib/AuthProvider"
 import { db } from "@/lib/firebase"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
 import {
   getObras, createObra, updateObra, deleteObra,
   uploadFotoObra, geocodeMorada, formatMorada,
@@ -26,18 +26,21 @@ import {
   Pencil, Trash2, X, Check, RefreshCw, Building2,
   Calendar, ArrowLeft, BarChart3, Camera, ImagePlus,
   Euro, Activity, MapIcon, LocateFixed, Loader2,
-  BookOpen, Package, FileText,
+  BookOpen, Package, FileText, ArrowRightLeft,
 } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils"
 
 // ── Tipos ─────────────────────────────────────────────────────────────────
 
 interface DiaryEntry {
   date: string
   colaborador: string
+  colaboradorId: string
   totalHoras: number
   normalHoras: number
   extraHoras: number
+  entryIndex: number
   services: {
     obraNome: string
     obraId?: string
@@ -58,9 +61,15 @@ interface ObraStats {
   todosMateriais: string[]
 }
 
+interface TransferTarget {
+  entryDate: string
+  colaboradorId: string
+  colaboradorNome: string
+  entryIndex: number
+}
+
 type View = "list" | "detail" | "create" | "edit"
 
-// Cor automática por estado
 const COR_POR_ESTADO: Record<string, string> = {
   ativa:     "#10b981",
   pausada:   "#f59e0b",
@@ -135,7 +144,135 @@ function FotoUploader({ previewUrl, uploading, progress, onFileSelected, onRemov
   )
 }
 
-// ── MapaObra com Leaflet + pin draggable ──────────────────────────────────
+// ── TransferModal ─────────────────────────────────────────────────────────
+
+function TransferModal({
+  obras, obraAtualId, target, transferring, onConfirm, onClose,
+}: {
+  obras: Obra[]
+  obraAtualId: string
+  target: TransferTarget
+  transferring: boolean
+  onConfirm: (obraDestino: Obra) => void
+  onClose: () => void
+}) {
+  const [search, setSearch] = useState("")
+  const [selected, setSelected] = useState<Obra | null>(null)
+
+  const obrasFiltradas = obras.filter(o =>
+    o.id !== obraAtualId &&
+    o.nome.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <>
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div
+          className="w-full sm:max-w-md bg-card rounded-t-3xl sm:rounded-2xl border border-border/50 shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200"
+          style={{ maxHeight: "85dvh" }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <ArrowRightLeft className="h-4 w-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">Transferir Registo</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {target.colaboradorNome} · {new Date(target.entryDate + "T12:00:00").toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" })}
+                </p>
+              </div>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted transition-colors">
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+
+          {/* Search */}
+          <div className="px-4 py-3 border-b border-border/40 shrink-0">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Pesquisar obra destino..."
+                className="pl-9 h-9 text-sm rounded-xl border-border/60"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Lista */}
+          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+            {obrasFiltradas.length === 0 ? (
+              <div className="py-10 text-center">
+                <Building2 className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Nenhuma obra disponível</p>
+              </div>
+            ) : obrasFiltradas.map(obra => {
+              const isSelected = selected?.id === obra.id
+              return (
+                <button
+                  key={obra.id}
+                  onClick={() => setSelected(isSelected ? null : obra)}
+                  className={cn(
+                    "w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all",
+                    isSelected
+                      ? "border-primary/50 bg-primary/5 ring-1 ring-primary/20"
+                      : "border-border/50 hover:border-border hover:bg-muted/40"
+                  )}
+                >
+                  <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 border border-border/40">
+                    {obra.fotoUrl
+                      ? <img src={obra.fotoUrl} alt="" className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center" style={{ backgroundColor: obra.cor + "25" }}>
+                          <HardHat className="h-5 w-5" style={{ color: obra.cor }} />
+                        </div>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{obra.nome}</p>
+                    {(obra.moradaRua || obra.moradaCidade) && (
+                      <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                        {[obra.moradaRua, obra.moradaCidade].filter(Boolean).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <EstadoBadge estado={obra.estado} size="xs" />
+                    {isSelected && <Check className="h-4 w-4 text-primary" />}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-4 border-t border-border/40 shrink-0 flex gap-2">
+            <button onClick={onClose} disabled={transferring}
+              className="flex-1 h-10 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50">
+              Cancelar
+            </button>
+            <button
+              onClick={() => selected && onConfirm(selected)}
+              disabled={!selected || transferring}
+              className="flex-1 h-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed text-primary-foreground text-sm font-semibold transition-all flex items-center justify-center gap-2"
+            >
+              {transferring
+                ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> A transferir...</>
+                : <><ArrowRightLeft className="h-3.5 w-3.5" /> Transferir</>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ── MapaObra ──────────────────────────────────────────────────────────────
 
 interface MapaObraProps {
   localizacao: ObraLocalizacao
@@ -148,7 +285,6 @@ interface MapaObraProps {
 function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) {
   const mapsUrl = getGoogleMapsUrl(localizacao)
   const wazeUrl = getWazeUrl(localizacao)
-
   const mapRef = useRef<HTMLDivElement>(null)
   const leafletMapRef = useRef<any>(null)
   const markerRef = useRef<any>(null)
@@ -197,19 +333,15 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
 
   useEffect(() => {
     if (typeof window === "undefined" || !mapRef.current) return
-
     const initMap = () => {
       const L = (window as any).L
       if (!L || !mapRef.current || leafletMapRef.current) return
-
       const map = L.map(mapRef.current, { center: [localizacao.lat, localizacao.lng], zoom: 17, zoomControl: true, scrollWheelZoom: false })
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OpenStreetMap contributors", maxZoom: 19 }).addTo(map)
-
       const icon = L.divIcon({
         html: `<div style="width:28px;height:28px;background:#2563eb;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(37,99,235,0.5);cursor:default;"></div>`,
         className: "", iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -32],
       })
-
       const marker = L.marker([localizacao.lat, localizacao.lng], { icon, draggable: false }).addTo(map)
       marker.on("dragstart", () => setDragging(true))
       marker.on("dragend", async (e: any) => {
@@ -217,11 +349,9 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
         const { lat, lng } = e.target.getLatLng()
         await doReverseGeocode(lat, lng)
       })
-
       leafletMapRef.current = map
       markerRef.current = marker
     }
-
     const loadLeaflet = async () => {
       if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link")
@@ -242,7 +372,6 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
       })
       initMap()
     }
-
     loadLeaflet().catch(console.error)
     return () => {
       if (leafletMapRef.current) { leafletMapRef.current.remove(); leafletMapRef.current = null; markerRef.current = null }
@@ -261,7 +390,6 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
     <div className={`rounded-2xl border bg-card overflow-hidden w-full min-w-0 transition-all ${editMode ? "border-primary/50 ring-2 ring-primary/20" : "border-border/60"}`}>
       <div className="relative w-full" style={{ height: "200px" }}>
         <div ref={mapRef} style={{ height: "100%", width: "100%" }} />
-
         {(dragging || reverseGeocoding || saved) && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none w-max max-w-[85vw]">
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold shadow-lg border backdrop-blur-sm ${saved ? "bg-emerald-500/90 text-white border-emerald-400/50" : "bg-background/95 text-foreground border-border/60"}`}>
@@ -271,7 +399,6 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
             </div>
           </div>
         )}
-
         {editMode && !dragging && !reverseGeocoding && !saved && (
           <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none w-max max-w-[85vw]">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-[11px] font-semibold shadow-lg">
@@ -280,7 +407,6 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
             </div>
           </div>
         )}
-
         {onLocationUpdate && !dragging && !reverseGeocoding && (
           <div className="absolute top-2 right-2 z-[1000]">
             {editMode ? (
@@ -297,7 +423,6 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
           </div>
         )}
       </div>
-
       <div className="p-3 space-y-2.5 w-full min-w-0">
         <div className="flex items-start gap-2 min-w-0">
           <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
@@ -314,7 +439,7 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
           <a href={wazeUrl} target="_blank" rel="noopener noreferrer"
             className="flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl bg-[#05C8F7] hover:bg-[#04b0d9] active:scale-95 text-white text-xs font-bold transition-all shadow-sm min-w-0 overflow-hidden">
             <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12.003 2C6.477 2 2 6.477 2 12.003c0 2.41.868 4.617 2.301 6.332L3.5 21.5l3.289-.786A9.962 9.962 0 0 0 12.003 22C17.53 22 22 17.53 22 12.003S17.53 2 12.003 2zm4.398 13.538c-.19.538-.956 1.007-1.558 1.14-.415.09-.957.162-2.782-.597-2.337-.976-3.844-3.36-3.96-3.515-.112-.155-.944-1.258-.944-2.4s.59-1.703.8-1.937c.21-.233.458-.29.61-.29l.44.008c.14.006.33-.053.517.394.193.457.653 1.6.71 1.716.057.116.095.252.019.407-.077.155-.116.252-.23.387-.116.135-.243.302-.347.406-.115.116-.235.242-.1.474.134.232.596.984 1.28 1.593.88.784 1.622 1.027 1.854 1.142.232.116.367.097.502-.058.135-.155.578-.673.733-.905.154-.232.309-.193.52-.116.212.077 1.346.634 1.578.75.232.116.386.174.443.27.058.097.058.56-.132 1.1z"/>
+              <path d="M12.003 2C6.477 2 2 6.477 2 12.003c0 2.41.868 4.617 2.301 6.332L3.5 21.5l3.289-.786A9.962 9.962 0 0 0 12.003 22C17.53 22 12.003 2zm4.398 13.538c-.19.538-.956 1.007-1.558 1.14-.415.09-.957.162-2.782-.597-2.337-.976-3.844-3.36-3.96-3.515-.112-.155-.944-1.258-.944-2.4s.59-1.703.8-1.937c.21-.233.458-.29.61-.29l.44.008c.14.006.33-.053.517.394.193.457.653 1.6.71 1.716.057.116.095.252.019.407-.077.155-.116.252-.23.387-.116.135-.243.302-.347.406-.115.116-.235.242-.1.474.134.232.596.984 1.28 1.593.88.784 1.622 1.027 1.854 1.142.232.116.367.097.502-.058.135-.155.578-.673.733-.905.154-.232.309-.193.52-.116.212.077 1.346.634 1.578.75.232.116.386.174.443.27.058.097.058.56-.132 1.1z"/>
             </svg>
             <span className="truncate">Waze</span>
           </a>
@@ -324,16 +449,17 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
   )
 }
 
-// ── ObraDetailTabs — Resumo + Diário + Materiais ──────────────────────────
+// ── ObraDetailTabs ────────────────────────────────────────────────────────
 
 function ObraDetailTabs({
-  stats,
-  fmtDate,
-  fmtEur,
+  stats, obras, obraAtualId, fmtDate, fmtEur, onTransferEntry,
 }: {
   stats: ObraStats
+  obras: Obra[]
+  obraAtualId: string
   fmtDate: (iso: string) => string
   fmtEur: (v: number) => string
+  onTransferEntry: (target: TransferTarget) => void
 }) {
   const [tab, setTab] = useState<"resumo" | "diario" | "materiais">("resumo")
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
@@ -366,13 +492,9 @@ function ObraDetailTabs({
           { id: "diario",    label: "Diário",    icon: BookOpen  },
           { id: "materiais", label: "Materiais", icon: Package   },
         ] as const).map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
+          <button key={id} onClick={() => setTab(id)}
             className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-[11px] font-semibold transition-all ${
-              tab === id
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              tab === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted"
             }`}
           >
             <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -381,7 +503,7 @@ function ObraDetailTabs({
         ))}
       </div>
 
-      {/* ── TAB: RESUMO ── */}
+      {/* ── RESUMO ── */}
       {tab === "resumo" && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
@@ -400,7 +522,6 @@ function ObraDetailTabs({
               </div>
             ))}
           </div>
-
           {stats.colaboradores.length > 0 && (
             <div className="rounded-2xl border border-border/60 bg-card p-4 space-y-3 min-w-0">
               <div className="flex items-center gap-2 min-w-0">
@@ -415,7 +536,6 @@ function ObraDetailTabs({
               </div>
             </div>
           )}
-
           {stats.ultimaAtividade && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted/40 border border-border/40 min-w-0">
               <Calendar className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -427,7 +547,7 @@ function ObraDetailTabs({
         </div>
       )}
 
-      {/* ── TAB: DIÁRIO ── */}
+      {/* ── DIÁRIO ── */}
       {tab === "diario" && (
         <div className="space-y-2">
           {diarioAgrupado.length === 0 ? (
@@ -435,125 +555,139 @@ function ObraDetailTabs({
               <BookOpen className="h-6 w-6 text-muted-foreground/30" />
               <p className="text-sm text-muted-foreground">Nenhum registo de diário ainda</p>
             </div>
-          ) : (
-            diarioAgrupado.map(([date, entries]) => {
-              const isOpen = expandedEntry === date
-              const totalHorasDia = entries.reduce((s, e) => s + e.totalHoras, 0)
-              const equipaDia = [...new Set(entries.flatMap(e => e.services.flatMap(s => s.equipa)))]
-              const materiaisDia = [...new Set(entries.flatMap(e => e.services.flatMap(s => s.materiais)))]
+          ) : diarioAgrupado.map(([date, entries]) => {
+            const isOpen = expandedEntry === date
+            const totalHorasDia = entries.reduce((s, e) => s + e.totalHoras, 0)
+            const equipaDia = [...new Set(entries.flatMap(e => e.services.flatMap(s => s.equipa)))]
+            const materiaisDia = [...new Set(entries.flatMap(e => e.services.flatMap(s => s.materiais)))]
 
-              return (
-                <div key={date} className="rounded-2xl border border-border/60 bg-card overflow-hidden">
-                  <button
-                    onClick={() => setExpandedEntry(isOpen ? null : date)}
-                    className="w-full flex items-center gap-3 p-3 sm:p-4 hover:bg-muted/30 transition-colors text-left"
-                  >
-                    <div className="shrink-0 w-12 h-12 rounded-xl bg-primary/8 border border-primary/15 flex flex-col items-center justify-center">
-                      <span className="text-[10px] font-semibold text-primary uppercase leading-none">
-                        {new Date(date + "T12:00:00").toLocaleDateString("pt-PT", { month: "short" })}
+            return (
+              <div key={date} className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+                <button
+                  onClick={() => setExpandedEntry(isOpen ? null : date)}
+                  className="w-full flex items-center gap-3 p-3 sm:p-4 hover:bg-muted/30 transition-colors text-left"
+                >
+                  <div className="shrink-0 w-12 h-12 rounded-xl bg-primary/8 border border-primary/15 flex flex-col items-center justify-center">
+                    <span className="text-[10px] font-semibold text-primary uppercase leading-none">
+                      {new Date(date + "T12:00:00").toLocaleDateString("pt-PT", { month: "short" })}
+                    </span>
+                    <span className="text-lg font-bold text-primary leading-tight">
+                      {new Date(date + "T12:00:00").getDate()}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-semibold capitalize">
+                        {new Date(date + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "long" })}
                       </span>
-                      <span className="text-lg font-bold text-primary leading-tight">
-                        {new Date(date + "T12:00:00").getDate()}
+                      <span className="text-[11px] text-muted-foreground">
+                        {entries.length > 1 ? `${entries.length} colaboradores` : entries[0].colaborador}
                       </span>
                     </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-semibold capitalize">
-                          {new Date(date + "T12:00:00").toLocaleDateString("pt-PT", { weekday: "long" })}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {entries.length > 1 ? `${entries.length} colaboradores` : entries[0].colaborador}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0" />{totalHorasDia.toFixed(1)}h
+                      </span>
+                      {equipaDia.length > 0 && (
                         <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3 shrink-0" />{totalHorasDia.toFixed(1)}h
+                          <Users className="h-3 w-3 shrink-0" />{equipaDia.length} pessoas
                         </span>
-                        {equipaDia.length > 0 && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Users className="h-3 w-3 shrink-0" />{equipaDia.length} pessoas
-                          </span>
-                        )}
-                        {materiaisDia.length > 0 && (
-                          <span className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Package className="h-3 w-3 shrink-0" />{materiaisDia.length} materiais
-                          </span>
-                        )}
-                      </div>
+                      )}
+                      {materiaisDia.length > 0 && (
+                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Package className="h-3 w-3 shrink-0" />{materiaisDia.length} materiais
+                        </span>
+                      )}
                     </div>
+                  </div>
+                  <ChevronRight className={`h-4 w-4 text-muted-foreground/50 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />
+                </button>
 
-                    <ChevronRight className={`h-4 w-4 text-muted-foreground/50 shrink-0 transition-transform ${isOpen ? "rotate-90" : ""}`} />
-                  </button>
-
-                  {isOpen && (
-                    <div className="border-t border-border/40 divide-y divide-border/30">
-                      {entries.map((entry, ei) => (
-                        <div key={ei} className="p-3 sm:p-4 space-y-3 bg-muted/10">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                              <span className="text-[11px] font-bold text-primary">
-                                {entry.colaborador.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold truncate">{entry.colaborador}</p>
-                              <p className="text-[11px] text-muted-foreground">
-                                {entry.totalHoras.toFixed(1)}h
-                                {entry.normalHoras > 0 && <span className="text-blue-600 dark:text-blue-400 ml-1">{entry.normalHoras}h normais</span>}
-                                {entry.extraHoras > 0 && <span className="text-amber-600 dark:text-amber-400 ml-1">{entry.extraHoras}h extra</span>}
-                              </p>
-                            </div>
+                {isOpen && (
+                  <div className="border-t border-border/40 divide-y divide-border/30">
+                    {entries.map((entry, ei) => (
+                      <div key={ei} className="p-3 sm:p-4 space-y-3 bg-muted/10">
+                        {/* Colaborador + botão transferir */}
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-[11px] font-bold text-primary">
+                              {entry.colaborador.charAt(0).toUpperCase()}
+                            </span>
                           </div>
-
-                          {entry.services.map((svc, si) => (
-                            <div key={si} className="rounded-xl border border-border/40 bg-background p-3 space-y-2">
-                              {svc.descricao && (
-                                <div className="flex items-start gap-2 min-w-0">
-                                  <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                                  <p className="text-xs text-foreground leading-relaxed break-words min-w-0">{svc.descricao}</p>
-                                </div>
-                              )}
-                              {svc.equipa.length > 0 && (
-                                <div className="flex items-start gap-2 min-w-0">
-                                  <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                                  <div className="flex flex-wrap gap-1 min-w-0">
-                                    {svc.equipa.map(n => (
-                                      <span key={n} className="text-[11px] px-2 py-0.5 rounded-full bg-primary/8 border border-primary/15 text-primary font-medium">{n}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {svc.materiais.length > 0 && (
-                                <div className="flex items-start gap-2 min-w-0">
-                                  <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
-                                  <div className="flex flex-wrap gap-1 min-w-0">
-                                    {svc.materiais.map((m, mi) => (
-                                      <span key={mi} className="text-[11px] px-2 py-0.5 rounded-full bg-muted border border-border/50 text-foreground/70 font-medium">{m}</span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                              {svc.totalHoras !== undefined && (
-                                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                                  <Clock className="h-3 w-3 shrink-0" />
-                                  {svc.totalHoras}h neste serviço
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold truncate">{entry.colaborador}</p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {entry.totalHoras.toFixed(1)}h
+                              {entry.normalHoras > 0 && <span className="text-blue-600 dark:text-blue-400 ml-1">{entry.normalHoras}h normais</span>}
+                              {entry.extraHoras > 0 && <span className="text-amber-600 dark:text-amber-400 ml-1">{entry.extraHoras}h extra</span>}
+                            </p>
+                          </div>
+                          {/* Botão Transferir */}
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              onTransferEntry({
+                                entryDate: entry.date,
+                                colaboradorId: entry.colaboradorId,
+                                colaboradorNome: entry.colaborador,
+                                entryIndex: entry.entryIndex,
+                              })
+                            }}
+                            className="flex items-center gap-1 h-7 px-2.5 rounded-lg border border-border/50 text-[11px] font-semibold text-muted-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all active:scale-95 shrink-0"
+                            title="Transferir para outra obra"
+                          >
+                            <ArrowRightLeft className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Transferir</span>
+                          </button>
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })
-          )}
+
+                        {entry.services.map((svc, si) => (
+                          <div key={si} className="rounded-xl border border-border/40 bg-background p-3 space-y-2">
+                            {svc.descricao && (
+                              <div className="flex items-start gap-2 min-w-0">
+                                <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                                <p className="text-xs text-foreground leading-relaxed break-words min-w-0">{svc.descricao}</p>
+                              </div>
+                            )}
+                            {svc.equipa.length > 0 && (
+                              <div className="flex items-start gap-2 min-w-0">
+                                <Users className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                                <div className="flex flex-wrap gap-1 min-w-0">
+                                  {svc.equipa.map(n => (
+                                    <span key={n} className="text-[11px] px-2 py-0.5 rounded-full bg-primary/8 border border-primary/15 text-primary font-medium">{n}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {svc.materiais.length > 0 && (
+                              <div className="flex items-start gap-2 min-w-0">
+                                <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                                <div className="flex flex-wrap gap-1 min-w-0">
+                                  {svc.materiais.map((m, mi) => (
+                                    <span key={mi} className="text-[11px] px-2 py-0.5 rounded-full bg-muted border border-border/50 text-foreground/70 font-medium">{m}</span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {svc.totalHoras !== undefined && (
+                              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <Clock className="h-3 w-3 shrink-0" />
+                                {svc.totalHoras}h neste serviço
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
 
-      {/* ── TAB: MATERIAIS ── */}
+      {/* ── MATERIAIS ── */}
       {tab === "materiais" && (
         <div className="space-y-2">
           {materiaisContagem.length === 0 ? (
@@ -599,6 +733,10 @@ export function AdminObrasView() {
   const [obraStats, setObraStats] = useState<ObraStats | null>(null)
   const [loadingStats, setLoadingStats] = useState(false)
 
+  // Transfer state
+  const [transferTarget, setTransferTarget] = useState<TransferTarget | null>(null)
+  const [transferring, setTransferring] = useState(false)
+
   const [formNome, setFormNome] = useState("")
   const [formRua, setFormRua] = useState("")
   const [formCp, setFormCp] = useState("")
@@ -638,11 +776,11 @@ export function AdminObrasView() {
         const entries: any[] = ud?.workData?.entries ?? []
         const taxa = ud?.workData?.settings?.taxaHoraria ?? 0
         const nome = ud?.username ?? ud?.name ?? d.id
+        const colaboradorId = d.id
 
-        for (const e of entries) {
+        for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+          const e = entries[entryIndex]
           const svcs: any[] = e.services ?? []
-
-          // Match por obraId (novo) OU por nome (retrocompat)
           const svcsMatch = svcs.filter((s: any) =>
             s.obraId === obra.id ||
             s.obraNome?.trim().toLowerCase() === obra.nome.trim().toLowerCase()
@@ -661,9 +799,11 @@ export function AdminObrasView() {
           diario.push({
             date: e.date,
             colaborador: nome,
+            colaboradorId,
             totalHoras: h,
             normalHoras: e.normalHoras ?? 0,
             extraHoras: e.extraHoras ?? 0,
+            entryIndex,
             services: svcsParaObra.map((s: any) => ({
               obraNome: s.obraNome ?? obra.nome,
               obraId: s.obraId,
@@ -677,14 +817,47 @@ export function AdminObrasView() {
       }
 
       diario.sort((a, b) => b.date.localeCompare(a.date))
-
-      const todosMateriais = [...new Set(
-        diario.flatMap(e => e.services.flatMap(s => s.materiais))
-      )]
-
+      const todosMateriais = [...new Set(diario.flatMap(e => e.services.flatMap(s => s.materiais)))]
       setObraStats({ totalHoras, totalCusto, colaboradores: Array.from(cols), ultimaAtividade, totalEntradas, diario, todosMateriais })
     } catch { setObraStats(null) }
     finally { setLoadingStats(false) }
+  }
+
+  // ── Transferir entrada para outra obra ──
+  const handleTransfer = async (obraDestino: Obra) => {
+    if (!transferTarget || !selectedObra) return
+    setTransferring(true)
+    try {
+      const userRef = doc(db, "users", transferTarget.colaboradorId)
+      const snap = await getDoc(userRef)
+      if (!snap.exists()) throw new Error("Utilizador não encontrado")
+
+      const userData = snap.data()
+      const entries: any[] = [...(userData?.workData?.entries ?? [])]
+      const entry = entries[transferTarget.entryIndex]
+      if (!entry) throw new Error("Entrada não encontrada")
+
+      // Atualiza obraId e obraNome em todos os services que pertencem à obra atual
+      const updatedServices = (entry.services ?? []).map((s: any) => {
+        const pertenceAobraAtual =
+          s.obraId === selectedObra.id ||
+          s.obraNome?.trim().toLowerCase() === selectedObra.nome.trim().toLowerCase()
+        if (!pertenceAobraAtual) return s
+        return { ...s, obraId: obraDestino.id, obraNome: obraDestino.nome }
+      })
+
+      entries[transferTarget.entryIndex] = { ...entry, services: updatedServices }
+      await updateDoc(userRef, { "workData.entries": entries })
+
+      setTransferTarget(null)
+      // Recarrega stats da obra atual
+      await loadObraStats(selectedObra)
+    } catch (err) {
+      console.error("Erro ao transferir:", err)
+      alert("Erro ao transferir o registo. Tente novamente.")
+    } finally {
+      setTransferring(false)
+    }
   }
 
   const obrasFiltradas = useMemo(() => obras.filter(o => {
@@ -733,7 +906,7 @@ export function AdminObrasView() {
     setGeocoding(true)
     const loc = await geocodeMorada(formRua, formCp, formCidade)
     setGeocoding(false)
-    if (!loc) { setFormError("Não foi possível localizar este endereço. Verifica os dados."); return }
+    if (!loc) { setFormError("Não foi possível localizar este endereço."); return }
     setFormError(""); setFormLocalizacao(loc)
   }
 
@@ -812,156 +985,172 @@ export function AdminObrasView() {
   if (view === "detail" && selectedObra) {
     const moradaCompleta = formatMorada(selectedObra)
     return (
-      <ScrollArea className="h-full w-full">
-        <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 md:py-8 pb-28 space-y-4 overflow-x-hidden">
+      <>
+        {/* Transfer Modal */}
+        {transferTarget && (
+          <TransferModal
+            obras={obras}
+            obraAtualId={selectedObra.id}
+            target={transferTarget}
+            transferring={transferring}
+            onConfirm={handleTransfer}
+            onClose={() => !transferring && setTransferTarget(null)}
+          />
+        )}
 
-          <div className="flex items-center gap-2 min-w-0">
-            <button onClick={() => setView("list")}
-              className="w-9 h-9 rounded-lg border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors shrink-0">
-              <ArrowLeft className="h-4 w-4" />
-            </button>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0 flex-1">
-              <span className="shrink-0">Obras</span>
-              <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-              <span className="text-foreground font-medium truncate">{selectedObra.nome}</span>
+        <ScrollArea className="h-full w-full">
+          <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 md:py-8 pb-28 space-y-4 overflow-x-hidden">
+
+            <div className="flex items-center gap-2 min-w-0">
+              <button onClick={() => setView("list")}
+                className="w-9 h-9 rounded-lg border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors shrink-0">
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+              <div className="flex items-center gap-1.5 text-sm text-muted-foreground min-w-0 flex-1">
+                <span className="shrink-0">Obras</span>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-foreground font-medium truncate">{selectedObra.nome}</span>
+              </div>
+              <button onClick={() => openEdit(selectedObra)}
+                className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border bg-background hover:bg-muted text-xs font-semibold transition-colors shrink-0">
+                <Pencil className="h-3.5 w-3.5" /><span className="hidden sm:inline">Editar</span>
+              </button>
             </div>
-            <button onClick={() => openEdit(selectedObra)}
-              className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-border bg-background hover:bg-muted text-xs font-semibold transition-colors shrink-0">
-              <Pencil className="h-3.5 w-3.5" /><span className="hidden sm:inline">Editar</span>
-            </button>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-            <div className="lg:col-span-1 space-y-3 min-w-0">
-
-              <div className="rounded-2xl overflow-hidden border border-border/60 bg-muted w-full" style={{ height: "200px" }}>
-                {selectedObra.fotoUrl ? (
-                  <img src={selectedObra.fotoUrl} alt={selectedObra.nome} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ backgroundColor: selectedObra.cor + "18" }}>
-                    <HardHat className="h-10 w-10 opacity-20" style={{ color: selectedObra.cor }} />
-                    <p className="text-xs text-muted-foreground/40">Sem foto</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/40 w-full min-w-0">
-                <div className="p-4 space-y-1.5 min-w-0">
-                  <div className="flex items-start justify-between gap-2 min-w-0">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedObra.cor }} />
-                      <h2 className="font-bold text-base leading-tight truncate">{selectedObra.nome}</h2>
-                    </div>
-                    <EstadoBadge estado={selectedObra.estado} size="xs" />
-                  </div>
-                  {moradaCompleta && (
-                    <div className="pl-5 space-y-0.5 min-w-0">
-                      {selectedObra.moradaRua && <p className="text-xs text-muted-foreground break-words">{selectedObra.moradaRua}</p>}
-                      {(selectedObra.moradaCodigoPostal || selectedObra.moradaCidade) && (
-                        <p className="text-xs text-muted-foreground">{[selectedObra.moradaCodigoPostal, selectedObra.moradaCidade].filter(Boolean).join(" ")}</p>
-                      )}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-1 space-y-3 min-w-0">
+                <div className="rounded-2xl overflow-hidden border border-border/60 bg-muted w-full" style={{ height: "200px" }}>
+                  {selectedObra.fotoUrl ? (
+                    <img src={selectedObra.fotoUrl} alt={selectedObra.nome} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{ backgroundColor: selectedObra.cor + "18" }}>
+                      <HardHat className="h-10 w-10 opacity-20" style={{ color: selectedObra.cor }} />
+                      <p className="text-xs text-muted-foreground/40">Sem foto</p>
                     </div>
                   )}
                 </div>
 
-                {selectedObra.descricao && (
-                  <div className="px-4 py-3 min-w-0">
-                    <p className="text-xs text-muted-foreground leading-relaxed break-words">{selectedObra.descricao}</p>
-                  </div>
-                )}
-
-                <div className="px-4 py-3 space-y-2">
-                  <div className="flex justify-between text-xs gap-2">
-                    <span className="text-muted-foreground shrink-0">Criada em</span>
-                    <span className="font-medium text-right">{fmtDate(selectedObra.criadaEm)}</span>
-                  </div>
-                  {selectedObra.criadaPorNome && (
-                    <div className="flex justify-between text-xs gap-2">
-                      <span className="text-muted-foreground shrink-0">por</span>
-                      <span className="font-medium truncate text-right">{selectedObra.criadaPorNome}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-3 space-y-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-1">Estado</p>
-                  <div className="grid grid-cols-3 gap-1.5">
-                    {(["ativa", "pausada", "concluida"] as ObraEstado[]).map(estado => {
-                      const ec = ESTADO_COLORS[estado]; const isActive = selectedObra.estado === estado
-                      return (
-                        <button key={estado} onClick={() => handleEstadoQuick(selectedObra, estado)}
-                          className={`flex flex-col items-center gap-1 py-2 rounded-xl text-[10px] font-bold border transition-all ${isActive ? `${ec.bg} ${ec.text} border-current` : "bg-background border-border/50 text-muted-foreground hover:bg-muted"}`}>
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? ec.dot : "bg-muted-foreground/30"}`} />
-                          <span className="truncate w-full text-center px-1">{ESTADO_LABELS[estado]}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {selectedObra.localizacao ? (
-                <MapaObra localizacao={selectedObra.localizacao} nomeMorada={selectedObra.localizacao.moradaCompleta || moradaCompleta} />
-              ) : moradaCompleta ? (
-                <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex items-start gap-3 min-w-0">
-                  <MapIcon className="h-5 w-5 text-muted-foreground/40 shrink-0 mt-0.5" />
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground">Localização não geocodificada</p>
-                    <p className="text-[11px] text-muted-foreground/60 mt-0.5">Edita a obra para atualizar a localização no mapa.</p>
-                  </div>
-                </div>
-              ) : null}
-
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-border/40 hover:border-destructive/30 hover:bg-destructive/[0.03] transition-all group">
-                    <span className="text-xs text-muted-foreground/60 group-hover:text-destructive/70 transition-colors font-medium">Eliminar obra</span>
-                    <Trash2 className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-destructive/50 transition-colors shrink-0" />
-                  </button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="max-w-[90vw] sm:max-w-md rounded-2xl">
-                  <AlertDialogHeader>
-                    <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
-                      <Trash2 className="h-6 w-6 text-destructive" />
-                    </div>
-                    <AlertDialogTitle className="text-center">Eliminar obra?</AlertDialogTitle>
-                    <AlertDialogDescription asChild>
-                      <div className="text-center space-y-2 text-sm text-muted-foreground">
-                        <p>A obra <strong className="text-foreground break-words">"{selectedObra.nome}"</strong> será eliminada permanentemente.</p>
-                        <div className="bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2 text-destructive font-semibold text-xs">Esta ação não pode ser desfeita.</div>
+                <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/40 w-full min-w-0">
+                  <div className="p-4 space-y-1.5 min-w-0">
+                    <div className="flex items-start justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: selectedObra.cor }} />
+                        <h2 className="font-bold text-base leading-tight truncate">{selectedObra.nome}</h2>
                       </div>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-                    <AlertDialogCancel className="w-full sm:w-auto">Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => handleDelete(selectedObra.id)} className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-white">Eliminar</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </div>
-
-            {/* Coluna direita — tabs */}
-            <div className="lg:col-span-2 space-y-3 min-w-0">
-              {loadingStats ? (
-                <div className="flex items-center justify-center py-16"><Spinner className="h-6 w-6 text-primary" /></div>
-              ) : obraStats ? (
-                <ObraDetailTabs stats={obraStats} fmtDate={fmtDate} fmtEur={fmtEur} />
-              ) : (
-                <div className="rounded-2xl border border-border/40 bg-muted/10 flex flex-col items-center justify-center py-16 text-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center shrink-0">
-                    <BarChart3 className="h-6 w-6 text-muted-foreground/40" />
+                      <EstadoBadge estado={selectedObra.estado} size="xs" />
+                    </div>
+                    {moradaCompleta && (
+                      <div className="pl-5 space-y-0.5 min-w-0">
+                        {selectedObra.moradaRua && <p className="text-xs text-muted-foreground break-words">{selectedObra.moradaRua}</p>}
+                        {(selectedObra.moradaCodigoPostal || selectedObra.moradaCidade) && (
+                          <p className="text-xs text-muted-foreground">{[selectedObra.moradaCodigoPostal, selectedObra.moradaCidade].filter(Boolean).join(" ")}</p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  <div className="px-4">
-                    <p className="text-sm font-medium text-foreground">Sem registos ainda</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Os colaboradores podem selecionar esta obra ao registar o dia.</p>
+                  {selectedObra.descricao && (
+                    <div className="px-4 py-3 min-w-0">
+                      <p className="text-xs text-muted-foreground leading-relaxed break-words">{selectedObra.descricao}</p>
+                    </div>
+                  )}
+                  <div className="px-4 py-3 space-y-2">
+                    <div className="flex justify-between text-xs gap-2">
+                      <span className="text-muted-foreground shrink-0">Criada em</span>
+                      <span className="font-medium text-right">{fmtDate(selectedObra.criadaEm)}</span>
+                    </div>
+                    {selectedObra.criadaPorNome && (
+                      <div className="flex justify-between text-xs gap-2">
+                        <span className="text-muted-foreground shrink-0">por</span>
+                        <span className="font-medium truncate text-right">{selectedObra.criadaPorNome}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-3 space-y-2">
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest px-1">Estado</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {(["ativa", "pausada", "concluida"] as ObraEstado[]).map(estado => {
+                        const ec = ESTADO_COLORS[estado]; const isActive = selectedObra.estado === estado
+                        return (
+                          <button key={estado} onClick={() => handleEstadoQuick(selectedObra, estado)}
+                            className={`flex flex-col items-center gap-1 py-2 rounded-xl text-[10px] font-bold border transition-all ${isActive ? `${ec.bg} ${ec.text} border-current` : "bg-background border-border/50 text-muted-foreground hover:bg-muted"}`}>
+                            <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? ec.dot : "bg-muted-foreground/30"}`} />
+                            <span className="truncate w-full text-center px-1">{ESTADO_LABELS[estado]}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
-              )}
+
+                {selectedObra.localizacao ? (
+                  <MapaObra localizacao={selectedObra.localizacao} nomeMorada={selectedObra.localizacao.moradaCompleta || moradaCompleta} />
+                ) : moradaCompleta ? (
+                  <div className="rounded-2xl border border-border/50 bg-muted/20 p-4 flex items-start gap-3 min-w-0">
+                    <MapIcon className="h-5 w-5 text-muted-foreground/40 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-muted-foreground">Localização não geocodificada</p>
+                      <p className="text-[11px] text-muted-foreground/60 mt-0.5">Edita a obra para atualizar a localização no mapa.</p>
+                    </div>
+                  </div>
+                ) : null}
+
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <button className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-border/40 hover:border-destructive/30 hover:bg-destructive/[0.03] transition-all group">
+                      <span className="text-xs text-muted-foreground/60 group-hover:text-destructive/70 transition-colors font-medium">Eliminar obra</span>
+                      <Trash2 className="h-3.5 w-3.5 text-muted-foreground/30 group-hover:text-destructive/50 transition-colors shrink-0" />
+                    </button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="max-w-[90vw] sm:max-w-md rounded-2xl">
+                    <AlertDialogHeader>
+                      <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-3">
+                        <Trash2 className="h-6 w-6 text-destructive" />
+                      </div>
+                      <AlertDialogTitle className="text-center">Eliminar obra?</AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div className="text-center space-y-2 text-sm text-muted-foreground">
+                          <p>A obra <strong className="text-foreground break-words">"{selectedObra.nome}"</strong> será eliminada permanentemente.</p>
+                          <div className="bg-destructive/8 border border-destructive/20 rounded-lg px-4 py-2 text-destructive font-semibold text-xs">Esta ação não pode ser desfeita.</div>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+                      <AlertDialogCancel className="w-full sm:w-auto">Cancelar</AlertDialogCancel>
+                      <AlertDialogAction onClick={() => handleDelete(selectedObra.id)} className="w-full sm:w-auto bg-destructive hover:bg-destructive/90 text-white">Eliminar</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+
+              {/* Coluna direita — tabs */}
+              <div className="lg:col-span-2 space-y-3 min-w-0">
+                {loadingStats ? (
+                  <div className="flex items-center justify-center py-16"><Spinner className="h-6 w-6 text-primary" /></div>
+                ) : obraStats ? (
+                  <ObraDetailTabs
+                    stats={obraStats}
+                    obras={obras}
+                    obraAtualId={selectedObra.id}
+                    fmtDate={fmtDate}
+                    fmtEur={fmtEur}
+                    onTransferEntry={setTransferTarget}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-border/40 bg-muted/10 flex flex-col items-center justify-center py-16 text-center gap-3 min-w-0">
+                    <div className="w-12 h-12 rounded-2xl bg-muted flex items-center justify-center shrink-0">
+                      <BarChart3 className="h-6 w-6 text-muted-foreground/40" />
+                    </div>
+                    <div className="px-4">
+                      <p className="text-sm font-medium text-foreground">Sem registos ainda</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Os colaboradores podem selecionar esta obra ao registar o dia.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </>
     )
   }
 
@@ -972,7 +1161,6 @@ export function AdminObrasView() {
     return (
       <div className="w-full overflow-x-hidden overflow-y-auto" style={{ boxSizing: "border-box" }}>
         <div className="w-full max-w-2xl mx-auto px-4 sm:px-6 md:px-8 py-4 sm:py-6 md:py-8 pb-28 space-y-4">
-
           <div className="flex items-center gap-2 min-w-0">
             <button onClick={() => setView(isEdit ? "detail" : "list")}
               className="w-9 h-9 rounded-lg border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors shrink-0">
@@ -1002,7 +1190,6 @@ export function AdminObrasView() {
           </div>
 
           <div className="rounded-2xl border border-border/60 bg-card overflow-hidden divide-y divide-border/30 w-full min-w-0">
-
             <div className="p-4 sm:p-5 space-y-2 min-w-0">
               <FotoUploader
                 previewUrl={formFotoUrl} uploading={uploading} progress={uploadProgress}
@@ -1035,11 +1222,9 @@ export function AdminObrasView() {
                   {geocoding ? "A localizar..." : "Pré-visualizar"}
                 </button>
               </div>
-
               <Input value={formRua} onChange={e => { setFormRua(e.target.value); setFormLocalizacao(undefined) }}
                 placeholder="Rua / Avenida e número"
                 className="h-11 rounded-xl border-border/60 bg-background text-sm focus-visible:ring-primary/30 w-full" />
-
               <div className="flex gap-2 min-w-0">
                 <Input value={formCp} onChange={e => { setFormCp(e.target.value); setFormLocalizacao(undefined) }}
                   placeholder="0000-000"
@@ -1048,7 +1233,6 @@ export function AdminObrasView() {
                   placeholder="Cidade"
                   className="flex-1 min-w-0 h-11 rounded-xl border-border/60 bg-background text-sm focus-visible:ring-primary/30" />
               </div>
-
               <p className="text-[11px] text-muted-foreground/60 flex items-start gap-1.5">
                 <LocateFixed className="h-3 w-3 shrink-0 mt-0.5" />
                 <span>A localização no mapa é gerada automaticamente ao guardar.</span>

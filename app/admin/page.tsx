@@ -69,7 +69,7 @@ function AdminContent() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <main className="flex-1 pb-16">
-        {activeTab === "dashboard"     && <AdminDashboardView />}
+        {activeTab === "dashboard"     && <AdminDashboardView onTabChange={setActiveTab} />}
         {activeTab === "collaborators" && <AdminCollaboratorsView />}
         {activeTab === "finance"       && <AdminFinanceView />}
         {activeTab === "obras"         && <AdminObrasView />}
