@@ -71,10 +71,11 @@ export function FinanceiroView() {
   const WARN_KEY = "financeiroEmitWarningDismissed"
 
   const calculated = useMemo(() => {
-    const taxa = data.settings.taxaHoraria ?? 0
+    // ✅ CORRIGIDO: taxa atual usada apenas como fallback para entries sem taxaHoraria gravada
+    const taxaAtual = data.settings.taxaHoraria ?? 0
 
     const totalDevidoGlobal = data.entries.reduce(
-      (sum, e) => sum + (e.totalHoras ?? 0) * taxa, 0
+      (sum, e) => sum + (e.totalHoras ?? 0) * (e.taxaHoraria ?? taxaAtual), 0 // ✅ usa taxa histórica da entry
     )
     const totalPagoGlobal = data.payments.reduce((sum, p) => sum + (p.valor ?? 0), 0)
     const saldoGlobalReal = totalPagoGlobal - totalDevidoGlobal
@@ -83,7 +84,8 @@ export function FinanceiroView() {
     data.entries.forEach((e) => {
       if (!e.date || !e.totalHoras) return
       const mesAno = e.date.slice(0, 7)
-      devidoPorMes[mesAno] = (devidoPorMes[mesAno] ?? 0) + e.totalHoras * taxa
+      // ✅ CORRIGIDO: usa a taxa gravada na entry, não a taxa atual
+      devidoPorMes[mesAno] = (devidoPorMes[mesAno] ?? 0) + e.totalHoras * (e.taxaHoraria ?? taxaAtual)
     })
 
     const mesesOrdenados = Object.keys(devidoPorMes).sort()
