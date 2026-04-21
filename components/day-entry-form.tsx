@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Plus, Minus, X, Trash2, Users, Check,
-  Clock, Hammer, Package, Search, HardHat, MapPin,
+  Clock, Hammer, Search, HardHat, MapPin,
   PenLine, AlertTriangle, Info, Maximize2,
   ChevronRight, ZoomIn,
 } from "lucide-react"
@@ -42,9 +42,7 @@ import {
   type Obra,
 } from "@/lib/obras-service"
 
-// Hook para colaboradores ativos
 import { useActiveCollaborators } from "@/hooks/useActiveCollaborators"
-// Lista legada de nomes (colaboradores.ts)
 import { getNomesColaboradores } from "@/lib/colaboradores"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -62,8 +60,8 @@ interface Service {
   obraId?: string
   obraObj?: Obra
   descricao: string
-  equipa: string[]           // Mantido para compatibilidade
-  equipaUids?: string[]      // Novo campo com UIDs
+  equipa: string[]
+  equipaUids?: string[]
   materiais: string[]
   totalHoras?: number
 }
@@ -181,7 +179,7 @@ function PhotoLightbox({ src, alt, onClose }: { src: string; alt: string; onClos
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ObraPicker (completo)
+// ObraPicker
 // ─────────────────────────────────────────────────────────────────────────────
 interface ObraPickerProps {
   open: boolean
@@ -355,7 +353,6 @@ function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
         attributionControl: false,
       })
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map)
-
       const icon = L.divIcon({
         html: `<div style="width:22px;height:22px;background:#2563eb;border:3px solid white;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 3px 10px rgba(37,99,235,0.4);"></div>`,
         className: "",
@@ -374,10 +371,7 @@ function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
         document.head.appendChild(link)
       }
-      if ((window as any).L) {
-        initMap()
-        return
-      }
+      if ((window as any).L) { initMap(); return }
       await new Promise<void>((res, rej) => {
         const s = document.createElement("script")
         s.id = "leaflet-js"
@@ -391,10 +385,7 @@ function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
     load().catch(console.error)
 
     return () => {
-      if (leafletMapRef.current) {
-        leafletMapRef.current.remove()
-        leafletMapRef.current = null
-      }
+      if (leafletMapRef.current) { leafletMapRef.current.remove(); leafletMapRef.current = null }
     }
   }, [open, hasLocation, obra])
 
@@ -417,9 +408,7 @@ function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
             )}
             <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-background via-background/60 to-transparent" />
             <div className="absolute bottom-0 inset-x-0 px-5 pb-4 z-10">
-              <SheetTitle className="text-xl font-bold text-foreground drop-shadow-sm line-clamp-2 leading-tight">
-                {obra.nome}
-              </SheetTitle>
+              <SheetTitle className="text-xl font-bold text-foreground drop-shadow-sm line-clamp-2 leading-tight">{obra.nome}</SheetTitle>
               {morada && (
                 <SheetDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                   <MapPin className="h-3 w-3 shrink-0" />
@@ -428,19 +417,11 @@ function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
               )}
             </div>
             {obra.fotoUrl && (
-              <button
-                type="button"
-                onClick={() => setLightboxOpen(true)}
-                className="absolute bottom-4 right-5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur-sm text-white text-[11px] font-semibold transition-all active:scale-95"
-              >
+              <button type="button" onClick={() => setLightboxOpen(true)} className="absolute bottom-4 right-5 z-10 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-black/45 hover:bg-black/65 backdrop-blur-sm text-white text-[11px] font-semibold transition-all active:scale-95">
                 <Maximize2 className="h-3 w-3" />Ampliar
               </button>
             )}
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute top-8 right-4 z-20 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm flex items-center justify-center transition-colors"
-            >
+            <button type="button" onClick={onClose} className="absolute top-8 right-4 z-20 w-8 h-8 rounded-full bg-black/30 hover:bg-black/50 backdrop-blur-sm flex items-center justify-center transition-colors">
               <X className="h-3.5 w-3.5 text-white" />
             </button>
           </div>
@@ -579,7 +560,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const { getEntry, addEntry, deleteEntry, data } = useWorkTracker()
   const { activeCollaborators, loading: loadingCollaborators } = useActiveCollaborators()
 
-  // Lista combinada: colaboradores ativos (com UID) + nomes legados de colaboradores.ts
   const nomesLegados = useMemo(() => getNomesColaboradores(), [])
 
   const allCollaborators = useMemo((): Collaborator[] => {
@@ -594,11 +574,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     nomesLegados.forEach(nome => {
       const nomeLower = nome.toLowerCase().trim()
       if (!activeMap.has(nomeLower)) {
-        combined.push({
-          uid: null,
-          nome,
-          isLegacy: true,
-        })
+        combined.push({ uid: null, nome, isLegacy: true })
       }
     })
 
@@ -608,20 +584,17 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const [totalHoras, setTotalHoras] = useState(8)
   const [services, setServices] = useState<Service[]>([])
   const [activeServiceId, setActiveServiceId] = useState<string | null>(null)
-  const [newMaterialInput, setNewMaterialInput] = useState("")
   const [initialHoras, setInitialHoras] = useState(8)
   const [initialServices, setInitialServices] = useState<Service[]>([])
   const [showTeamDialog, setShowTeamDialog] = useState(false)
   const [tempEquipa, setTempEquipa] = useState<Collaborator[]>([])
   const [teamFilter, setTeamFilter] = useState("")
   const [showObraPicker, setShowObraPicker] = useState(false)
-  const [manualInputServiceId, setManualInputServiceId] = useState<string | null>(null)
   const [obraInfoSheet, setObraInfoSheet] = useState<Obra | null>(null)
   const [unlinkServiceId, setUnlinkServiceId] = useState<string | null>(null)
 
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
 
-  // const dateStr = date ? date.toISOString().split("T")[0] : ""
   const dateStr = date ? formatLocalDate(date) : ""
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
@@ -681,9 +654,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       setInitialHoras(8)
       setInitialServices(JSON.parse(JSON.stringify([ns])))
     }
-
-    setNewMaterialInput("")
-    setManualInputServiceId(null)
   }, [date, open, existingEntry, meuNome])
 
   const activeService = useMemo(() => services.find(s => s.id === activeServiceId) ?? services[0], [services, activeServiceId])
@@ -717,23 +687,17 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }, [teamFilter, allCollaborators])
 
   const openTeamSelector = () => {
-  const current: Collaborator[] = []
-
-  if (activeService?.equipa) {
-    activeService.equipa.forEach((nome, i) => {
-      const uid = activeService.equipaUids?.[i] ?? null
-      current.push({
-        uid: uid || null,
-        nome,
-        isLegacy: !uid,
+    const current: Collaborator[] = []
+    if (activeService?.equipa) {
+      activeService.equipa.forEach((nome, i) => {
+        const uid = activeService.equipaUids?.[i] ?? null
+        current.push({ uid: uid || null, nome, isLegacy: !uid })
       })
-    })
+    }
+    setTempEquipa(current)
+    setTeamFilter("")
+    setShowTeamDialog(true)
   }
-
-  setTempEquipa(current)
-  setTeamFilter("")
-  setShowTeamDialog(true)
-}
 
   const toggleTempMember = (collab: Collaborator) => {
     setTempEquipa(prev =>
@@ -745,10 +709,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
   const confirmTeamSelection = () => {
     const nomes = tempEquipa.map(m => m.nome)
-    const uids = tempEquipa
-      .filter(m => m.uid !== null)
-      .map(m => m.uid!) as string[]
-
+    const uids = tempEquipa.filter(m => m.uid !== null).map(m => m.uid!) as string[]
     updateActiveService({
       equipa: nomes,
       equipaUids: uids.length > 0 ? uids : undefined,
@@ -770,8 +731,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     }
     setServices(prev => [...prev, ns])
     setActiveServiceId(ns.id)
-    setManualInputServiceId(null)
-    setNewMaterialInput("")
   }
 
   const handleRemoveService = (id: string) => {
@@ -779,7 +738,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     const next = services.filter(s => s.id !== id)
     setServices(next)
     setActiveServiceId(next[0]?.id ?? null)
-    setNewMaterialInput("")
   }
 
   const handleObraSelect = (obra: Obra) =>
@@ -792,7 +750,6 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       setUnlinkServiceId(serviceId)
     } else {
       updateService(serviceId, { obraNome: "", obraId: undefined, obraObj: undefined })
-      setManualInputServiceId(null)
     }
   }
 
@@ -811,26 +768,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         equipaUids: [],
         totalHoras: undefined,
       })
-      setManualInputServiceId(null)
     } else {
       handleRemoveService(id)
     }
   }
 
   const adjustHours = (d: number) => setTotalHoras(prev => Math.max(0, prev + d))
-
-  const addMaterialToActive = () => {
-    if (newMaterialInput.trim()) {
-      updateActiveService({ materiais: [...(activeService?.materiais ?? []), newMaterialInput.trim()] })
-      setNewMaterialInput("")
-    }
-  }
-
-  const removeMaterialFromActive = (i: number) =>
-    updateActiveService({ materiais: (activeService?.materiais ?? []).filter((_, j) => j !== i) })
-
-  const isManualMode = (s: Service) =>
-    manualInputServiceId === s.id || (!s.obraId && !manualInputServiceId && s.obraNome.trim() !== "")
 
   const unlinkService = unlinkServiceId ? services.find(s => s.id === unlinkServiceId) : null
 
@@ -854,8 +797,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         descricao: s.descricao,
         equipa: s.equipa,
         equipaUids: s.equipaUids || [],
-        materiais: s.materiais,
-        totalHoras: s.totalHoras,
+        materiais: s.materiais,       // preserved for retrocompatibility
+        totalHoras: s.totalHoras,     // preserved for retrocompatibility
       })),
       descricao: services.length === 1 ? services[0].descricao : "Múltiplos serviços",
       equipa: services.flatMap(s => s.equipa),
@@ -885,8 +828,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${isEditing ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
-                      }`}>
+                    <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${isEditing ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"}`}>
                       {isEditing ? "Editar registo" : "Novo registo"}
                     </span>
                     {isWeekend && (
@@ -905,7 +847,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto px-5 space-y-4 pb-10">
-              {/* Horas do dia */}
+
+              {/* ── Horas do dia ── */}
               <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-border/25 flex items-center gap-2">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground/50" />
@@ -942,7 +885,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 </div>
               </div>
 
-              {/* Serviços */}
+              {/* ── Serviços ── */}
               <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-border/25 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -960,7 +903,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 </div>
 
                 {services.length > 0 && (
-                  <Tabs value={activeServiceId || ""} onValueChange={id => { setActiveServiceId(id); setNewMaterialInput("") }} className="w-full">
+                  <Tabs value={activeServiceId || ""} onValueChange={id => setActiveServiceId(id)} className="w-full">
                     {services.length > 1 && (
                       <div className="px-4 pt-3 overflow-x-auto">
                         <TabsList className="flex w-max gap-1.5 bg-transparent p-0 h-auto">
@@ -975,12 +918,21 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
                     {services.map(s => (
                       <TabsContent key={s.id} value={s.id} className="p-4 space-y-4 mt-0">
-                        {/* Obra Section */}
+
+                        {/* ── Obra / Serviço — manual first, list as secondary action ── */}
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Obra / Serviço</label>
+
                           {s.obraId && s.obraObj ? (
-                            <ObraVinculadaCard obra={s.obraObj} obraNome={s.obraNome} onInfo={() => setObraInfoSheet(s.obraObj!)} onUnlink={() => handleUnlinkAttempt(s.id)} />
+                            // Obra vinculada
+                            <ObraVinculadaCard
+                              obra={s.obraObj}
+                              obraNome={s.obraNome}
+                              onInfo={() => setObraInfoSheet(s.obraObj!)}
+                              onUnlink={() => handleUnlinkAttempt(s.id)}
+                            />
                           ) : s.obraId && !s.obraObj ? (
+                            // A carregar obra
                             <div className="flex items-center gap-3 p-3.5 rounded-2xl border border-primary/18 bg-primary/[0.02]">
                               <div className="w-10 h-10 rounded-xl bg-muted animate-pulse shrink-0" />
                               <div className="flex-1 min-w-0">
@@ -991,67 +943,40 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 <X className="h-3.5 w-3.5 text-muted-foreground/50" />
                               </button>
                             </div>
-                          ) : isManualMode(s) ? (
-                            <div className="space-y-2">
-                              {manualInputServiceId === s.id && (
-                                <button type="button" onClick={() => { updateService(s.id, { obraNome: "" }); setManualInputServiceId(null) }} className="flex items-center gap-1 text-xs font-semibold text-red-500 hover:text-red-600 transition-colors shrink-0">
-                                  ← Voltar
-                                </button>
-                              )}
-                              <Input value={s.obraNome} onChange={e => updateService(s.id, { obraNome: e.target.value })} placeholder="ex: Reabilitação Casa Sr. António" className="h-11 bg-background border-border/45 rounded-xl text-sm focus-visible:ring-primary/20" />
-                              {s.obraNome.trim() !== "" && (
-                                <button type="button" onClick={() => { setActiveServiceId(s.id); setShowObraPicker(true) }} className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-muted/35 hover:bg-primary/5 border border-border/35 hover:border-primary/22 transition-all group">
-                                  <Search className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary shrink-0 transition-colors" />
-                                  <span className="text-xs text-muted-foreground/60 group-hover:text-primary transition-colors flex-1 text-left">Vincular a uma obra existente</span>
-                                  <ChevronRight className="h-3 w-3 text-muted-foreground/25 group-hover:text-primary shrink-0 transition-colors" />
-                                </button>
-                              )}
-                            </div>
                           ) : (
-                            <div className="grid grid-cols-2 gap-2">
-                              <button type="button" onClick={() => { setActiveServiceId(s.id); setShowObraPicker(true) }} className="flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-2xl border border-border/50 bg-background hover:bg-primary/5 hover:border-primary/35 active:scale-[0.98] transition-all group">
-                                <div className="w-9 h-9 rounded-xl bg-primary/8 group-hover:bg-primary/14 flex items-center justify-center transition-colors">
-                                  <Search className="h-4.5 w-4.5 text-primary/70" />
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs font-semibold text-foreground leading-tight">Selecionar obra</p>
-                                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">da lista</p>
-                                </div>
-                              </button>
-                              <button type="button" onClick={() => setManualInputServiceId(s.id)} className="flex flex-col items-center justify-center gap-2 px-3 py-4 rounded-2xl border border-border/50 bg-background hover:bg-muted/50 hover:border-border/70 active:scale-[0.98] transition-all group">
-                                <div className="w-9 h-9 rounded-xl bg-muted group-hover:bg-muted/80 flex items-center justify-center transition-colors">
-                                  <PenLine className="h-4 w-4 text-muted-foreground/60" />
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-xs font-semibold text-foreground leading-tight">Nome manual</p>
-                                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">escrever</p>
-                                </div>
+                            // Input manual — estado padrão, com botão de lista à direita
+                            <div className="flex items-center gap-2">
+                              <Input
+                                value={s.obraNome}
+                                onChange={e => updateService(s.id, { obraNome: e.target.value })}
+                                placeholder="Nome da obra ou serviço..."
+                                className="flex-1 h-11 bg-background border-border/45 rounded-xl text-sm focus-visible:ring-primary/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => { setActiveServiceId(s.id); setShowObraPicker(true) }}
+                                title="Selecionar da lista de obras"
+                                className="h-11 px-3 rounded-xl border border-border/45 bg-background hover:bg-primary/5 hover:border-primary/30 flex items-center gap-1.5 transition-all shrink-0 group"
+                              >
+                                <Search className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+                                <span className="text-xs font-semibold text-muted-foreground/60 group-hover:text-primary transition-colors hidden sm:inline">Lista</span>
                               </button>
                             </div>
                           )}
                         </div>
 
-                        {/* Descrição */}
+                        {/* ── Descrição ── */}
                         <div className="space-y-2">
                           <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Descrição</label>
-                          <Textarea value={s.descricao} onChange={e => updateService(s.id, { descricao: e.target.value })} placeholder="Descreve o trabalho realizado..." className="min-h-[80px] bg-background border-border/45 rounded-xl text-sm resize-none focus-visible:ring-primary/20" />
+                          <Textarea
+                            value={s.descricao}
+                            onChange={e => updateService(s.id, { descricao: e.target.value })}
+                            placeholder="Descreve o trabalho realizado..."
+                            className="min-h-[80px] bg-background border-border/45 rounded-xl text-sm resize-none focus-visible:ring-primary/20"
+                          />
                         </div>
 
-                        {/* Horas neste serviço */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Horas neste serviço <span className="normal-case font-normal opacity-60">(opcional)</span></label>
-                          <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => updateService(s.id, { totalHoras: Math.max(0, (s.totalHoras ?? 0) - 1) })} className="w-10 h-10 rounded-xl border border-border/40 bg-background hover:bg-muted active:scale-95 flex items-center justify-center transition-all">
-                              <Minus className="h-4 w-4 text-foreground/45" />
-                            </button>
-                            <Input type="number" value={s.totalHoras ?? ""} onChange={e => updateService(s.id, { totalHoras: e.target.value === "" ? undefined : Number(e.target.value) })} placeholder="—" className="flex-1 h-10 text-center font-bold bg-background border-border/40 rounded-xl text-sm focus-visible:ring-primary/20" min={0} step={0.5} />
-                            <button type="button" onClick={() => updateService(s.id, { totalHoras: (s.totalHoras ?? 0) + 1 })} className="w-10 h-10 rounded-xl border border-border/40 bg-background hover:bg-muted active:scale-95 flex items-center justify-center transition-all">
-                              <Plus className="h-4 w-4 text-foreground/45" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Equipa - COM VISUAL DIFERENCIADO PARA NOMES MANUAIS */}
+                        {/* ── Equipa ── */}
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest flex items-center gap-1.5">
@@ -1076,10 +1001,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 return (
                                   <span
                                     key={`${nome}-${index}`}
-                                    className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${isLegacy
+                                    className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${
+                                      isLegacy
                                         ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
                                         : "bg-primary/7 border-primary/15 text-primary"
-                                      }`}
+                                    }`}
                                   >
                                     {nome}
                                     {isLegacy && <span className="text-[9px] opacity-70 ml-0.5">(manual)</span>}
@@ -1100,43 +1026,13 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                           </div>
                         </div>
 
-                        {/* Materiais */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest flex items-center gap-1.5">
-                            <Package className="h-3 w-3" /> Materiais
-                          </label>
-                          <div className="flex gap-2">
-                            <Input
-                              value={newMaterialInput}
-                              onChange={e => setNewMaterialInput(e.target.value)}
-                              onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addMaterialToActive())}
-                              placeholder="ex: Tinta 15L, Isocril..."
-                              className="flex-1 h-10 bg-background border-border/40 rounded-xl text-sm focus-visible:ring-primary/20"
-                            />
-                            <button type="button" onClick={addMaterialToActive} className="w-10 h-10 rounded-xl bg-primary hover:bg-primary/85 active:scale-95 flex items-center justify-center transition-all">
-                              <Plus className="h-4 w-4 text-primary-foreground" />
-                            </button>
-                          </div>
-                          {s.materiais.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 pt-0.5">
-                              {s.materiais.map((m, idx) => (
-                                <span key={idx} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-muted border border-border/35 text-xs font-medium text-foreground/55">
-                                  {m}
-                                  <button type="button" onClick={() => removeMaterialFromActive(idx)} className="w-4 h-4 rounded-full hover:bg-destructive/12 hover:text-destructive flex items-center justify-center transition-colors ml-0.5">
-                                    <X className="h-2.5 w-2.5" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
                       </TabsContent>
                     ))}
                   </Tabs>
                 )}
               </div>
 
-              {/* Remover serviço */}
+              {/* ── Remover serviço ── */}
               {services.length > 1 && activeService && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -1161,7 +1057,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 </AlertDialog>
               )}
 
-              {/* Apagar dia */}
+              {/* ── Apagar dia ── */}
               {isEditing && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
@@ -1206,7 +1102,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         </SheetContent>
       </Sheet>
 
-      {/* Team Selector - COM VISUAL PARA NOMES MANUAIS */}
+      {/* ── Team Selector ── */}
       <Sheet open={showTeamDialog} onOpenChange={setShowTeamDialog}>
         <SheetContent side="bottom" className="rounded-t-3xl border-0 max-h-[85dvh] flex flex-col p-0 shadow-2xl [&>button]:hidden sm:max-w-xl sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl">
           <div className="flex justify-center pt-3 shrink-0">
@@ -1231,10 +1127,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             {tempEquipa.length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {tempEquipa.map(member => (
-                  <span key={member.nome} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${member.isLegacy
+                  <span key={member.nome} className={`inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium border ${
+                    member.isLegacy
                       ? "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800"
                       : "bg-primary/10 border-primary/18 text-primary"
-                    }`}>
+                  }`}>
                     {member.nome}
                     {member.isLegacy && <span className="text-[9px] opacity-70">(manual)</span>}
                     <button type="button" onClick={() => toggleTempMember(member)} className="w-4 h-4 rounded-full hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center ml-0.5">
@@ -1259,8 +1156,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     key={collab.nome}
                     type="button"
                     onClick={() => toggleTempMember(collab)}
-                    className={`w-full text-left px-5 py-3.5 flex justify-between items-center transition-colors border-b border-border/10 last:border-0 ${isSelected ? "bg-primary/5 text-primary font-semibold" : "hover:bg-muted/25 text-foreground"
-                      }`}
+                    className={`w-full text-left px-5 py-3.5 flex justify-between items-center transition-colors border-b border-border/10 last:border-0 ${
+                      isSelected ? "bg-primary/5 text-primary font-semibold" : "hover:bg-muted/25 text-foreground"
+                    }`}
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{collab.nome}</span>
@@ -1286,13 +1184,13 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         </SheetContent>
       </Sheet>
 
-      {/* Obra Picker */}
+      {/* ── Obra Picker ── */}
       <ObraPicker open={showObraPicker} onClose={() => setShowObraPicker(false)} onSelect={handleObraSelect} />
 
-      {/* Obra Info Sheet */}
+      {/* ── Obra Info Sheet ── */}
       {obraInfoSheet && <ObraInfoSheet open={!!obraInfoSheet} onClose={() => setObraInfoSheet(null)} obra={obraInfoSheet} />}
 
-      {/* Unlink Confirm */}
+      {/* ── Unlink Confirm ── */}
       <AlertDialog open={!!unlinkServiceId} onOpenChange={o => !o && setUnlinkServiceId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

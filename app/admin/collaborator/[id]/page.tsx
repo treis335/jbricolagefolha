@@ -1,4 +1,4 @@
-//admin/collaborator/[id]/page.tsx
+// /admin/collaborator/[id]/page.tsx
 "use client"
 
 import { useState, useEffect, useCallback, useMemo } from "react"
@@ -13,17 +13,19 @@ import {
   ArrowLeft, Calendar as CalendarIcon, FileText, User,
   Euro, Clock, TrendingUp, Mail, AtSign, Layers,
   ChevronRight, ChevronLeft, Camera, ImageIcon, Loader2,
-  Pencil, Check, X, Lock, LockOpen, ShieldAlert,
+  Check, X, Lock, LockOpen, ShieldAlert, CreditCard,
+  Building2, Hash, Phone, Zap, ZapOff,
 } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
 import { uploadFotoObra } from "@/lib/obras-service"
 import { cn } from "@/lib/utils"
 
-import { CollaboratorCalendarView } from "@/components/admin/collaborator-calendar-view"
-import { CollaboratorReportsView } from "@/components/admin/collaborator-reports-view"
-import { CollaboratorOverview } from "@/components/admin/collaborator-overview"
-import type { RateHistoryEntry } from "@/components/admin/collaborator-rate-manager"
+import { CollaboratorCalendarView }  from "@/components/admin/collaborator-calendar-view"
+import { CollaboratorReportsView }   from "@/components/admin/collaborator-reports-view"
+import { CollaboratorOverview }      from "@/components/admin/collaborator-overview"
+import { CollaboratorFinanceView }   from "@/components/admin/collaborator-finance-view"
+import type { RateHistoryEntry }     from "@/components/admin/collaborator-rate-manager"
 
 const MONTH_NAMES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -42,7 +44,7 @@ function resolveEntryTaxa(entry: any, currentRate: number): number {
 // ── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string; size?: "sm" | "lg" }) {
   const initials = nome.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("")
-  const dim = size === "lg" ? "w-16 h-16 md:w-20 md:h-20" : "w-10 h-10"
+  const dim  = size === "lg" ? "w-16 h-16 md:w-20 md:h-20" : "w-10 h-10"
   const text = size === "lg" ? "text-xl md:text-2xl" : "text-base"
 
   if (fotoUrl) {
@@ -107,7 +109,7 @@ function LockRow({ label, description, locked, onToggle, saving }: {
 }) {
   return (
     <div className={cn(
-      "flex items-center justify-between gap-3 px-4 py-3.5 rounded-2xl border transition-all",
+      "flex items-center justify-between gap-3 px-3.5 py-3 rounded-2xl border transition-all",
       locked
         ? "bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800/50"
         : "bg-muted/30 border-border/30"
@@ -122,20 +124,29 @@ function LockRow({ label, description, locked, onToggle, saving }: {
         onClick={onToggle}
         disabled={saving}
         className={cn(
-          "w-10 h-10 rounded-2xl flex items-center justify-center transition-all shrink-0 active:scale-95 disabled:opacity-50",
+          "w-9 h-9 rounded-xl flex items-center justify-center transition-all shrink-0 active:scale-95 disabled:opacity-50",
           locked
             ? "bg-red-100 dark:bg-red-950/40 hover:bg-red-200 dark:hover:bg-red-900/50"
             : "bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700"
         )}
       >
         {saving
-          ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
           : locked
-            ? <Lock className="h-4 w-4 text-red-500" />
-            : <LockOpen className="h-4 w-4 text-slate-400" />
+            ? <Lock className="h-3.5 w-3.5 text-red-500" />
+            : <LockOpen className="h-3.5 w-3.5 text-slate-400" />
         }
       </button>
     </div>
+  )
+}
+
+// ── Section Divider ───────────────────────────────────────────────────────────
+function SectionTitle({ icon, label }: { icon: React.ReactNode; label: string }) {
+  return (
+    <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold flex items-center gap-1.5">
+      {icon}{label}
+    </p>
   )
 }
 
@@ -146,15 +157,61 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
   onNameSaved: (name: string) => void
   onLockChanged: (locks: { fotoLocked: boolean; nomeLocked: boolean }) => void
 }) {
+  // ── Nome ──
   const [draftName, setDraftName] = useState(collaborator.name)
   const [savingName, setSavingName] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
 
+  // ── Permissões perfil ──
   const [fotoLocked, setFotoLocked] = useState(collaborator.fotoLocked ?? false)
   const [nomeLocked, setNomeLocked] = useState(collaborator.nomeLocked ?? false)
   const [savingFotoLock, setSavingFotoLock] = useState(false)
   const [savingNomeLock, setSavingNomeLock] = useState(false)
 
+  // ── Dados financeiros ──
+  const [finLoading, setFinLoading] = useState(true)
+  const [fin, setFin] = useState({
+    iban: "", banco: "",
+    mbwayAtivo: false, mbwayTelemovel: "", mbwayTitular: "",
+    ibanLocked: false, mbwayLocked: false,
+  })
+  const [finSaving, setFinSaving] = useState<string | null>(null)
+  const [finSaved,  setFinSaved]  = useState<string | null>(null)
+
+  // Carregar dados financeiros ao abrir
+  useEffect(() => {
+    getDoc(doc(db, "users", collaborator.id))
+      .then(snap => {
+        if (snap.exists()) {
+          const d = snap.data()
+          setFin({
+            iban:           d.iban           || "",
+            banco:          d.banco          || "",
+            mbwayAtivo:     d.mbwayAtivo     ?? false,
+            mbwayTelemovel: d.mbwayTelemovel || "",
+            mbwayTitular:   d.mbwayTitular   || "",
+            ibanLocked:     d.ibanLocked     ?? false,
+            mbwayLocked:    d.mbwayLocked    ?? false,
+          })
+        }
+      })
+      .catch(console.error)
+      .finally(() => setFinLoading(false))
+  }, [collaborator.id])
+
+  const saveFinField = async (fields: Partial<typeof fin>) => {
+    const key = Object.keys(fields)[0]
+    setFinSaving(key)
+    try {
+      await setDoc(doc(db, "users", collaborator.id), fields, { merge: true })
+      setFin(prev => ({ ...prev, ...fields }))
+      setFinSaved(key)
+      setTimeout(() => setFinSaved(null), 2000)
+    } catch { alert("Erro ao guardar.") }
+    finally { setFinSaving(null) }
+  }
+
+  // ── Nome ──────────────────────────────────────────────────────────────────
   const saveName = async () => {
     if (!draftName.trim() || draftName.trim() === collaborator.name) return
     setSavingName(true)
@@ -167,6 +224,7 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
     finally { setSavingName(false) }
   }
 
+  // ── Locks perfil ──────────────────────────────────────────────────────────
   const toggleFotoLock = async () => {
     setSavingFotoLock(true)
     const next = !fotoLocked
@@ -189,16 +247,90 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
     finally { setSavingNomeLock(false) }
   }
 
+  // ── FinField — campo editável inline ─────────────────────────────────────
+  function FinField({ fieldKey, label, value, placeholder, type = "text", icon }: {
+    fieldKey: string; label: string; value: string
+    placeholder: string; type?: string; icon?: React.ReactNode
+  }) {
+    const [editing, setEditing] = useState(false)
+    const [draft, setDraft]     = useState(value)
+
+    useEffect(() => { if (!editing) setDraft(value) }, [value, editing])
+
+    const save = async () => {
+      await saveFinField({ [fieldKey]: draft.trim() } as any)
+      setEditing(false)
+    }
+
+    const isSaving = finSaving === fieldKey
+    const isSaved  = finSaved  === fieldKey
+
+    return (
+      <div className="space-y-1.5">
+        <p className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground/40 font-bold flex items-center gap-1.5">
+          {icon}<span>{label}</span>
+        </p>
+        {editing ? (
+          <div className="flex items-center gap-1.5">
+            <Input
+              value={draft}
+              type={type}
+              onChange={e => setDraft(e.target.value)}
+              placeholder={placeholder}
+              autoFocus
+              className="h-9 text-sm flex-1 bg-background border-border/50 rounded-xl focus-visible:ring-1 focus-visible:ring-primary"
+              onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false) }}
+            />
+            <button
+              onClick={save}
+              disabled={isSaving}
+              className={cn(
+                "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95 disabled:opacity-40 shadow-sm",
+                isSaved ? "bg-emerald-500 text-white" : "bg-primary hover:bg-primary/90 text-white"
+              )}
+            >
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              disabled={isSaving}
+              className="w-9 h-9 rounded-xl border border-border/40 hover:bg-muted text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <p className={cn(
+              "text-sm font-medium truncate flex-1 min-w-0",
+              !value && "text-muted-foreground/35 italic font-normal text-xs"
+            )}>
+              {value || placeholder}
+            </p>
+            <button
+              onClick={() => { setEditing(true); setDraft(value) }}
+              className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all shrink-0 active:scale-95"
+            >
+              {finSaved === fieldKey
+                ? <Check className="h-3.5 w-3.5 text-emerald-500" />
+                : <svg className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+              }
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const canEnableMbway = !!fin.mbwayTelemovel && !!fin.mbwayTitular
+
   return (
     <>
-      {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal — bottom sheet em mobile, centrado em desktop */}
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-4 pb-0 sm:pb-0">
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-4">
         <div className="w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-300">
 
-          {/* Handle (mobile) */}
+          {/* Handle mobile */}
           <div className="flex justify-center pt-3 pb-1 sm:hidden">
             <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
           </div>
@@ -220,14 +352,12 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
             </button>
           </div>
 
-          {/* Body */}
-          <div className="px-5 py-5 space-y-5 max-h-[70dvh] overflow-y-auto">
+          {/* Body — scrollável */}
+          <div className="px-5 py-5 space-y-6 max-h-[75dvh] overflow-y-auto">
 
-            {/* Nome */}
+            {/* ── 1. Nome ── */}
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold flex items-center gap-1.5">
-                <User className="h-3 w-3 opacity-60" />Nome / Username
-              </p>
+              <SectionTitle icon={<User className="h-3 w-3 opacity-60" />} label="Nome / Username" />
               <div className="flex items-center gap-2">
                 <Input
                   value={draftName}
@@ -241,51 +371,170 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
                   disabled={savingName || !draftName.trim() || draftName.trim() === collaborator.name}
                   className={cn(
                     "w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-95 disabled:opacity-40 shadow-sm",
-                    nameSaved
-                      ? "bg-emerald-500 text-white"
-                      : "bg-primary hover:bg-primary/90 text-white"
+                    nameSaved ? "bg-emerald-500 text-white" : "bg-primary hover:bg-primary/90 text-white"
                   )}
                 >
-                  {savingName
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : nameSaved
-                      ? <Check className="h-4 w-4" />
-                      : <Check className="h-4 w-4" />
-                  }
+                  {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Bloqueios */}
+            {/* ── 2. Permissões de perfil ── */}
             <div className="space-y-2">
-              <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold flex items-center gap-1.5">
-                <Lock className="h-3 w-3 opacity-60" />Permissões do User
-              </p>
+              <SectionTitle icon={<Lock className="h-3 w-3 opacity-60" />} label="Permissões do User" />
               <div className="space-y-2">
-                <LockRow
-                  label="Nome"
-                  description="User pode alterar livremente"
-                  locked={nomeLocked}
-                  onToggle={toggleNomeLock}
-                  saving={savingNomeLock}
-                />
-                <LockRow
-                  label="Foto de Perfil"
-                  description="User pode alterar livremente"
-                  locked={fotoLocked}
-                  onToggle={toggleFotoLock}
-                  saving={savingFotoLock}
-                />
+                <LockRow label="Nome" description="User pode alterar livremente" locked={nomeLocked} onToggle={toggleNomeLock} saving={savingNomeLock} />
+                <LockRow label="Foto de Perfil" description="User pode alterar livremente" locked={fotoLocked} onToggle={toggleFotoLock} saving={savingFotoLock} />
               </div>
+            </div>
+
+            {/* ── 3. Dados Financeiros ── */}
+            <div className="space-y-3">
+              <SectionTitle icon={<CreditCard className="h-3 w-3 opacity-60" />} label="Dados de Pagamento" />
+
+              {finLoading ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground rounded-2xl border border-dashed border-border/50">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  A carregar dados...
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-border/40 bg-muted/10 overflow-hidden">
+
+                  {/* ── Banco ── */}
+                  <div className="px-4 py-3.5 border-b border-border/30">
+                    <FinField
+                      fieldKey="banco"
+                      label="Banco"
+                      value={fin.banco}
+                      placeholder="ex: Caixa Geral de Depósitos"
+                      icon={<Building2 className="h-3 w-3 opacity-60" />}
+                    />
+                  </div>
+
+                  {/* ── IBAN ── */}
+                  <div className="px-4 py-3.5 border-b border-border/30 space-y-3">
+                    <FinField
+                      fieldKey="iban"
+                      label="IBAN"
+                      value={fin.iban}
+                      placeholder="PT50 0000 0000 0000 0000 0000 0"
+                      icon={<Hash className="h-3 w-3 opacity-60" />}
+                    />
+                    <LockRow
+                      label="Bloquear IBAN"
+                      description="User pode alterar livremente"
+                      locked={fin.ibanLocked}
+                      onToggle={() => saveFinField({ ibanLocked: !fin.ibanLocked })}
+                      saving={finSaving === "ibanLocked"}
+                    />
+                  </div>
+
+                  {/* ── MBWay ── */}
+                  <div className="px-4 py-3.5 space-y-3">
+
+                    {/* Toggle ativo */}
+                    <div className={cn(
+                      "flex items-center justify-between gap-3 px-3.5 py-3 rounded-2xl border transition-all duration-300",
+                      fin.mbwayAtivo
+                        ? "bg-violet-50 dark:bg-violet-950/20 border-violet-200 dark:border-violet-800/50"
+                        : "bg-muted/30 border-border/30"
+                    )}>
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={cn(
+                          "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300",
+                          fin.mbwayAtivo
+                            ? "bg-gradient-to-br from-violet-500 to-indigo-600 shadow-sm shadow-violet-500/30"
+                            : "bg-muted"
+                        )}>
+                          {fin.mbwayAtivo
+                            ? <Zap className="h-3.5 w-3.5 text-white" />
+                            : <ZapOff className="h-3.5 w-3.5 text-muted-foreground/40" />
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold">MBWay</p>
+                          <p className={cn("text-xs truncate",
+                            fin.mbwayAtivo
+                              ? "text-violet-600 dark:text-violet-400"
+                              : "text-muted-foreground"
+                          )}>
+                            {fin.mbwayAtivo
+                              ? `Ativo · ${fin.mbwayTitular || fin.mbwayTelemovel}`
+                              : !canEnableMbway
+                                ? "Preenche o titular e número"
+                                : "Inativo"
+                            }
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Toggle switch */}
+                      <button
+                        onClick={() => saveFinField({ mbwayAtivo: !fin.mbwayAtivo })}
+                        disabled={finSaving === "mbwayAtivo" || (!fin.mbwayAtivo && !canEnableMbway)}
+                        className={cn(
+                          "relative w-11 h-6 rounded-full transition-all duration-300 shrink-0 disabled:opacity-40 focus:outline-none",
+                          fin.mbwayAtivo ? "bg-violet-500 shadow-md shadow-violet-500/30" : "bg-muted-foreground/20"
+                        )}
+                      >
+                        <span className={cn(
+                          "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300",
+                          fin.mbwayAtivo ? "left-[22px]" : "left-0.5"
+                        )}>
+                          {finSaving === "mbwayAtivo" && (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <Loader2 className="h-2.5 w-2.5 text-muted-foreground animate-spin" />
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Titular */}
+                    <FinField
+                      fieldKey="mbwayTitular"
+                      label="Titular MBWay"
+                      value={fin.mbwayTitular}
+                      placeholder="ex: João Silva"
+                      icon={<User className="h-3 w-3 opacity-60" />}
+                    />
+
+                    {/* Número */}
+                    <FinField
+                      fieldKey="mbwayTelemovel"
+                      label="Número MBWay"
+                      value={fin.mbwayTelemovel}
+                      placeholder="ex: 912 345 678"
+                      type="tel"
+                      icon={<Phone className="h-3 w-3 opacity-60" />}
+                    />
+
+                    {/* Lock MBWay */}
+                    <LockRow
+                      label="Bloquear dados MBWay"
+                      description="User pode alterar livremente"
+                      locked={fin.mbwayLocked}
+                      onToggle={() => saveFinField({ mbwayLocked: !fin.mbwayLocked })}
+                      saving={finSaving === "mbwayLocked"}
+                    />
+                  </div>
+
+                  {/* Info footer */}
+                  <div className="px-4 py-3 flex items-start gap-2 bg-blue-50/60 dark:bg-blue-950/10 border-t border-blue-100/50 dark:border-blue-900/20">
+                    <ShieldAlert className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                    <p className="text-[10px] text-blue-700 dark:text-blue-400 font-medium leading-relaxed">
+                      Dados gravados pelo admin. Ativa os bloqueios para impedir que o colaborador os altere.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Footer */}
           <div className="px-5 py-4 border-t border-border/20 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-            <button
-              onClick={onClose}
-              className="w-full h-11 rounded-2xl bg-muted hover:bg-muted/80 text-sm font-semibold text-foreground transition-colors active:scale-[0.98]"
-            >
+            <button onClick={onClose}
+              className="w-full h-11 rounded-2xl bg-muted hover:bg-muted/80 text-sm font-semibold text-foreground transition-colors active:scale-[0.98]">
               Fechar
             </button>
           </div>
@@ -301,10 +550,10 @@ export default function CollaboratorDetailPage() {
   const router = useRouter()
   const collaboratorId = params?.id as string
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading]           = useState(true)
   const [collaborator, setCollaborator] = useState<any>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState("overview")
+  const [error, setError]               = useState<string | null>(null)
+  const [activeTab, setActiveTab]       = useState("overview")
 
   const now = new Date()
   const [selectedMonth, setSelectedMonth] = useState({ year: now.getFullYear(), month: now.getMonth() })
@@ -318,11 +567,11 @@ export default function CollaboratorDetailPage() {
   const isCurrentMonth = selectedMonth.year === now.getFullYear() && selectedMonth.month === now.getMonth()
 
   const [showPhotoOptions, setShowPhotoOptions] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [pendingFile, setPendingFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [uploadingPhoto, setUploadingPhoto] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
+  const [showEditModal, setShowEditModal]       = useState(false)
+  const [pendingFile, setPendingFile]           = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl]             = useState<string | null>(null)
+  const [uploadingPhoto, setUploadingPhoto]     = useState(false)
+  const [uploadProgress, setUploadProgress]     = useState(0)
 
   useEffect(() => {
     if (!previewUrl) return
@@ -336,8 +585,9 @@ export default function CollaboratorDetailPage() {
       const userSnap = await getDoc(doc(db, "users", collaboratorId))
       if (!userSnap.exists()) { setError("Colaborador não encontrado"); return }
 
-      const userData = userSnap.data()
-      const entries = userData.workData?.entries || []
+      const userData    = userSnap.data()
+      const entries     = userData.workData?.entries  || []
+      const payments    = userData.workData?.payments || []
       const currentRate = userData.workData?.settings?.taxaHoraria || 0
       const rateHistory: RateHistoryEntry[] = userData.rateHistory || []
 
@@ -355,6 +605,7 @@ export default function CollaboratorDetailPage() {
         currentRate,
         totalHoursAllTime,
         entries,
+        payments,
         role: userData.role || "worker",
         createdAt: userData.createdAt,
         migrated: userData.migrated || false,
@@ -379,7 +630,7 @@ export default function CollaboratorDetailPage() {
         if (year === selectedMonth.year && month - 1 === selectedMonth.month) {
           const h = entry.totalHoras || 0
           hours += h
-          cost += h * resolveEntryTaxa(entry, collaborator.currentRate)
+          cost  += h * resolveEntryTaxa(entry, collaborator.currentRate)
         }
       }
     })
@@ -425,6 +676,7 @@ export default function CollaboratorDetailPage() {
     if (previewUrl) { URL.revokeObjectURL(previewUrl); setPreviewUrl(null) }
   }
 
+  // ── Loading / Error states ────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -459,28 +711,34 @@ export default function CollaboratorDetailPage() {
 
   const isAdmin = collaborator.role === "admin"
 
+  // ── Month Navigator ───────────────────────────────────────────────────────
   const MonthNavigator = () => (
-    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-      <button onClick={goToPrevMonth}
-        className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-all active:scale-90">
-        <ChevronLeft className="h-3.5 w-3.5" />
+    <div className="flex items-center gap-0.5" onClick={e => e.stopPropagation()}>
+      <button
+        onClick={goToPrevMonth}
+        className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-all active:scale-90"
+      >
+        <ChevronLeft className="h-3 w-3" />
       </button>
-      <span className="text-[10px] font-semibold text-muted-foreground min-w-[90px] text-center leading-tight">
-        {MONTH_NAMES_PT[selectedMonth.month]}<br />
-        <span className="text-[9px] font-normal">{selectedMonth.year}</span>
+      <span className="text-[9px] font-semibold text-muted-foreground min-w-[52px] text-center leading-tight">
+        {MONTH_NAMES_PT[selectedMonth.month].slice(0, 3)}<br />
+        <span className="text-[8px] font-normal">{selectedMonth.year}</span>
       </span>
-      <button onClick={goToNextMonth} disabled={isCurrentMonth}
-        className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-all active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed">
-        <ChevronRight className="h-3.5 w-3.5" />
+      <button
+        onClick={goToNextMonth}
+        disabled={isCurrentMonth}
+        className="w-6 h-6 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-black/10 dark:hover:bg-white/10 transition-all active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed"
+      >
+        <ChevronRight className="h-3 w-3" />
       </button>
     </div>
   )
 
   const kpis = [
-    { icon: Euro,       label: "Taxa Horária",   value: `${collaborator.currentRate.toFixed(2)} €`,     sub: "por hora",          color: "blue",    nav: false },
-    { icon: Clock,      label: "Horas este Mês", value: `${totalHoursThisMonth.toFixed(1)}`,            sub: "horas trabalhadas", color: "violet",  nav: true  },
-    { icon: TrendingUp, label: "Custo Mensal",   value: `${costThisMonth.toFixed(2)} €`,                sub: "custo acumulado",   color: "emerald", nav: true  },
-    { icon: Layers,     label: "Total Histórico",value: `${collaborator.totalHoursAllTime.toFixed(1)}`, sub: "horas totais",      color: "amber",   nav: false },
+    { icon: Euro,       label: "Taxa Horária",    value: `${collaborator.currentRate.toFixed(2)} €`,      sub: "por hora",          color: "blue",    nav: false },
+    { icon: Clock,      label: "Horas este Mês",  value: `${totalHoursThisMonth.toFixed(1)}h`,            sub: "horas trabalhadas", color: "violet",  nav: true  },
+    { icon: TrendingUp, label: "Custo Mensal",    value: `${costThisMonth.toFixed(2)} €`,                 sub: "custo acumulado",   color: "emerald", nav: true  },
+    { icon: Layers,     label: "Total Histórico", value: `${collaborator.totalHoursAllTime.toFixed(1)}h`, sub: "horas totais",      color: "amber",   nav: false },
   ]
 
   const colorMap: Record<string, { card: string; icon: string; iconBg: string }> = {
@@ -492,17 +750,17 @@ export default function CollaboratorDetailPage() {
 
   const tabs = [
     { value: "overview", label: "Visão Geral", Icon: User },
+    { value: "finance",  label: "Financeiro",  Icon: Euro },
     { value: "calendar", label: "Calendário",  Icon: CalendarIcon },
     { value: "reports",  label: "Relatórios",  Icon: FileText },
   ]
 
   return (
     <>
-      {/* ── Inputs SEMPRE no DOM (Android) ── */}
-      <input id="admin-foto-selfie" type="file" accept="image/*" capture="user" className="sr-only" onChange={handleFileChosen} />
-      <input id="admin-foto-galeria" type="file" accept="image/*" className="sr-only" onChange={handleFileChosen} />
+      {/* ── File inputs sempre no DOM (Android) ── */}
+      <input id="admin-foto-selfie"  type="file" accept="image/*" capture="user" className="sr-only" onChange={handleFileChosen} />
+      <input id="admin-foto-galeria" type="file" accept="image/*"               className="sr-only" onChange={handleFileChosen} />
 
-      {/* ── Preview + Confirmação ── */}
       {previewUrl && (
         <PhotoConfirmDialog
           previewUrl={previewUrl}
@@ -520,8 +778,10 @@ export default function CollaboratorDetailPage() {
             {/* ── Top Bar ── */}
             <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b">
               <div className="flex items-center gap-3 px-4 py-3 md:px-8">
-                <button onClick={() => router.push("/admin")}
-                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+                <button
+                  onClick={() => router.push("/admin")}
+                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+                >
                   <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform" />
                   <span className="hidden sm:inline">Colaboradores</span>
                 </button>
@@ -547,7 +807,9 @@ export default function CollaboratorDetailPage() {
 
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                    <h1 className="text-lg md:text-2xl font-bold tracking-tight leading-tight truncate">{collaborator.name}</h1>
+                    <h1 className="text-lg md:text-2xl font-bold tracking-tight leading-tight truncate">
+                      {collaborator.name}
+                    </h1>
                     <Badge variant="outline" className={cn(
                       "text-[10px] font-medium shrink-0",
                       isAdmin
@@ -556,7 +818,9 @@ export default function CollaboratorDetailPage() {
                     )}>
                       {isAdmin ? "Admin" : "Colaborador"}
                     </Badge>
-                    {collaborator.migrated && <Badge variant="outline" className="text-[10px] shrink-0">Migrado</Badge>}
+                    {collaborator.migrated && (
+                      <Badge variant="outline" className="text-[10px] shrink-0">Migrado</Badge>
+                    )}
                   </div>
                   <div className="flex flex-col gap-0.5">
                     {collaborator.email && (
@@ -573,8 +837,6 @@ export default function CollaboratorDetailPage() {
                       </span>
                     )}
                   </div>
-
-                  {/* Botão editar (admin) */}
                   <button
                     onClick={() => setShowEditModal(true)}
                     className="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 border border-primary/20 text-primary text-xs font-semibold transition-all active:scale-95"
@@ -590,19 +852,31 @@ export default function CollaboratorDetailPage() {
             <div className="px-4 pb-6 md:px-8">
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {kpis.map((kpi) => {
-                  const c = colorMap[kpi.color]
+                  const c    = colorMap[kpi.color]
                   const Icon = kpi.icon
                   return (
-                    <div key={kpi.label} className={cn("relative rounded-2xl border p-4 md:p-5 transition-all hover:shadow-sm", c.card)}>
-                      <div className="flex items-start justify-between mb-3">
+                    <div key={kpi.label}
+                      className={cn("relative rounded-2xl border p-3.5 md:p-5 transition-all hover:shadow-sm", c.card)}>
+                      <div className="flex items-start justify-between mb-2.5">
                         <div className={cn("inline-flex p-2 rounded-xl", c.iconBg)}>
-                          <Icon className={cn("h-4 w-4", c.icon)} />
+                          <Icon className={cn("h-3.5 w-3.5 md:h-4 md:w-4", c.icon)} />
                         </div>
-                        {kpi.nav && <MonthNavigator />}
+                        {kpi.nav && (
+                          <div className="hidden sm:flex">
+                            <MonthNavigator />
+                          </div>
+                        )}
                       </div>
-                      <p className="text-[11px] uppercase tracking-wide font-medium text-muted-foreground mb-1">{kpi.label}</p>
-                      <p className="text-xl md:text-2xl font-bold tracking-tight">{kpi.value}</p>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">{kpi.sub}</p>
+                      <p className="text-[10px] md:text-[11px] uppercase tracking-wide font-medium text-muted-foreground mb-1 leading-tight">
+                        {kpi.label}
+                      </p>
+                      <p className="text-lg md:text-2xl font-bold tracking-tight">{kpi.value}</p>
+                      <p className="text-[10px] md:text-[11px] text-muted-foreground mt-0.5">{kpi.sub}</p>
+                      {kpi.nav && (
+                        <div className="flex sm:hidden mt-2 pt-2 border-t border-current/10">
+                          <MonthNavigator />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -612,28 +886,56 @@ export default function CollaboratorDetailPage() {
             {/* ── Tabs ── */}
             <div className="px-4 pb-10 md:px-8">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex h-11 rounded-xl bg-muted/50 p-1 mb-6">
+                <TabsList className="w-full sm:w-auto grid grid-cols-4 sm:inline-flex h-11 rounded-xl bg-muted/50 p-1 mb-6 gap-0.5">
                   {tabs.map(({ value, label, Icon }) => (
-                    <TabsTrigger key={value} value={value}
-                      className="flex items-center gap-2 rounded-lg h-9 px-4 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all">
+                    <TabsTrigger
+                      key={value}
+                      value={value}
+                      className="flex items-center justify-center gap-1.5 rounded-lg h-9 px-2 sm:px-3.5 text-sm font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm transition-all"
+                    >
                       <Icon className="h-3.5 w-3.5 shrink-0" />
-                      <span className="hidden xs:inline sm:inline">{label}</span>
+                      <span className="hidden sm:inline whitespace-nowrap">{label}</span>
                     </TabsTrigger>
                   ))}
                 </TabsList>
+
                 <TabsContent value="overview" className="focus-visible:outline-none mt-0">
-                  <CollaboratorOverview collaborator={collaborator} onRateUpdated={handleRateUpdated}
-                    selectedMonth={selectedMonth} onPrevMonth={goToPrevMonth} onNextMonth={goToNextMonth} isCurrentMonth={isCurrentMonth} />
+                  <CollaboratorOverview
+                    collaborator={collaborator}
+                    onRateUpdated={handleRateUpdated}
+                    selectedMonth={selectedMonth}
+                    onPrevMonth={goToPrevMonth}
+                    onNextMonth={goToNextMonth}
+                    isCurrentMonth={isCurrentMonth}
+                  />
                 </TabsContent>
+
+                <TabsContent value="finance" className="focus-visible:outline-none mt-0">
+                  <CollaboratorFinanceView
+                    collaboratorId={collaborator.id}
+                    collaboratorName={collaborator.name}
+                    currentRate={collaborator.currentRate}
+                    entries={collaborator.entries}
+                    payments={collaborator.payments || []}
+                    onRefetch={fetchCollaborator}
+                  />
+                </TabsContent>
+
                 <TabsContent value="calendar" className="focus-visible:outline-none mt-0">
-                  <CollaboratorCalendarView collaboratorId={collaborator.id} collaboratorName={collaborator.name}
-                    currentRate={collaborator.currentRate} entries={collaborator.entries} />
+                  <CollaboratorCalendarView
+                    collaboratorId={collaborator.id}
+                    collaboratorName={collaborator.name}
+                    currentRate={collaborator.currentRate}
+                    entries={collaborator.entries}
+                  />
                 </TabsContent>
+
                 <TabsContent value="reports" className="focus-visible:outline-none mt-0">
                   <CollaboratorReportsView collaborator={collaborator} />
                 </TabsContent>
               </Tabs>
             </div>
+
           </div>
         </ScrollArea>
       </div>

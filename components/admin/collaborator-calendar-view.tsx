@@ -65,14 +65,17 @@ function EntryDetail({
   const isAbsence = totalHoras === 0
 
   return (
-    <div className="flex flex-col h-full min-h-0 sm:max-h-[85dvh]">
+    // ✅ flex column, altura total disponível, sem overflow oculto no container pai
+    <div className="flex flex-col w-full min-h-0 h-full">
+
       {/* ── Hero Header ── */}
       <div className={cn(
-        "relative px-6 pt-6 pb-7 overflow-hidden shrink-0",
+        "relative px-5 pt-5 pb-6 overflow-hidden shrink-0",
         isAbsence
           ? "bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500"
           : "bg-gradient-to-br from-primary via-primary/90 to-primary/80"
       )}>
+        {/* Decorative rings */}
         <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full border-2 border-white/10 pointer-events-none" />
         <div className="absolute -top-8 -right-8 w-36 h-36 rounded-full border border-white/10 pointer-events-none" />
         <div className="absolute top-1/2 -right-20 w-48 h-48 rounded-full bg-white/5 pointer-events-none" />
@@ -86,14 +89,17 @@ function EntryDetail({
           <X className="h-4 w-4 text-white" />
         </button>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 border border-white/20 mb-4">
-          <Calendar className="h-3 w-3 text-white/80" />
-          <span className="text-xs font-semibold text-white capitalize tracking-wide">{dateLabel}</span>
+        {/* Date pill */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 border border-white/20 mb-4 max-w-full">
+          <Calendar className="h-3 w-3 text-white/80 shrink-0" />
+          {/* ✅ truncate + break-words para datas muito longas em mobile */}
+          <span className="text-xs font-semibold text-white capitalize tracking-wide truncate">{dateLabel}</span>
         </div>
 
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <p className="text-white/60 text-[11px] font-semibold uppercase tracking-widest mb-1.5">
+        <div className="flex items-end justify-between gap-3 min-w-0">
+          <div className="min-w-0 flex-1">
+            {/* ✅ truncate no nome do colaborador */}
+            <p className="text-white/60 text-[11px] font-semibold uppercase tracking-widest mb-1.5 truncate">
               {collaboratorName}
             </p>
             {isAbsence ? (
@@ -101,7 +107,7 @@ function EntryDetail({
                 Ausência<br />registada
               </h3>
             ) : (
-              <div className="flex items-baseline gap-1">
+              <div className="flex items-baseline gap-1 flex-wrap">
                 <span className="text-4xl font-black text-white tabular-nums leading-none drop-shadow-sm">
                   {totalHoras}
                 </span>
@@ -112,23 +118,23 @@ function EntryDetail({
           </div>
 
           {!isAbsence && (
-            <div className="text-right bg-white/15 border border-white/20 rounded-2xl px-4 py-3 backdrop-blur-sm">
+            <div className="text-right bg-white/15 border border-white/20 rounded-2xl px-3 py-2.5 backdrop-blur-sm shrink-0">
               <p className="text-white/50 text-[10px] uppercase tracking-widest mb-0.5">Custo</p>
-              <p className="text-2xl font-black text-white tabular-nums leading-tight">{fmt(custo)}</p>
+              <p className="text-xl font-black text-white tabular-nums leading-tight">{fmt(custo)}</p>
               <p className="text-white/40 text-[10px] mt-0.5">{taxa.toFixed(2)} €/h</p>
             </div>
           )}
         </div>
 
         {!isAbsence && (
-          <div className="flex flex-wrap gap-2 mt-5">
+          <div className="flex flex-wrap gap-2 mt-4">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 border border-white/20">
-              <Clock className="h-3 w-3 text-white/80" />
+              <Clock className="h-3 w-3 text-white/80 shrink-0" />
               <span className="text-xs font-bold text-white">{normalHoras}h normais</span>
             </div>
             {extraHoras > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/20 border border-white/20">
-                <Zap className="h-3 w-3 text-white/80" />
+                <Zap className="h-3 w-3 text-white/80 shrink-0" />
                 <span className="text-xs font-bold text-white">+{extraHoras}h extra</span>
               </div>
             )}
@@ -137,11 +143,12 @@ function EntryDetail({
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto bg-slate-50/60">
+      {/* ✅ overflow-y-auto com overscroll-contain para scroll interno em mobile */}
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 min-h-0">
         {services.length > 0 && (
-          <div className="px-5 pt-5 pb-4 space-y-4">
+          <div className="px-4 pt-5 pb-4 space-y-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                 <Briefcase className="h-3.5 w-3.5 text-primary" />
               </div>
               <p className="text-xs font-black uppercase tracking-widest text-slate-400">
@@ -151,13 +158,16 @@ function EntryDetail({
 
             {services.map((svc: any, idx: number) => (
               <div key={svc.id || idx} className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+
+                {/* Obra header */}
                 {svc.obraNome ? (
                   <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-100 bg-slate-50">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
                       <HardHat className="h-4 w-4 text-primary" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-bold text-slate-800 truncate">{svc.obraNome}</p>
+                      {/* ✅ break-words para nomes de obra longos */}
+                      <p className="text-sm font-bold text-slate-800 break-words">{svc.obraNome}</p>
                       {svc.totalHoras !== undefined && svc.totalHoras > 0 && (
                         <p className="text-xs text-slate-400 mt-0.5">{svc.totalHoras}h neste serviço</p>
                       )}
@@ -170,20 +180,26 @@ function EntryDetail({
                 ) : null}
 
                 <div className="divide-y divide-slate-100">
+
+                  {/* Descrição */}
                   {svc.descricao?.trim() ? (
                     <div className="px-4 py-4">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 flex items-center gap-1.5">
-                        <span className="w-1 h-3 rounded-full bg-primary/50 inline-block" />
+                        <span className="w-1 h-3 rounded-full bg-primary/50 inline-block shrink-0" />
                         Descrição
                       </p>
-                      <p className="text-sm text-slate-700 leading-relaxed">{svc.descricao}</p>
+                      {/* ✅ break-words + whitespace-pre-wrap para preservar quebras de linha e evitar overflow horizontal */}
+                      <p className="text-sm text-slate-700 leading-relaxed break-words whitespace-pre-wrap">
+                        {svc.descricao}
+                      </p>
                     </div>
                   ) : null}
 
+                  {/* Equipa */}
                   {Array.isArray(svc.equipa) && svc.equipa.length > 0 && (
                     <div className="px-4 py-4">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                        <Users className="h-3 w-3" />
+                        <Users className="h-3 w-3 shrink-0" />
                         Equipa · {svc.equipa.length} {svc.equipa.length === 1 ? "pessoa" : "pessoas"}
                       </p>
                       <div className="flex flex-wrap gap-2">
@@ -194,19 +210,20 @@ function EntryDetail({
                             <div
                               key={`${nome}-${i}`}
                               className={cn(
-                                "flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold",
+                                "flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-xs font-semibold max-w-full",
                                 temUid
                                   ? "bg-primary/5 border-primary/20 text-primary"
                                   : "bg-slate-50 border-slate-200 text-slate-600"
                               )}
                             >
                               <span className={cn(
-                                "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black",
+                                "w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-black shrink-0",
                                 temUid ? "bg-primary/15 text-primary" : "bg-slate-200 text-slate-500"
                               )}>
                                 {initials}
                               </span>
-                              {nome}
+                              {/* ✅ break-words para nomes longos */}
+                              <span className="break-words min-w-0">{nome}</span>
                             </div>
                           )
                         })}
@@ -214,17 +231,18 @@ function EntryDetail({
                     </div>
                   )}
 
+                  {/* Materiais */}
                   {Array.isArray(svc.materiais) && svc.materiais.length > 0 && (
                     <div className="px-4 py-4">
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-1.5">
-                        <Package className="h-3 w-3" />
+                        <Package className="h-3 w-3 shrink-0" />
                         Materiais · {svc.materiais.length}
                       </p>
                       <div className="flex flex-wrap gap-2">
                         {svc.materiais.map((m: string, i: number) => (
                           <span
                             key={i}
-                            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 break-words max-w-full"
                           >
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
                             {m}
@@ -234,6 +252,7 @@ function EntryDetail({
                     </div>
                   )}
 
+                  {/* Empty state */}
                   {!svc.descricao?.trim() && !svc.equipa?.length && !svc.materiais?.length && (
                     <div className="px-4 py-8 text-center">
                       <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-3">
@@ -281,11 +300,11 @@ export function CollaboratorCalendarView({
     return map
   }, [entries])
 
- const handleMonthChange = (dir: "prev" | "next") => {
-  setCurrentMonth(prev =>
-    new Date(prev.getFullYear(), prev.getMonth() + (dir === "next" ? 1 : -1), 1)
-  )
-}
+  const handleMonthChange = (dir: "prev" | "next") => {
+    setCurrentMonth(prev =>
+      new Date(prev.getFullYear(), prev.getMonth() + (dir === "next" ? 1 : -1), 1)
+    )
+  }
 
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear()
@@ -412,21 +431,21 @@ export function CollaboratorCalendarView({
                 {date.getDate()}
               </span>
               {hasEntry && !isAbsence && entry.totalHoras > 0 && (
-  <span className={cn(
-    "font-semibold tabular-nums leading-none",
-    compact ? "text-[9px] text-primary/70 mt-0.5" : "text-[10px] text-primary/80 mt-0.5"
-  )}>
-    {entry.totalHoras}h
-  </span>
-)}
-{isAbsence && (
-  <span className={cn(
-    "font-semibold leading-none",
-    compact ? "text-[9px] text-amber-600/50 mt-0.5" : "text-[10px] text-amber-600/60 mt-0.5"
-  )}>
-    aus.
-  </span>
-)}
+                <span className={cn(
+                  "font-semibold tabular-nums leading-none",
+                  compact ? "text-[9px] text-primary/70 mt-0.5" : "text-[10px] text-primary/80 mt-0.5"
+                )}>
+                  {entry.totalHoras}h
+                </span>
+              )}
+              {isAbsence && (
+                <span className={cn(
+                  "font-semibold leading-none",
+                  compact ? "text-[9px] text-amber-600/50 mt-0.5" : "text-[10px] text-amber-600/60 mt-0.5"
+                )}>
+                  aus.
+                </span>
+              )}
             </button>
           )
         })}
@@ -460,7 +479,7 @@ export function CollaboratorCalendarView({
             <p className="text-2xl font-bold tracking-tight">
               {monthStats.totalHours.toFixed(1)}<span className="text-sm font-normal text-muted-foreground ml-1">h</span>
             </p>
-            <div className="flex gap-3 mt-2 text-[11px] text-muted-foreground">
+            <div className="flex gap-3 mt-2 text-[11px] text-muted-foreground flex-wrap">
               <span>{monthStats.normalHours.toFixed(1)}h normais</span>
               {monthStats.extraHours > 0 && (
                 <span className="text-amber-500 font-medium">+{monthStats.extraHours.toFixed(1)}h extra</span>
@@ -546,14 +565,17 @@ export function CollaboratorCalendarView({
         <DialogContent
           className={cn(
             "p-0 gap-0 border-0 shadow-2xl overflow-hidden",
-            "max-sm:fixed max-sm:inset-0 max-sm:top-0 max-sm:left-0 max-sm:right-0 max-sm:bottom-0",
-            "max-sm:translate-x-0 max-sm:translate-y-0",
-            "max-sm:rounded-none max-sm:w-full max-sm:h-full max-sm:max-h-full max-sm:max-w-full",
+            // ✅ Mobile: ocupa o ecrã todo mas com flex column para scroll funcionar
+            "max-sm:fixed max-sm:inset-0 max-sm:w-full max-sm:h-full",
+            "max-sm:max-w-full max-sm:max-h-full",
+            "max-sm:rounded-none max-sm:translate-x-0 max-sm:translate-y-0",
+            // ✅ Desktop: tamanho máximo com scroll interno
             "sm:w-[520px] sm:max-w-[90vw] sm:max-h-[85dvh] sm:rounded-3xl",
+            // ✅ Essencial: flex column em todos os tamanhos para o scroll do body funcionar
+            "flex flex-col",
             "[&>button]:hidden",
           )}
         >
-          {/* Título acessível via sr-only */}
           <DialogTitle className="sr-only">
             {selectedEntry
               ? `Detalhe do dia ${selectedDateLabel} — ${collaboratorName}`
