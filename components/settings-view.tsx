@@ -13,7 +13,7 @@ import {
   DatabaseBackup, ChevronRight,
   Phone, CreditCard, Camera, Building2,
   Hash, Loader2, Zap, ZapOff, Settings2, ImageIcon,
-  Eye, EyeOff, UserCircle2,
+  Eye, EyeOff, UserCircle2, Shield, Sparkles,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -30,9 +30,11 @@ interface UserProfile {
   telemovel: string
   banco: string
   iban: string
+  ibanLocked: boolean
   mbwayAtivo: boolean
   mbwayTelemovel: string
   mbwayTitular: string
+  mbwayLocked: boolean
   fotoUrl: string
   fotoLocked: boolean
   nomeLocked: boolean
@@ -43,9 +45,11 @@ const PROFILE_DEFAULTS: UserProfile = {
   telemovel: "",
   banco: "",
   iban: "",
+  ibanLocked: false,
   mbwayAtivo: false,
   mbwayTelemovel: "",
   mbwayTitular: "",
+  mbwayLocked: false,
   fotoUrl: "",
   fotoLocked: false,
   nomeLocked: false,
@@ -54,8 +58,8 @@ const PROFILE_DEFAULTS: UserProfile = {
 // ── Avatar ────────────────────────────────────────────────────────────────────
 function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string; size?: "sm" | "lg" }) {
   const initials = nome.split(" ").filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("")
-  const dim = size === "lg" ? "w-16 h-16 sm:w-20 sm:h-20" : "w-10 h-10"
-  const text = size === "lg" ? "text-xl sm:text-2xl" : "text-base"
+  const dim = size === "lg" ? "w-20 h-20 sm:w-24 sm:h-24" : "w-10 h-10"
+  const text = size === "lg" ? "text-2xl sm:text-3xl" : "text-base"
 
   if (fotoUrl) {
     return (
@@ -63,16 +67,16 @@ function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string;
         key={fotoUrl}
         src={fotoUrl}
         alt={nome}
-        className={cn(dim, "rounded-3xl object-cover ring-2 ring-white/10 shadow-xl shrink-0")}
+        className={cn(dim, "rounded-[1.25rem] object-cover ring-4 ring-white/15 shadow-2xl shrink-0")}
       />
     )
   }
   return (
     <div className={cn(
       dim, text,
-      "rounded-3xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center font-bold text-white shrink-0 shadow-xl ring-2 ring-white/10"
+      "rounded-[1.25rem] bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-600 flex items-center justify-center font-black text-white shrink-0 shadow-2xl ring-4 ring-white/15"
     )}>
-      {initials || <User className="h-5 w-5 sm:h-6 sm:w-6 opacity-80" />}
+      {initials || <User className="h-6 w-6 sm:h-8 sm:w-8 opacity-90" />}
     </div>
   )
 }
@@ -80,49 +84,39 @@ function Avatar({ fotoUrl, nome, size = "lg" }: { fotoUrl: string; nome: string;
 // ── Locked Photo Button ───────────────────────────────────────────────────────
 function LockedPhotoButton() {
   return (
-    <div className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-2xl bg-red-600 border-2 border-background flex items-center justify-center shadow-md">
-      <Lock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
+    <div className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-2xl bg-red-500 border-[3px] border-background flex items-center justify-center shadow-lg">
+      <Lock className="h-3.5 w-3.5 text-white" />
     </div>
   )
 }
 
 // ── Confirm Edit Dialog ───────────────────────────────────────────────────────
-function ConfirmEditDialog({
-  field,
-  onConfirm,
-  onCancel,
-}: {
-  field: string
-  onConfirm: () => void
-  onCancel: () => void
+function ConfirmEditDialog({ field, onConfirm, onCancel }: {
+  field: string; onConfirm: () => void; onCancel: () => void
 }) {
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-md" onClick={onCancel} />
       <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
-        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex justify-center pt-7 pb-4">
-            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center">
-              <AlertCircle className="h-7 w-7 text-amber-500" />
+        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/40 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="flex justify-center pt-8 pb-5">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/30">
+              <AlertCircle className="h-8 w-8 text-white" />
             </div>
           </div>
-          <div className="px-6 pb-2 text-center">
+          <div className="px-6 pb-3 text-center">
             <p className="text-base font-bold">Alterar {field}?</p>
-            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+            <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
               Este campo já tem um valor guardado. Tens a certeza que pretendes modificá-lo?
             </p>
           </div>
-          <div className="p-5 grid grid-cols-2 gap-3 mt-2">
-            <button
-              onClick={onCancel}
-              className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95"
-            >
+          <div className="p-5 grid grid-cols-2 gap-3">
+            <button onClick={onCancel}
+              className="h-12 rounded-2xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted/60 transition-all active:scale-95">
               Cancelar
             </button>
-            <button
-              onClick={onConfirm}
-              className="h-11 rounded-xl bg-amber-500 hover:bg-amber-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-amber-500/30"
-            >
+            <button onClick={onConfirm}
+              className="h-12 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white text-sm font-bold transition-all active:scale-95 shadow-md shadow-amber-500/25">
               Modificar
             </button>
           </div>
@@ -132,7 +126,7 @@ function ConfirmEditDialog({
   )
 }
 
-// ── InstallPWAButton ─────────────────────────────────────────────────────────
+// ── InstallPWAButton ──────────────────────────────────────────────────────────
 function InstallPWAButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null)
   const [isInstalled, setIsInstalled] = useState(false)
@@ -161,50 +155,47 @@ function InstallPWAButton() {
   }
 
   return (
-    <Card icon={<Smartphone className="h-4 w-4 sm:h-4.5 sm:w-4.5" />} gradient="from-violet-500 to-purple-600" title="Instalar App">
+    <Section
+      icon={<Smartphone className="h-4 w-4" />}
+      gradient="from-violet-500 via-purple-500 to-fuchsia-500"
+      title="Instalar App"
+    >
       {isInstalled ? (
-        <RowItem>
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-              <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 truncate">Aplicação instalada</p>
-              <p className="text-xs text-muted-foreground truncate">A correr em modo standalone</p>
-            </div>
+        <div className="flex items-center gap-3 px-4 py-4">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="h-5 w-5 text-emerald-500" />
           </div>
-        </RowItem>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">Aplicação instalada</p>
+            <p className="text-xs text-muted-foreground mt-0.5">A correr em modo standalone</p>
+          </div>
+        </div>
       ) : (
-        <RowItem>
-          <div className="flex-1 min-w-0 mr-3">
-            <p className="text-sm font-semibold truncate">Instalar no dispositivo</p>
-            <p className="text-xs text-muted-foreground mt-0.5 truncate">Acesso rápido e modo offline</p>
+        <div className="flex items-center gap-3 px-4 py-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">Instalar no dispositivo</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Acesso rápido e modo offline</p>
           </div>
           <Button
             size="sm"
             onClick={handleInstall}
-            className="shrink-0 bg-violet-600 hover:bg-violet-500 text-white h-9 px-3 sm:px-4 rounded-xl shadow-sm shadow-violet-500/30 text-xs sm:text-sm"
+            className="shrink-0 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white h-9 px-4 rounded-xl shadow-md shadow-violet-500/25 text-xs font-bold border-0"
           >
-            <Download className="h-3.5 w-3.5 mr-1" />Instalar
+            <Download className="h-3.5 w-3.5 mr-1.5" />Instalar
           </Button>
-        </RowItem>
+        </div>
       )}
-    </Card>
+    </Section>
   )
 }
 
 // ── EditableField ─────────────────────────────────────────────────────────────
 function EditableField({
-  label, value, placeholder, type = "text", icon, onSave, sensitive, confirmIfFilled,
+  label, value, placeholder, type = "text", icon, onSave, sensitive, confirmIfFilled, locked,
 }: {
-  label: string
-  value: string
-  placeholder: string
-  type?: string
-  icon?: React.ReactNode
-  onSave: (v: string) => Promise<void>
-  sensitive?: boolean
-  confirmIfFilled?: boolean
+  label: string; value: string; placeholder: string; type?: string
+  icon?: React.ReactNode; onSave: (v: string) => Promise<void>
+  sensitive?: boolean; confirmIfFilled?: boolean; locked?: boolean
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(value)
@@ -218,17 +209,39 @@ function EditableField({
   }
 
   const handleEditClick = () => {
-    if (confirmIfFilled && value.trim()) {
-      setShowConfirm(true)
-    } else {
-      setEditing(true)
-      setDraft(value)
-    }
+    if (confirmIfFilled && value.trim()) setShowConfirm(true)
+    else { setEditing(true); setDraft(value) }
   }
 
   const masked = sensitive && value && !editing
     ? value.slice(0, 4) + " ···· ···· " + value.slice(-4)
     : value
+
+  if (locked) {
+    return (
+      <div className="px-4 py-3.5">
+        <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-2.5">
+          {icon && <span className="opacity-50">{icon}</span>}{label}
+        </label>
+        <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-red-50/80 dark:bg-red-950/20 border border-red-200/50 dark:border-red-800/30">
+          <p className={cn(
+            "text-sm font-medium truncate flex-1 min-w-0 text-red-900/70 dark:text-red-200/60",
+            !value && "italic font-normal text-red-400/60"
+          )}>
+            {sensitive && value ? value.slice(0, 4) + " ···· ···· " + value.slice(-4) : value || placeholder}
+          </p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="h-5 w-5 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+              <Lock className="h-3 w-3 text-red-500" />
+            </div>
+          </div>
+        </div>
+        <p className="text-[10px] text-red-500/60 dark:text-red-400/60 mt-1.5 font-semibold">
+          Bloqueado pela gestão — contacta o supervisor.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -239,19 +252,18 @@ function EditableField({
           onCancel={() => setShowConfirm(false)}
         />
       )}
-      <div className="px-3 sm:px-4 py-3">
-        <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-2">
-          {icon && <span className="opacity-60">{icon}</span>}
-          {label}
+      <div className="px-4 py-3.5">
+        <label className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-2.5">
+          {icon && <span className="opacity-50">{icon}</span>}{label}
         </label>
         {editing ? (
-          <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-center gap-2">
             <Input
               value={draft}
               onChange={e => setDraft(e.target.value)}
               placeholder={placeholder}
               type={type}
-              className="h-10 text-sm flex-1 min-w-0 bg-muted/40 border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-blue-500"
+              className="h-10 text-sm flex-1 min-w-0 bg-muted/40 border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-blue-500/60"
               disabled={saving}
               autoFocus
               onKeyDown={e => {
@@ -259,34 +271,26 @@ function EditableField({
                 if (e.key === "Escape") { setEditing(false); setDraft(value) }
               }}
             />
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-sm shadow-emerald-500/30"
-            >
+            <button onClick={handleSave} disabled={saving}
+              className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-md shadow-emerald-500/25">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             </button>
-            <button
-              onClick={() => { setEditing(false); setDraft(value) }}
-              disabled={saving}
-              className="w-10 h-10 rounded-xl border border-border/40 hover:bg-muted text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95"
-            >
+            <button onClick={() => { setEditing(false); setDraft(value) }} disabled={saving}
+              className="w-10 h-10 rounded-xl border border-border/40 hover:bg-muted/70 text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95">
               <X className="h-4 w-4" />
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-3">
             <p className={cn(
               "text-sm font-medium truncate flex-1 min-w-0",
-              !value && "text-muted-foreground/40 italic font-normal"
+              !value && "text-muted-foreground/35 italic font-normal"
             )}>
               {masked || placeholder}
             </p>
-            <button
-              onClick={handleEditClick}
-              className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all shrink-0 active:scale-95"
-            >
-              <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+            <button onClick={handleEditClick}
+              className="w-8 h-8 rounded-xl bg-muted/60 hover:bg-muted border border-border/30 flex items-center justify-center transition-all shrink-0 active:scale-95">
+              <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" />
             </button>
           </div>
         )}
@@ -297,18 +301,11 @@ function EditableField({
 
 // ── MBwayToggle ───────────────────────────────────────────────────────────────
 function MBwayToggle({
-  enabled,
-  mbwayTelemovel,
-  mbwayTitular,
-  iban,
-  onToggle,
-  onSaveTelemovel,
-  onSaveTitular,
+  enabled, mbwayTelemovel, mbwayTitular, iban, locked,
+  onToggle, onSaveTelemovel, onSaveTitular,
 }: {
-  enabled: boolean
-  mbwayTelemovel: string
-  mbwayTitular: string
-  iban: string
+  enabled: boolean; mbwayTelemovel: string; mbwayTitular: string
+  iban: string; locked?: boolean
   onToggle: (v: boolean) => Promise<void>
   onSaveTelemovel: (v: string) => Promise<void>
   onSaveTitular: (v: string) => Promise<void>
@@ -324,10 +321,10 @@ function MBwayToggle({
   useEffect(() => { if (!editingTel) setDraftTel(mbwayTelemovel) }, [mbwayTelemovel, editingTel])
   useEffect(() => { if (!editingTitular) setDraftTitular(mbwayTitular) }, [mbwayTitular, editingTitular])
 
-  const canEnable = !!mbwayTelemovel && !!mbwayTitular && !!iban
+  const canEnable = !!mbwayTelemovel && !!mbwayTitular
 
   const handleToggle = async () => {
-    if (!canEnable && !enabled) return
+    if (locked || (!canEnable && !enabled)) return
     setSaving(true); await onToggle(!enabled); setSaving(false)
   }
 
@@ -340,49 +337,60 @@ function MBwayToggle({
   }
 
   return (
-    <div className="px-3 sm:px-4 py-4">
+    <div className="px-4 py-4">
+      {/* Main toggle row */}
       <div className={cn(
-        "rounded-2xl border p-3 sm:p-4 transition-all duration-300",
-        enabled
-          ? "bg-gradient-to-br from-blue-500/8 to-indigo-500/8 border-blue-400/30"
-          : "bg-muted/30 border-border/30"
+        "rounded-2xl border p-4 transition-all duration-300",
+        locked
+          ? "bg-red-50/60 dark:bg-red-950/10 border-red-200/50 dark:border-red-800/30"
+          : enabled
+            ? "bg-gradient-to-br from-indigo-50/80 to-blue-50/60 dark:from-indigo-950/20 dark:to-blue-950/15 border-indigo-200/60 dark:border-indigo-800/40 shadow-sm"
+            : "bg-muted/30 border-border/30"
       )}>
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className={cn(
-              "w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300",
-              enabled ? "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md shadow-blue-500/30" : "bg-muted"
+              "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-300",
+              locked
+                ? "bg-red-100 dark:bg-red-950/40"
+                : enabled
+                  ? "bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/30"
+                  : "bg-muted/70 border border-border/30"
             )}>
-              {enabled
-                ? <Zap className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-white" />
-                : <ZapOff className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-muted-foreground/50" />
+              {locked
+                ? <Lock className="h-4 w-4 text-red-500" />
+                : enabled
+                  ? <Zap className="h-4 w-4 text-white" />
+                  : <ZapOff className="h-4 w-4 text-muted-foreground/40" />
               }
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold">MBway</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {!iban
-                  ? "Preenche o IBAN primeiro"
-                  : enabled
-                    ? `Ativo · ${mbwayTitular || mbwayTelemovel}`
-                    : !mbwayTelemovel || !mbwayTitular
-                      ? "Preenche os dados abaixo"
-                      : "Desativado"
-                }
+              <p className="text-sm font-bold">MBway</p>
+              <p className={cn("text-xs truncate mt-0.5",
+                locked ? "text-red-500/80" : enabled ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"
+              )}>
+                {locked ? "Bloqueado pela gestão"
+                  : enabled ? `Ativo · ${mbwayTitular || mbwayTelemovel}`
+                  : !mbwayTelemovel || !mbwayTitular ? "Preenche os dados abaixo"
+                  : "Desativado"}
               </p>
             </div>
           </div>
 
+          {/* Toggle pill */}
           <button
             onClick={handleToggle}
-            disabled={saving || (!canEnable && !enabled)}
+            disabled={saving || locked || (!canEnable && !enabled)}
             className={cn(
-              "relative w-12 h-6 rounded-full transition-all duration-300 shrink-0 disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
-              enabled ? "bg-blue-500 shadow-md shadow-blue-500/40" : "bg-muted-foreground/20"
+              "relative w-12 h-6 rounded-full transition-all duration-300 shrink-0 focus:outline-none",
+              locked ? "opacity-40 cursor-not-allowed bg-muted-foreground/20"
+                : enabled ? "bg-gradient-to-r from-blue-500 to-indigo-500 shadow-md shadow-blue-500/30"
+                : "bg-muted-foreground/20",
+              !locked && "disabled:opacity-40"
             )}
           >
             <span className={cn(
-              "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-all duration-300",
+              "absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-300",
               enabled ? "left-[26px]" : "left-0.5"
             )}>
               {saving && (
@@ -394,89 +402,86 @@ function MBwayToggle({
           </button>
         </div>
 
-        <div className="mt-3 pt-3 border-t border-border/20 space-y-3">
+        {locked && (
+          <p className="text-[10px] text-red-500/70 mt-3 font-semibold">
+            Bloqueado pela gestão — contacta o supervisor para alterações.
+          </p>
+        )}
+
+        {/* Sub-fields */}
+        <div className="mt-4 pt-4 border-t border-border/15 space-y-4">
+          {/* Titular */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-2 flex items-center gap-1.5">
-              <UserCircle2 className="h-3 w-3 opacity-60" />
-              Titular da conta
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-2 flex items-center gap-1.5">
+              <UserCircle2 className="h-3 w-3 opacity-60" />Titular da conta
             </p>
-            {editingTitular ? (
+            {!locked && editingTitular ? (
               <div className="flex items-center gap-1.5">
-                <Input
-                  value={draftTitular}
-                  onChange={e => setDraftTitular(e.target.value)}
-                  placeholder="ex: João Silva"
-                  type="text"
-                  className="h-9 text-sm flex-1 min-w-0 bg-background border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-blue-500"
-                  disabled={savingTitular}
-                  autoFocus
-                  onKeyDown={e => {
-                    if (e.key === "Enter") handleSaveTitular()
-                    if (e.key === "Escape") { setEditingTitular(false); setDraftTitular(mbwayTitular) }
-                  }}
+                <Input value={draftTitular} onChange={e => setDraftTitular(e.target.value)}
+                  placeholder="ex: João Silva" type="text"
+                  className="h-9 text-sm flex-1 min-w-0 bg-background/80 border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-blue-500/60"
+                  disabled={savingTitular} autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") handleSaveTitular(); if (e.key === "Escape") { setEditingTitular(false); setDraftTitular(mbwayTitular) } }}
                 />
                 <button onClick={handleSaveTitular} disabled={savingTitular}
-                  className="w-9 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95">
+                  className="w-9 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-md shadow-emerald-500/20">
                   {savingTitular ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 </button>
                 <button onClick={() => { setEditingTitular(false); setDraftTitular(mbwayTitular) }} disabled={savingTitular}
-                  className="w-9 h-9 rounded-xl border border-border/40 hover:bg-muted text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95">
+                  className="w-9 h-9 rounded-xl border border-border/40 hover:bg-muted/60 text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center justify-between gap-2">
                 <p className={cn("text-sm font-semibold truncate flex-1 min-w-0",
-                  !mbwayTitular && "text-muted-foreground/40 italic font-normal text-xs")}>
-                  {mbwayTitular || "Sem titular — toca no lápis para adicionar"}
+                  !mbwayTitular && "text-muted-foreground/35 italic font-normal text-xs")}>
+                  {mbwayTitular || "Sem titular"}
                 </p>
-                <button onClick={() => { setEditingTitular(true); setDraftTitular(mbwayTitular) }}
-                  className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all shrink-0 active:scale-95">
-                  <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                </button>
+                {!locked ? (
+                  <button onClick={() => { setEditingTitular(true); setDraftTitular(mbwayTitular) }}
+                    className="w-8 h-8 rounded-xl bg-muted/60 hover:bg-muted border border-border/30 flex items-center justify-center transition-all shrink-0 active:scale-95">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  </button>
+                ) : <Lock className="h-3.5 w-3.5 text-red-400/60 shrink-0" />}
               </div>
             )}
           </div>
 
+          {/* Número */}
           <div>
-            <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-2 flex items-center gap-1.5">
-              <Phone className="h-3 w-3 opacity-60" />
-              Número MBway
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-2 flex items-center gap-1.5">
+              <Phone className="h-3 w-3 opacity-60" />Número MBway
             </p>
-            {editingTel ? (
+            {!locked && editingTel ? (
               <div className="flex items-center gap-1.5">
-                <Input
-                  value={draftTel}
-                  onChange={e => setDraftTel(e.target.value)}
-                  placeholder="ex: 912 345 678"
-                  type="tel"
-                  className="h-9 text-sm flex-1 min-w-0 bg-background border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-blue-500"
-                  disabled={savingTel}
-                  autoFocus
-                  onKeyDown={e => {
-                    if (e.key === "Enter") handleSaveTel()
-                    if (e.key === "Escape") { setEditingTel(false); setDraftTel(mbwayTelemovel) }
-                  }}
+                <Input value={draftTel} onChange={e => setDraftTel(e.target.value)}
+                  placeholder="ex: 912 345 678" type="tel"
+                  className="h-9 text-sm flex-1 min-w-0 bg-background/80 border-border/40 rounded-xl focus-visible:ring-1 focus-visible:ring-blue-500/60"
+                  disabled={savingTel} autoFocus
+                  onKeyDown={e => { if (e.key === "Enter") handleSaveTel(); if (e.key === "Escape") { setEditingTel(false); setDraftTel(mbwayTelemovel) } }}
                 />
                 <button onClick={handleSaveTel} disabled={savingTel}
-                  className="w-9 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95">
+                  className="w-9 h-9 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-md shadow-emerald-500/20">
                   {savingTel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
                 </button>
                 <button onClick={() => { setEditingTel(false); setDraftTel(mbwayTelemovel) }} disabled={savingTel}
-                  className="w-9 h-9 rounded-xl border border-border/40 hover:bg-muted text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95">
+                  className="w-9 h-9 rounded-xl border border-border/40 hover:bg-muted/60 text-muted-foreground flex items-center justify-center transition-all shrink-0 active:scale-95">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center justify-between gap-2">
                 <p className={cn("text-sm font-semibold truncate flex-1 min-w-0",
-                  !mbwayTelemovel && "text-muted-foreground/40 italic font-normal text-xs")}>
-                  {mbwayTelemovel || "Sem número — toca no lápis para adicionar"}
+                  !mbwayTelemovel && "text-muted-foreground/35 italic font-normal text-xs")}>
+                  {mbwayTelemovel || "Sem número"}
                 </p>
-                <button onClick={() => { setEditingTel(true); setDraftTel(mbwayTelemovel) }}
-                  className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all shrink-0 active:scale-95">
-                  <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                </button>
+                {!locked ? (
+                  <button onClick={() => { setEditingTel(true); setDraftTel(mbwayTelemovel) }}
+                    className="w-8 h-8 rounded-xl bg-muted/60 hover:bg-muted border border-border/30 flex items-center justify-center transition-all shrink-0 active:scale-95">
+                    <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" />
+                  </button>
+                ) : <Lock className="h-3.5 w-3.5 text-red-400/60 shrink-0" />}
               </div>
             )}
           </div>
@@ -491,107 +496,96 @@ function TaxaHorariaCard({ taxa }: { taxa: number }) {
   const [visible, setVisible] = useState(false)
 
   return (
-    <Card
-      icon={<Euro className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
-      gradient="from-amber-500 to-orange-500"
+    <Section
+      icon={<Euro className="h-4 w-4" />}
+      gradient="from-amber-400 via-orange-400 to-rose-400"
       title="Taxa Horária"
     >
-      <div className="flex items-center gap-3 px-3 sm:px-4 py-3.5">
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-1.5">Taxa atual</p>
-          {visible ? (
-            <div className="flex items-baseline gap-1 animate-in fade-in duration-200">
-              <span className="text-2xl sm:text-3xl font-black tabular-nums text-foreground">
-                {taxa.toFixed(2)}
-              </span>
-              <span className="text-base sm:text-lg font-bold text-muted-foreground">€</span>
-              <span className="text-xs sm:text-sm text-muted-foreground/60 ml-0.5">/hora</span>
+      <div className="px-4 py-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-2">Taxa atual</p>
+            {visible ? (
+              <div className="flex items-baseline gap-1.5 animate-in fade-in duration-200">
+                <span className="text-4xl sm:text-5xl font-black tabular-nums tracking-tight">{taxa.toFixed(2)}</span>
+                <span className="text-xl font-bold text-muted-foreground">€</span>
+                <span className="text-sm text-muted-foreground/60">/hora</span>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-4xl sm:text-5xl font-black tabular-nums tracking-widest text-muted-foreground/30 select-none">••••</span>
+                <span className="text-xl font-bold text-muted-foreground/30">€</span>
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-center gap-2 shrink-0">
+            <button
+              onClick={() => setVisible(v => !v)}
+              className={cn(
+                "w-12 h-12 rounded-2xl flex items-center justify-center transition-all active:scale-90 shadow-sm",
+                visible
+                  ? "bg-amber-100 dark:bg-amber-950/40 hover:bg-amber-200 dark:hover:bg-amber-900/50"
+                  : "bg-muted/60 hover:bg-muted border border-border/30"
+              )}
+            >
+              {visible
+                ? <EyeOff className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                : <Eye className="h-5 w-5 text-muted-foreground/50" />
+              }
+            </button>
+            <div className="w-12 h-12 rounded-2xl bg-muted/40 border border-border/20 flex items-center justify-center">
+              <Lock className="h-4.5 w-4.5 text-muted-foreground/30" />
             </div>
-          ) : (
-            <div className="flex items-baseline gap-1">
-              <span className="text-2xl sm:text-3xl font-black tabular-nums text-foreground tracking-widest select-none">
-                ••••
-              </span>
-              <span className="text-base sm:text-lg font-bold text-muted-foreground">€</span>
-              <span className="text-xs sm:text-sm text-muted-foreground/60 ml-0.5">/hora</span>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setVisible(v => !v)}
-            className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/40 hover:bg-amber-200 dark:hover:bg-amber-900/50 flex items-center justify-center transition-all active:scale-95"
-            title={visible ? "Esconder taxa" : "Mostrar taxa"}
-          >
-            {visible
-              ? <EyeOff className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-amber-600 dark:text-amber-400" />
-              : <Eye className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-amber-600 dark:text-amber-400" />
-            }
-          </button>
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-muted/60 flex items-center justify-center">
-            <Lock className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-muted-foreground/40" />
           </div>
         </div>
-      </div>
 
-      <div className="px-3 sm:px-4 pb-4">
-        <div className="flex items-start gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 px-3 py-2.5 rounded-2xl border border-amber-200/50 dark:border-amber-800/50">
+        <div className="mt-4 flex items-start gap-2 text-xs bg-amber-50/80 dark:bg-amber-950/20 px-3.5 py-3 rounded-2xl border border-amber-200/40 dark:border-amber-800/30">
           <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-amber-500" />
-          <span className="font-medium">Definida pela gestão. Contacta o supervisor para alterações.</span>
+          <span className="font-medium text-amber-700/80 dark:text-amber-300/70">Definida pela gestão. Contacta o supervisor para alterações.</span>
         </div>
       </div>
-    </Card>
+    </Section>
   )
 }
 
 // ── UI Primitives ─────────────────────────────────────────────────────────────
-function Card({
-  icon, gradient, title, children,
-}: {
+function Section({ icon, gradient, title, children }: {
   icon: React.ReactNode; gradient: string; title: string; children: React.ReactNode
 }) {
   return (
-    <div className="rounded-3xl border border-border/50 bg-card shadow-sm overflow-hidden w-full">
-      <div className="flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 border-b border-border/30">
+    <div className="rounded-3xl border border-border/40 bg-card/80 backdrop-blur-sm shadow-sm overflow-hidden w-full">
+      <div className="flex items-center gap-3 px-4 py-4 border-b border-border/20 bg-muted/10">
         <div className={cn(
-          "w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm",
+          "w-8 h-8 rounded-xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-md",
           gradient
         )}>
           <span className="text-white">{icon}</span>
         </div>
-        <p className="text-sm font-bold tracking-tight truncate">{title}</p>
+        <p className="text-sm font-bold tracking-tight">{title}</p>
       </div>
       <div>{children}</div>
     </div>
   )
 }
 
-function RowItem({ children }: { children: React.ReactNode }) {
-  return <div className="flex items-center gap-3 px-3 sm:px-4 py-3 sm:py-3.5">{children}</div>
+function SectionDivider() {
+  return <div className="h-px bg-border/20 mx-4" />
 }
 
-function ActionRow({
-  icon, iconGradient, label, description, onClick,
-}: {
+function ActionRow({ icon, iconGradient, label, description, onClick }: {
   icon: React.ReactNode; iconGradient: string; label: string; description: string; onClick: () => void
 }) {
   return (
-    <button
-      onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 text-sm hover:bg-muted/40 transition-colors active:scale-[0.99] group"
-    >
-      <div className={cn(
-        "w-8 h-8 sm:w-9 sm:h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm",
-        iconGradient
-      )}>
+    <button onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-4 text-sm hover:bg-muted/40 transition-all active:scale-[0.99] group">
+      <div className={cn("w-9 h-9 rounded-2xl bg-gradient-to-br flex items-center justify-center shrink-0 shadow-sm", iconGradient)}>
         <span className="text-white">{icon}</span>
       </div>
       <div className="flex-1 text-left min-w-0">
         <p className="font-semibold truncate">{label}</p>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">{description}</p>
       </div>
-      <ChevronRight className="h-4 w-4 text-muted-foreground/30 shrink-0 group-hover:translate-x-0.5 transition-transform" />
+      <ChevronRight className="h-4 w-4 text-muted-foreground/25 shrink-0 group-hover:translate-x-0.5 transition-transform" />
     </button>
   )
 }
@@ -617,7 +611,6 @@ export function SettingsView() {
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null)
 
-  // ── Load profile ──────────────────────────────────────────────────────────
   useEffect(() => {
     if (!user?.uid) { setLoadingProfile(false); return }
     getDoc(doc(db, "users", user.uid))
@@ -629,9 +622,11 @@ export function SettingsView() {
             telemovel: d.telemovel || "",
             banco: d.banco || "",
             iban: d.iban || "",
+            ibanLocked: d.ibanLocked ?? false,
             mbwayAtivo: d.mbwayAtivo || false,
             mbwayTelemovel: d.mbwayTelemovel || d.telemovel || "",
             mbwayTitular: d.mbwayTitular || "",
+            mbwayLocked: d.mbwayLocked ?? false,
             fotoUrl: d.fotoUrl || "",
             fotoLocked: d.fotoLocked ?? false,
             nomeLocked: d.nomeLocked ?? false,
@@ -642,19 +637,16 @@ export function SettingsView() {
       .finally(() => setLoadingProfile(false))
   }, [user?.uid])
 
-  // ── Save field ────────────────────────────────────────────────────────────
   const saveField = async (field: keyof UserProfile, value: string | boolean) => {
     if (!user?.uid) return
     setProfile(prev => ({ ...prev, [field]: value }))
     await setDoc(doc(db, "users", user.uid), { [field]: value }, { merge: true })
   }
 
-  // ── Photo upload ──────────────────────────────────────────────────────────
   const handleFileChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ""
     if (!file || !user?.uid) return
-
     setShowPhotoOptions(false)
     setUploadingPhoto(true)
     setUploadProgress(0)
@@ -672,7 +664,6 @@ export function SettingsView() {
     }
   }
 
-  // ── Username ──────────────────────────────────────────────────────────────
   const handleSaveUsername = async () => {
     if (!user?.uid || !editedUsername.trim()) return
     setSavingUsername(true)
@@ -681,11 +672,8 @@ export function SettingsView() {
       await saveField("username", novoNome)
       syncCollaboratorName(user.uid, novoNome).catch(console.error)
       setIsEditingUsername(false)
-    } catch {
-      alert("Erro ao guardar o nome.")
-    } finally {
-      setSavingUsername(false)
-    }
+    } catch { alert("Erro ao guardar o nome.") }
+    finally { setSavingUsername(false) }
   }
 
   const handleCopyUid = () => {
@@ -698,7 +686,6 @@ export function SettingsView() {
     try { await logout() } catch { alert("Erro ao terminar a sessão.") }
   }
 
-  // ── Backup ────────────────────────────────────────────────────────────────
   const exportarDados = async () => {
     const conteudo = JSON.stringify(data)
     if (!conteudo) { setSyncMessage("Não há dados para exportar."); setSyncSuccess(false); return }
@@ -742,90 +729,82 @@ export function SettingsView() {
     ? "A carregar..."
     : profile.username || user?.displayName || user?.email?.split("@")[0] || "Utilizador"
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <>
-      {/* Inputs de foto — SEMPRE no DOM */}
-      <input
-        id="foto-perfil-selfie"
-        type="file"
-        accept="image/*"
-        capture="user"
-        className="sr-only"
-        onChange={handleFileChosen}
-      />
-      <input
-        id="foto-perfil-galeria"
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={handleFileChosen}
-      />
+      <input id="foto-perfil-selfie" type="file" accept="image/*" capture="user" className="sr-only" onChange={handleFileChosen} />
+      <input id="foto-perfil-galeria" type="file" accept="image/*" className="sr-only" onChange={handleFileChosen} />
 
       <ScrollArea className="h-full">
-        <div className="min-h-full bg-gradient-to-b from-slate-50 to-slate-100/50 dark:from-slate-950 dark:to-slate-900">
+        <div className="min-h-full bg-gradient-to-b from-slate-50 via-white to-slate-50/50 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900">
           <div className="pb-28 md:pb-16 w-full max-w-xl mx-auto">
 
-            {/* Hero */}
-            <div className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 px-4 sm:px-5 pt-8 sm:pt-10 pb-7 sm:pb-8">
-              <div className="relative flex items-center gap-3 sm:gap-4">
-                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
-                  <Settings2 className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">Definições</h1>
-                  <p className="text-xs sm:text-sm text-slate-400 mt-0.5">JBricolage · v1.0</p>
+            {/* ── Hero Header ── */}
+            <div className="relative overflow-hidden">
+              {/* Background with mesh gradient */}
+              <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 dark:from-slate-950 dark:via-slate-900 dark:to-black" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-600/20 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-indigo-600/15 via-transparent to-transparent" />
+              {/* Subtle grid pattern */}
+              <div className="absolute inset-0 opacity-[0.03]" style={{
+                backgroundImage: "linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)",
+                backgroundSize: "32px 32px"
+              }} />
+
+              <div className="relative px-4 sm:px-6 pt-8 sm:pt-10 pb-8 sm:pb-10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-xl shadow-blue-500/30">
+                    <Settings2 className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">Definições</h1>
+                    <p className="text-xs sm:text-sm text-slate-400 mt-0.5 font-medium">JBricolage · v1.0</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="space-y-3 sm:space-y-4 px-3 sm:px-4 pt-4 sm:pt-5">
+            <div className="space-y-3 px-3 sm:px-4 pt-4">
 
-              {/* PERFIL */}
-              <Card
-                icon={<User className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
-                gradient="from-blue-500 to-indigo-600"
-                title="Perfil"
-              >
+              {/* ── PERFIL ── */}
+              <Section icon={<User className="h-4 w-4" />} gradient="from-blue-500 to-indigo-600" title="Perfil">
                 {user ? (
                   <>
-                    {/* Foto + Nome */}
-                    <div className="px-3 sm:px-4 py-4 sm:py-5 flex items-center gap-3 sm:gap-4 border-b border-border/20">
+                    {/* ── Avatar + Info row ── */}
+                    <div className="px-4 py-5 flex items-center gap-4 border-b border-border/15">
                       <div className="relative shrink-0">
                         <Avatar fotoUrl={profile.fotoUrl} nome={displayName} size="lg" />
 
+                        {/* Upload overlay */}
                         {uploadingPhoto && (
-                          <div className="absolute inset-0 rounded-3xl bg-black/50 flex flex-col items-center justify-center gap-1 pointer-events-none">
-                            <Loader2 className="h-5 w-5 text-white animate-spin" />
-                            <span className="text-[10px] font-bold text-white">{uploadProgress}%</span>
+                          <div className="absolute inset-0 rounded-[1.25rem] bg-black/55 flex flex-col items-center justify-center gap-1.5 pointer-events-none">
+                            <Loader2 className="h-6 w-6 text-white animate-spin" />
+                            <span className="text-[11px] font-bold text-white tabular-nums">{uploadProgress}%</span>
                           </div>
                         )}
 
-                        {profile.fotoLocked ? (
-                          <LockedPhotoButton />
-                        ) : (
+                        {profile.fotoLocked ? <LockedPhotoButton /> : (
                           <button
                             type="button"
                             onClick={() => !uploadingPhoto && setShowPhotoOptions(true)}
                             disabled={uploadingPhoto}
-                            className="absolute -bottom-1 -right-1 w-7 h-7 sm:w-8 sm:h-8 rounded-2xl bg-blue-600 hover:bg-blue-500 border-2 border-background flex items-center justify-center transition-all shadow-md active:scale-90 disabled:opacity-60"
+                            className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-400 hover:to-indigo-500 border-[3px] border-background flex items-center justify-center transition-all shadow-lg active:scale-90 disabled:opacity-60"
                           >
-                            <Camera className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-white" />
+                            <Camera className="h-3.5 w-3.5 text-white" />
                           </button>
                         )}
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm sm:text-base font-bold truncate">{displayName}</p>
+                        <p className="text-base sm:text-lg font-bold truncate leading-tight">{displayName}</p>
                         {uploadingPhoto ? (
-                          <div className="flex items-center gap-2 mt-1">
-                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-blue-500 rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
+                          <div className="flex items-center gap-2 mt-2">
+                            <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                              <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-200" style={{ width: `${uploadProgress}%` }} />
                             </div>
-                            <span className="text-[10px] font-semibold text-blue-500 tabular-nums shrink-0">{uploadProgress}%</span>
+                            <span className="text-[10px] font-bold text-blue-500 tabular-nums shrink-0">{uploadProgress}%</span>
                           </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground truncate mt-0.5">{user.email || "—"}</p>
+                          <p className="text-xs text-muted-foreground/70 truncate mt-1">{user.email || "—"}</p>
                         )}
                       </div>
                     </div>
@@ -833,45 +812,37 @@ export function SettingsView() {
                     {/* Photo Bottom Sheet */}
                     {showPhotoOptions && !profile.fotoLocked && (
                       <>
-                        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setShowPhotoOptions(false)} />
-                        <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-xl mx-auto px-3 sm:px-4 pb-5 sm:pb-6 animate-in slide-in-from-bottom-4 duration-300">
-                          <div className="rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden">
+                        <div className="fixed inset-0 z-40 bg-black/50 backdrop-blur-md" onClick={() => setShowPhotoOptions(false)} />
+                        <div className="fixed bottom-0 left-0 right-0 z-50 w-full max-w-xl mx-auto px-3 pb-5 animate-in slide-in-from-bottom-4 duration-300">
+                          <div className="rounded-3xl bg-card border border-border/40 shadow-2xl overflow-hidden">
                             <div className="flex justify-center pt-3 pb-1">
                               <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
                             </div>
-                            <p className="text-center text-sm font-bold text-muted-foreground pb-3 pt-1">
-                              Alterar foto de perfil
-                            </p>
-                            <div className="grid grid-cols-2 gap-2 sm:gap-3 px-3 sm:px-4 pb-4 sm:pb-5">
-                              <label
-                                htmlFor="foto-perfil-selfie"
-                                className="flex flex-col items-center gap-2 sm:gap-3 py-4 sm:py-5 px-2 sm:px-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-all active:scale-95 cursor-pointer select-none"
-                              >
-                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 pointer-events-none">
-                                  <Camera className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                            <p className="text-center text-sm font-bold text-muted-foreground pb-4 pt-2">Alterar foto de perfil</p>
+                            <div className="grid grid-cols-2 gap-2.5 px-3 pb-4">
+                              <label htmlFor="foto-perfil-selfie"
+                                className="flex flex-col items-center gap-3 py-5 px-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/40 dark:border-blue-800/40 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition-all active:scale-95 cursor-pointer select-none">
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-blue-500/30 pointer-events-none">
+                                  <Camera className="h-7 w-7 text-white" />
                                 </div>
                                 <div className="text-center pointer-events-none">
                                   <p className="text-sm font-bold text-blue-700 dark:text-blue-300">Tirar selfie</p>
-                                  <p className="text-[11px] text-blue-500/70 mt-0.5">Câmara frontal</p>
+                                  <p className="text-[11px] text-blue-500/60 mt-0.5">Câmara frontal</p>
                                 </div>
                               </label>
-                              <label
-                                htmlFor="foto-perfil-galeria"
-                                className="flex flex-col items-center gap-2 sm:gap-3 py-4 sm:py-5 px-2 sm:px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all active:scale-95 cursor-pointer select-none"
-                              >
-                                <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shadow-lg shadow-slate-500/20 pointer-events-none">
-                                  <ImageIcon className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                              <label htmlFor="foto-perfil-galeria"
+                                className="flex flex-col items-center gap-3 py-5 px-3 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200/40 dark:border-slate-700/40 hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-all active:scale-95 cursor-pointer select-none">
+                                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-600 to-slate-800 flex items-center justify-center shadow-xl shadow-slate-500/20 pointer-events-none">
+                                  <ImageIcon className="h-7 w-7 text-white" />
                                 </div>
                                 <div className="text-center pointer-events-none">
                                   <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Galeria</p>
-                                  <p className="text-[11px] text-slate-500/70 mt-0.5">Escolher foto</p>
+                                  <p className="text-[11px] text-slate-500/60 mt-0.5">Escolher foto</p>
                                 </div>
                               </label>
                             </div>
-                            <button
-                              onClick={() => setShowPhotoOptions(false)}
-                              className="w-full py-3.5 sm:py-4 text-sm font-semibold text-muted-foreground border-t border-border/30 hover:bg-muted/40 transition-colors"
-                            >
+                            <button onClick={() => setShowPhotoOptions(false)}
+                              className="w-full py-4 text-sm font-semibold text-muted-foreground border-t border-border/20 hover:bg-muted/30 transition-colors">
                               Cancelar
                             </button>
                           </div>
@@ -879,13 +850,13 @@ export function SettingsView() {
                       </>
                     )}
 
-                    {/* Nome com bloqueio */}
-                    <div className="border-b border-border/20 px-3 sm:px-4 py-3">
-                      <label className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold flex items-center gap-1.5 mb-2">
-                        <User className="h-3 w-3 opacity-60" />Nome
+                    {/* ── Nome ── */}
+                    <div className="border-b border-border/15 px-4 py-3.5">
+                      <label className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black flex items-center gap-1.5 mb-2.5">
+                        <User className="h-3 w-3 opacity-50" />Nome
                       </label>
                       {isEditingUsername ? (
-                        <div className="flex items-center gap-1.5 sm:gap-2">
+                        <div className="flex items-center gap-2">
                           <Input
                             value={editedUsername}
                             onChange={e => setEditedUsername(e.target.value)}
@@ -896,40 +867,40 @@ export function SettingsView() {
                             onKeyDown={e => e.key === "Enter" && handleSaveUsername()}
                           />
                           <button onClick={handleSaveUsername} disabled={savingUsername || !editedUsername.trim()}
-                            className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-sm shadow-emerald-500/30">
+                            className="w-10 h-10 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white flex items-center justify-center transition-all shrink-0 disabled:opacity-50 active:scale-95 shadow-md shadow-emerald-500/25">
                             {savingUsername ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                           </button>
                           <button onClick={() => setIsEditingUsername(false)} disabled={savingUsername}
-                            className="w-10 h-10 rounded-xl border border-border/40 hover:bg-muted flex items-center justify-center transition-all shrink-0 active:scale-95">
+                            className="w-10 h-10 rounded-xl border border-border/40 hover:bg-muted/60 flex items-center justify-center transition-all shrink-0 active:scale-95">
                             <X className="h-4 w-4 text-muted-foreground" />
                           </button>
                         </div>
                       ) : profile.nomeLocked ? (
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-medium truncate flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-2xl bg-red-50/80 dark:bg-red-950/20 border border-red-200/40 dark:border-red-800/30">
+                          <p className="text-sm font-medium truncate flex-1 min-w-0 text-red-900/70 dark:text-red-200/60">
                             {profile.username || "Sem nome definido"}
                           </p>
-                          <div className="w-8 h-8 rounded-xl bg-red-100 dark:bg-red-950 flex items-center justify-center">
-                            <Lock className="h-3.5 w-3.5 text-red-500" />
+                          <div className="h-5 w-5 rounded-lg bg-red-100 dark:bg-red-900/40 flex items-center justify-center shrink-0">
+                            <Lock className="h-3 w-3 text-red-500" />
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={cn("text-sm font-medium truncate flex-1 min-w-0", !profile.username && "text-muted-foreground/40 italic font-normal")}>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className={cn("text-sm font-medium truncate flex-1 min-w-0",
+                            !profile.username && "text-muted-foreground/35 italic font-normal")}>
                             {profile.username || "Sem nome definido"}
                           </p>
                           <button
                             onClick={() => { setIsEditingUsername(true); setEditedUsername(profile.username || user.displayName || user.email?.split("@")[0] || "") }}
-                            className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-all shrink-0 active:scale-95"
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                            className="w-8 h-8 rounded-xl bg-muted/60 hover:bg-muted border border-border/30 flex items-center justify-center transition-all shrink-0 active:scale-95">
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground/60" />
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* Telemóvel */}
-                    <div className="border-b border-border/20">
+                    {/* ── Telemóvel ── */}
+                    <div className="border-b border-border/15">
                       <EditableField
                         label="Telemovel"
                         value={profile.telemovel}
@@ -940,23 +911,25 @@ export function SettingsView() {
                       />
                     </div>
 
-                    {/* Email read-only */}
-                    <div className="border-b border-border/20 px-3 sm:px-4 py-3">
-                      <label className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-2 block">Email</label>
-                      <p className="text-sm text-muted-foreground truncate">{user.email || "—"}</p>
+                    {/* ── Email read-only ── */}
+                    <div className="border-b border-border/15 px-4 py-3.5">
+                      <label className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-2.5 block">Email</label>
+                      <p className="text-sm text-muted-foreground/70 truncate">{user.email || "—"}</p>
                     </div>
 
-                    {/* UID */}
-                    <div className="border-b border-border/20">
-                      <div className="flex items-center gap-2 px-3 sm:px-4 py-3">
+                    {/* ── UID ── */}
+                    <div className="border-b border-border/15">
+                      <div className="flex items-center gap-3 px-4 py-3.5">
                         <div className="flex-1 min-w-0">
-                          <p className="text-[10px] uppercase tracking-[0.1em] text-muted-foreground/50 font-bold mb-1">ID da conta</p>
-                          <p className="text-xs font-mono text-muted-foreground truncate">{user.uid.slice(0, 8)}…{user.uid.slice(-4)}</p>
+                          <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground/40 font-black mb-1.5">ID da conta</p>
+                          <p className="text-xs font-mono text-muted-foreground/60 truncate">{user.uid.slice(0, 8)}…{user.uid.slice(-4)}</p>
                         </div>
                         <button
-                          className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-muted transition-all shrink-0 active:scale-95"
                           onClick={handleCopyUid}
-                        >
+                          className={cn(
+                            "h-9 w-9 flex items-center justify-center rounded-xl transition-all shrink-0 active:scale-95",
+                            copiedUid ? "bg-emerald-50 dark:bg-emerald-950/30" : "bg-muted/60 hover:bg-muted border border-border/30"
+                          )}>
                           {copiedUid
                             ? <Check className="h-4 w-4 text-emerald-500" />
                             : <Copy className="h-4 w-4 text-muted-foreground/50" />
@@ -965,40 +938,38 @@ export function SettingsView() {
                       </div>
                     </div>
 
-                    {/* Logout */}
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-3 px-3 sm:px-4 py-3.5 sm:py-4 text-sm font-semibold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors active:scale-[0.99] group"
-                    >
-                      <div className="w-9 h-9 rounded-2xl bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0 group-hover:bg-red-200 dark:group-hover:bg-red-900/50 transition-colors">
+                    {/* ── Logout ── */}
+                    <button onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-4 py-4 text-sm font-semibold text-red-500 hover:bg-red-50/60 dark:hover:bg-red-950/15 transition-all active:scale-[0.99] group">
+                      <div className="w-9 h-9 rounded-2xl bg-red-50 dark:bg-red-950/30 border border-red-200/40 dark:border-red-800/30 flex items-center justify-center shrink-0 group-hover:bg-red-100 dark:group-hover:bg-red-900/40 transition-colors">
                         <LogOut className="h-4 w-4 text-red-500" />
                       </div>
                       Terminar sessão
-                      <ChevronRight className="h-4 w-4 ml-auto opacity-30" />
+                      <ChevronRight className="h-4 w-4 ml-auto text-red-400/40 group-hover:translate-x-0.5 transition-transform" />
                     </button>
                   </>
                 ) : (
-                  <div className="px-3 sm:px-4 py-3">
+                  <div className="px-4 py-4">
                     <p className="text-sm text-muted-foreground">Não estás autenticado.</p>
                   </div>
                 )}
-              </Card>
+              </Section>
 
-              {/* INFORMAÇÃO DE PAGAMENTO */}
+              {/* ── INFORMAÇÃO DE PAGAMENTO ── */}
               {user && (
-                <Card
-                  icon={<CreditCard className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
-                  gradient="from-emerald-500 to-teal-600"
+                <Section
+                  icon={<CreditCard className="h-4 w-4" />}
+                  gradient="from-emerald-500 to-teal-500"
                   title="Informação de Pagamento"
                 >
-                  <div className="px-3 sm:px-4 pt-3 pb-1">
-                    <div className="flex items-start gap-2 text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/30 px-3 py-2.5 rounded-2xl border border-blue-200/50 dark:border-blue-800/50">
-                      <Info className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-500" />
-                      <span className="font-medium">Dados privados — visíveis apenas para a gestão.</span>
+                  <div className="px-4 pt-4 pb-1">
+                    <div className="flex items-start gap-2.5 text-xs bg-blue-50/80 dark:bg-blue-950/20 px-3.5 py-3 rounded-2xl border border-blue-200/40 dark:border-blue-800/30">
+                      <Shield className="h-3.5 w-3.5 shrink-0 mt-0.5 text-blue-500" />
+                      <span className="font-semibold text-blue-700/80 dark:text-blue-300/70">Dados privados — visíveis apenas para a gestão.</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-border/20 mt-3">
+                  <div className="border-t border-border/15 mt-4">
                     <EditableField
                       label="Banco"
                       value={profile.banco}
@@ -1009,38 +980,40 @@ export function SettingsView() {
                     />
                   </div>
 
-                  <div className="border-t border-border/20">
-                    <EditableField
-                      label="IBAN"
-                      value={profile.iban}
-                      placeholder="ex: PT50 0000 0000 0000 0000 0000 0"
-                      icon={<Hash className="h-3 w-3" />}
-                      onSave={v => saveField("iban", v)}
-                      sensitive
-                      confirmIfFilled
-                    />
-                  </div>
+                  <SectionDivider />
 
-                  <div className="border-t border-border/20">
-                    <MBwayToggle
-                      enabled={profile.mbwayAtivo}
-                      mbwayTelemovel={profile.mbwayTelemovel}
-                      mbwayTitular={profile.mbwayTitular}
-                      iban={profile.iban}
-                      onToggle={v => saveField("mbwayAtivo", v)}
-                      onSaveTelemovel={v => saveField("mbwayTelemovel", v)}
-                      onSaveTitular={v => saveField("mbwayTitular", v)}
-                    />
-                  </div>
-                </Card>
+                  <EditableField
+                    label="IBAN"
+                    value={profile.iban}
+                    placeholder="ex: PT50 0000 0000 0000 0000 0000 0"
+                    icon={<Hash className="h-3 w-3" />}
+                    onSave={v => saveField("iban", v)}
+                    sensitive
+                    confirmIfFilled
+                    locked={profile.ibanLocked}
+                  />
+
+                  <SectionDivider />
+
+                  <MBwayToggle
+                    enabled={profile.mbwayAtivo}
+                    mbwayTelemovel={profile.mbwayTelemovel}
+                    mbwayTitular={profile.mbwayTitular}
+                    iban={profile.iban}
+                    locked={profile.mbwayLocked}
+                    onToggle={v => saveField("mbwayAtivo", v)}
+                    onSaveTelemovel={v => saveField("mbwayTelemovel", v)}
+                    onSaveTitular={v => saveField("mbwayTitular", v)}
+                  />
+                </Section>
               )}
 
-              {/* TAXA HORÁRIA */}
+              {/* ── TAXA HORÁRIA ── */}
               <TaxaHorariaCard taxa={data.settings.taxaHoraria} />
 
-              {/* BACKUP & SYNC */}
-              <Card
-                icon={<DatabaseBackup className="h-4 w-4 sm:h-4.5 sm:w-4.5" />}
+              {/* ── BACKUP & SYNC ── */}
+              <Section
+                icon={<DatabaseBackup className="h-4 w-4" />}
                 gradient="from-violet-500 to-purple-600"
                 title="Backup & Sincronização"
               >
@@ -1051,9 +1024,7 @@ export function SettingsView() {
                   description="Partilhar ou guardar backup"
                   onClick={exportarDados}
                 />
-
-                <div className="h-px bg-border/20 mx-3 sm:mx-4" />
-
+                <SectionDivider />
                 <ActionRow
                   icon={<Upload className="h-4 w-4" />}
                   iconGradient="from-violet-500 to-purple-600"
@@ -1063,21 +1034,21 @@ export function SettingsView() {
                 />
                 <input type="file" accept=".json" ref={fileInputRef} onChange={importarDeArquivo} className="hidden" />
 
-                <div className="px-3 sm:px-4 pb-4 pt-3 border-t border-border/20 space-y-3 mt-1">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/50">
+                <div className="px-4 pb-4 pt-4 border-t border-border/15 space-y-3 mt-1">
+                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground/40">
                     Ou cola o JSON de backup:
                   </p>
                   <Textarea
                     value={textoColado}
                     onChange={e => setTextoColado(e.target.value)}
                     placeholder='{"entries":[...],"payments":[...],...}'
-                    className="min-h-[90px] font-mono text-xs resize-none bg-muted/30 border-border/40 rounded-2xl"
+                    className="min-h-[90px] font-mono text-xs resize-none bg-muted/30 border-border/30 rounded-2xl"
                   />
                   <Button
                     onClick={importarTextoColado}
                     disabled={!textoColado.trim()}
                     variant="secondary"
-                    className="w-full h-10 rounded-xl font-semibold"
+                    className="w-full h-10 rounded-xl font-bold"
                   >
                     Importar texto colado
                   </Button>
@@ -1085,21 +1056,20 @@ export function SettingsView() {
 
                 {syncMessage && (
                   <div className={cn(
-                    "mx-3 sm:mx-4 mb-4 flex items-start gap-3 px-3 sm:px-4 py-3.5 rounded-2xl text-sm border font-medium",
+                    "mx-4 mb-4 flex items-start gap-3 px-4 py-3.5 rounded-2xl text-sm border font-medium",
                     syncSuccess
-                      ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-200/60 dark:border-emerald-800/40"
-                      : "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border-red-200/60 dark:border-red-800/40"
+                      ? "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-200/50 dark:border-emerald-800/30"
+                      : "bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 border-red-200/50 dark:border-red-800/30"
                   )}>
                     {syncSuccess
-                      ? <CheckCircle2 className="h-4.5 w-4.5 mt-0.5 shrink-0 text-emerald-500" />
-                      : <AlertCircle className="h-4.5 w-4.5 mt-0.5 shrink-0 text-red-500" />
+                      ? <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0 text-emerald-500" />
+                      : <AlertCircle className="h-4 w-4 mt-0.5 shrink-0 text-red-500" />
                     }
                     <span>{syncMessage}</span>
                   </div>
                 )}
-              </Card>
+              </Section>
 
-              {/* PWA & Migration */}
               <InstallPWAButton />
               <MigrateLegacyDataButton />
 
