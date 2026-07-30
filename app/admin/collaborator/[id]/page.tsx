@@ -925,6 +925,7 @@ export default function CollaboratorDetailPage() {
                     collaboratorName={collaborator.name}
                     currentRate={collaborator.currentRate}
                     entries={collaborator.entries}
+                    isAdmin={true}
                   />
                 </TabsContent>
 

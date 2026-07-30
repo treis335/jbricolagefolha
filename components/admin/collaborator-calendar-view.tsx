@@ -12,12 +12,14 @@ import { cn, fmt, resolveEntryTaxa } from "@/lib/utils"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { formatLocalDate } from "@/lib/date-utils"
 import { CollaboratorReportsView } from "@/components/admin/collaborator-reports-view"
+import { EntryRateOverride } from "@/components/admin/entry-rate-override"
 
 interface CollaboratorCalendarViewProps {
   collaboratorId: string
   collaboratorName: string
   currentRate: number
   entries: any[]
+  isAdmin?: boolean   // mostra botão "Alterar Taxa" e multi-select
 }
 
 
@@ -279,12 +281,17 @@ export function CollaboratorCalendarView({
   collaboratorName,
   currentRate,
   entries,
+  isAdmin = false,
 }: CollaboratorCalendarViewProps) {
 
-  const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
-  const [selectedEntry, setSelectedEntry] = useState<any>(null)
-  const [modalOpen, setModalOpen] = useState(false)
+  const [currentMonth,    setCurrentMonth]    = useState<Date>(new Date())
+  const [selectedEntry,   setSelectedEntry]   = useState<any>(null)
+  const [modalOpen,       setModalOpen]       = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState(false)
+  // ── Rate override (admin only) ──
+  const [rateMode,        setRateMode]        = useState(false)   // multi-select active
+  const [selectedDates,   setSelectedDates]   = useState<string[]>([])
+  const [lastSelected,    setLastSelected]    = useState<string | null>(null)
 
   const entryMap = useMemo(() => {
     const map = new Map<string, any>()
@@ -333,9 +340,30 @@ export function CollaboratorCalendarView({
     return { totalHours, normalHours, extraHours, daysWorked, totalCost }
   }, [entries, currentMonth, currentRate])
 
-  const handleDayClick = (date: Date | null) => {
+  const handleDayClick = (date: Date | null, shiftKey = false) => {
     if (!date) return
     const dateStr = formatLocalDate(date)
+
+    if (rateMode) {
+      // Multi-select: shift-click = range, normal click = toggle
+      if (shiftKey && lastSelected) {
+        const allDays = calendarDays.filter(Boolean).map(d => formatLocalDate(d!.date))
+        const a = allDays.indexOf(lastSelected)
+        const b = allDays.indexOf(dateStr)
+        const range = allDays.slice(Math.min(a, b), Math.max(a, b) + 1)
+        setSelectedDates(prev => {
+          const set = new Set([...prev, ...range])
+          return Array.from(set)
+        })
+      } else {
+        setSelectedDates(prev =>
+          prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr]
+        )
+        setLastSelected(dateStr)
+      }
+      return
+    }
+
     const entry = entryMap.get(dateStr)
     if (entry) { setSelectedEntry(entry); setModalOpen(true) }
   }
@@ -387,16 +415,22 @@ export function CollaboratorCalendarView({
           return (
             <button
               key={`${dateStr}-${index}`}
-              onClick={() => handleDayClick(date)}
-              disabled={!hasEntry}
+              onClick={e => handleDayClick(date, e.shiftKey)}
+              disabled={!rateMode && !hasEntry}
               className={cn(
                 "flex flex-col items-center justify-center relative transition-all select-none border-r border-b",
                 isLastCol && "border-r-0",
                 compact ? "h-9" : "aspect-square",
-                !hasEntry && "cursor-default",
-                isWeekend && !hasEntry && (compact ? "bg-muted/20" : "bg-muted/30"),
-                hasEntry && !isAbsence && "cursor-pointer hover:bg-primary/5 active:scale-95 bg-primary/[0.04]",
-                isAbsence && "cursor-pointer hover:bg-amber-50/60 bg-amber-50/30",
+                // Rate-mode styles
+                rateMode && "cursor-pointer",
+                rateMode && selectedDates.includes(dateStr) && "bg-primary/15 ring-inset ring-2 ring-primary/40",
+                rateMode && !selectedDates.includes(dateStr) && hasEntry && "hover:bg-primary/5",
+                rateMode && !hasEntry && "opacity-30 cursor-default",
+                // Normal mode styles
+                !rateMode && !hasEntry && "cursor-default",
+                !rateMode && isWeekend && !hasEntry && (compact ? "bg-muted/20" : "bg-muted/30"),
+                !rateMode && hasEntry && !isAbsence && "cursor-pointer hover:bg-primary/5 active:scale-95 bg-primary/[0.04]",
+                !rateMode && isAbsence && "cursor-pointer hover:bg-amber-50/60 bg-amber-50/30",
               )}
             >
               {isToday && (
@@ -461,6 +495,21 @@ export function CollaboratorCalendarView({
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+          {/* Admin: Alterar Taxa button */}
+          {isAdmin && (
+            <button
+              onClick={() => { setRateMode(r => !r); setSelectedDates([]) }}
+              className={cn(
+                "shrink-0 flex items-center gap-1.5 px-2.5 h-9 rounded-xl border transition-colors text-xs font-medium",
+                rateMode
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card text-foreground border-border hover:bg-muted"
+              )}
+            >
+              <Euro className="h-3.5 w-3.5" />
+              <span className="hidden xs:inline">{rateMode ? "Cancelar" : "Taxa"}</span>
+            </button>
+          )}
           {/* Relatório button */}
           <button
             onClick={() => setReportModalOpen(true)}
@@ -504,7 +553,27 @@ export function CollaboratorCalendarView({
           </div>
         </div>
 
+        {/* Rate mode tip */}
+        {rateMode && isAdmin && (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary/8 border border-primary/20 text-xs text-primary/80 font-medium">
+            <Euro className="h-3.5 w-3.5 shrink-0" />
+            Toca nos dias para seleccionar · Shift+toque para intervalo
+          </div>
+        )}
+
         <CalendarGrid compact={false} />
+
+        {/* Rate override panel */}
+        {rateMode && isAdmin && selectedDates.length > 0 && (
+          <EntryRateOverride
+            collaboratorId={collaboratorId}
+            collaboratorName={collaboratorName}
+            selectedDates={selectedDates}
+            allEntries={entries}
+            defaultRate={currentRate}
+            onDone={() => { setSelectedDates([]); setRateMode(false) }}
+          />
+        )}
 
         <div className="flex items-center justify-center gap-5 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-primary" />Trabalhado</span>
@@ -535,11 +604,31 @@ export function CollaboratorCalendarView({
             </div>
           </div>
           <CalendarGrid compact={true} />
+          {/* Rate mode tip */}
+          {rateMode && isAdmin && (
+            <p className="text-[10px] text-primary/70 font-medium flex items-center gap-1">
+              <Euro className="h-2.5 w-2.5" />
+              Clica nos dias para seleccionar · Shift+clique para intervalo
+            </p>
+          )}
+
           <div className="flex items-center gap-4 text-[11px] text-muted-foreground pt-0.5">
             <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-primary" />Trabalhado</span>
             <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Ausência</span>
             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded ring-1 ring-primary/40" />Hoje</span>
           </div>
+
+          {/* Rate override panel desktop */}
+          {rateMode && isAdmin && selectedDates.length > 0 && (
+            <EntryRateOverride
+              collaboratorId={collaboratorId}
+              collaboratorName={collaboratorName}
+              selectedDates={selectedDates}
+              allEntries={entries}
+              defaultRate={currentRate}
+              onDone={() => { setSelectedDates([]); setRateMode(false) }}
+            />
+          )}
         </div>
 
         <div className="w-48 shrink-0 space-y-2.5 pt-7">
