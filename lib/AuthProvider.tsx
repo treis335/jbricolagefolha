@@ -99,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth)
     setUser(null)
     setIsSuspended(false)
+    // Redireciona para o logout do Google para limpar a sessão em cache
+    // Ao voltar, o login page vai pedir para selecionar conta novamente
     router.push("/login")
   }
 
@@ -171,6 +173,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider()
+    // Força o seletor de conta Google sempre — sem cache de sessão
+    provider.setCustomParameters({ prompt: "select_account" })
     try {
       const result = await signInWithPopup(auth, provider)
       setUser(result.user)
