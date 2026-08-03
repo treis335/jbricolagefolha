@@ -2,6 +2,7 @@
 "use client"
 
 import { useState } from "react"
+import { useCollaborators } from "@/hooks/useCollaborators"
 import { Calendar, BarChart3, History, Clock, FileBarChart, Download, ChevronRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { MonthlyReportModal }     from "@/components/admin/monthly-report-modal"
@@ -150,14 +151,15 @@ function ReportCard({ report, onClick }: { report: typeof REPORTS[0]; onClick?: 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function AdminReportsView() {
   const [open, setOpen] = useState<string|null>(null)
+  const { collaborators } = useCollaborators()
 
   return (
     <>
-      <MonthlyReportModal     open={open==="monthly"}     onClose={()=>setOpen(null)} />
-      <AnnualReportModal      open={open==="annual"}       onClose={()=>setOpen(null)} />
-      <RateHistoryModal       open={open==="rates"}        onClose={()=>setOpen(null)} />
-      <HoursReportModal       open={open==="hours"}        onClose={()=>setOpen(null)} />
-      <PerformanceReportModal open={open==="performance"}  onClose={()=>setOpen(null)} />
+      <MonthlyReportModal     open={open==="monthly"}     onClose={()=>setOpen(null)} collaborators={collaborators} />
+      <AnnualReportModal      open={open==="annual"}       onClose={()=>setOpen(null)} collaborators={collaborators} />
+      <RateHistoryModal       open={open==="rates"}        onClose={()=>setOpen(null)} collaborators={collaborators} />
+      <HoursReportModal       open={open==="hours"}        onClose={()=>setOpen(null)} collaborators={collaborators} />
+      <PerformanceReportModal open={open==="performance"}  onClose={()=>setOpen(null)} collaborators={collaborators} />
 
       <div className="h-full w-full overflow-y-auto overflow-x-hidden">
         <div className="px-4 sm:px-6 py-6 pb-28 md:py-10 md:pb-12 max-w-5xl mx-auto w-full space-y-8">

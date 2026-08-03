@@ -97,8 +97,7 @@ async function exportPDF(rows: HistoryRow[], collaborators: any[]) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function RateHistoryModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { collaborators, loading } = useCollaborators()
+export function RateHistoryModal({ open, onClose, collaborators = [] }: { open: boolean; onClose: () => void; collaborators?: import("@/hooks/useCollaborators").Collaborator[] }) {
   const [search, setSearch]   = useState("")
   const [exporting, setExp]   = useState(false)
 
@@ -157,7 +156,7 @@ export function RateHistoryModal({ open, onClose }: { open: boolean; onClose: ()
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
-          {loading ? (
+          {false ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-7 h-7 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
             </div>

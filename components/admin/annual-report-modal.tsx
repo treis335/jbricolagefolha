@@ -115,8 +115,7 @@ async function exportPDF(months: MonthSummary[], collabs: CollabAnnual[], year: 
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function AnnualReportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { collaborators, loading } = useCollaborators()
+export function AnnualReportModal({ open, onClose, collaborators = [] }: { open: boolean; onClose: () => void; collaborators?: import("@/hooks/useCollaborators").Collaborator[] }) {
   const [year, setYear]     = useState(currentYear)
   const [tab,  setTab]      = useState<"mensal"|"colaboradores">("mensal")
   const [exporting, setExp] = useState<"csv"|"pdf"|null>(null)
@@ -179,7 +178,7 @@ export function AnnualReportModal({ open, onClose }: { open: boolean; onClose: (
         </div>
 
         {/* KPIs */}
-        {!loading && hasData && (
+        {!false && hasData && (
           <div className="grid grid-cols-4 divide-x border-b shrink-0">
             {[
               {icon:Users,       label:"Colaboradores", value:`${collabs.length}`,          color:"text-foreground"},
@@ -208,7 +207,7 @@ export function AnnualReportModal({ open, onClose }: { open: boolean; onClose: (
 
         {/* Content */}
         <div className="flex-1 overflow-auto">
-          {loading ? (
+          {false ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-7 h-7 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
             </div>

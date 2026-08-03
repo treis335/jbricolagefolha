@@ -52,8 +52,7 @@ async function exportPDF(rows: MonthRow[], monthKey: string, label: string) {
   doc.save(`relatorio-mensal-${monthKey}.pdf`)
 }
 
-export function MonthlyReportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { collaborators, loading } = useCollaborators()
+export function MonthlyReportModal({ open, onClose, collaborators = [] }: { open: boolean; onClose: () => void; collaborators?: import("@/hooks/useCollaborators").Collaborator[] }) {
   const [monthKey, setMonthKey]   = useState(getTodayKey)
   const [exporting, setExporting] = useState<"csv"|"pdf"|null>(null)
   useEffect(()=>{ if(open) setMonthKey(getTodayKey()) },[open])
@@ -115,7 +114,7 @@ export function MonthlyReportModal({ open, onClose }: { open: boolean; onClose: 
           </button>
         </div>
 
-        {!loading && rows.length>0 && (
+        {!false && rows.length>0 && (
           <div className="grid grid-cols-4 divide-x border-b shrink-0">
             {[
               {icon:Users,       label:"Ativos",   value:`${rows.length}`,             color:"text-foreground"},
@@ -132,7 +131,7 @@ export function MonthlyReportModal({ open, onClose }: { open: boolean; onClose: 
         )}
 
         <div className="flex-1 overflow-auto">
-          {loading ? (
+          {false ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-7 h-7 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
             </div>
