@@ -5,20 +5,32 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  // Force clients to use new SW immediately
+  clientsClaim: true,
   workboxOptions: {
+    // Bump this string to force ALL users to get fresh cache
+    cacheId: 'jbricolage-v3',
+    skipWaiting: true,
+    clientsClaim: true,
+    // Clean old caches on activate
+    cleanupOutdatedCaches: true,
     runtimeCaching: [
       {
         urlPattern: /\.(?:png|jpg|jpeg|svg|webp|ico|gif)$/,
-        handler: 'CacheFirst',
+        handler: 'NetworkFirst',
         options: {
-          cacheName: 'images',
-          expiration: { maxEntries: 100, maxAgeSeconds: 30 * 24 * 60 * 60 },
+          cacheName: 'jbricolage-images-v3',
+          expiration: { maxEntries: 100, maxAgeSeconds: 7 * 24 * 60 * 60 },
+          networkTimeoutSeconds: 5,
         },
       },
       {
         urlPattern: /\.(?:js|css)$/,
-        handler: 'StaleWhileRevalidate',
-        options: { cacheName: 'static-resources' },
+        handler: 'NetworkFirst',
+        options: {
+          cacheName: 'jbricolage-static-v3',
+          networkTimeoutSeconds: 5,
+        },
       },
     ],
   },

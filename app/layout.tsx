@@ -69,6 +69,23 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               {children}
             </div>
             <Analytics />
+            {/* Force SW update + clear old caches for all users */}
+            <script dangerouslySetInnerHTML={{ __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(regs => {
+                  regs.forEach(reg => {
+                    reg.update();
+                  });
+                });
+                caches.keys().then(keys => {
+                  keys.forEach(key => {
+                    if (!key.includes('v3')) {
+                      caches.delete(key);
+                    }
+                  });
+                });
+              }
+            ` }} />
           </WorkTrackerProvider>
         </AuthProvider>
       </body>
