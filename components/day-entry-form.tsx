@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/sheet"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
-  Plus, Minus, X, Trash2, Users, Check, Loader2,
+  Plus, Minus, X, Trash2, Users, UserPlus, Check, Loader2,
   Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
@@ -202,6 +202,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const [showTeamDialog, setShowTeamDialog] = useState(false)
   const [tempEquipa, setTempEquipa] = useState<Collaborator[]>([])
   const [teamFilter, setTeamFilter] = useState("")
+  const [manualName, setManualName] = useState("")
   const [showObraPicker, setShowObraPicker] = useState(false)
   const [obraInfoSheet, setObraInfoSheet] = useState<Obra | null>(null)
   const [unlinkServiceId, setUnlinkServiceId] = useState<string | null>(null)
@@ -299,6 +300,16 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     return allCollaborators.filter(c => c.nome.toLowerCase().includes(f))
   }, [teamFilter, allCollaborators])
 
+  const addManualMember = () => {
+    const name = manualName.trim()
+    if (!name) return
+    const already = tempEquipa.some(m => m.nome.toLowerCase() === name.toLowerCase())
+    if (!already) {
+      setTempEquipa(prev => [...prev, { uid: null, nome: name, isLegacy: true }])
+    }
+    setManualName("")
+  }
+
   const openTeamSelector = () => {
     const current: Collaborator[] = []
     if (activeService?.equipa) {
@@ -309,6 +320,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     }
     setTempEquipa(current)
     setTeamFilter("")
+    setManualName("")
     setShowTeamDialog(true)
   }
 
@@ -808,6 +820,28 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 onChange={e => setTeamFilter(e.target.value)}
                 className="pl-10 h-11 rounded-xl bg-muted/40 border-border/40 focus-visible:ring-primary/20 text-sm"
               />
+            </div>
+
+            {/* ── Adicionar membro manual ── */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <UserPlus className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40 pointer-events-none" />
+                <Input
+                  placeholder="Nome manual (ex: João Silva)..."
+                  value={manualName}
+                  onChange={e => setManualName(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && addManualMember()}
+                  className="pl-10 h-11 rounded-xl bg-amber-50/60 dark:bg-amber-950/15 border-amber-200/60 dark:border-amber-800/40 focus-visible:ring-amber-400/20 text-sm placeholder:text-muted-foreground/40"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addManualMember}
+                disabled={!manualName.trim()}
+                className="h-11 px-4 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-30 disabled:cursor-not-allowed text-white text-sm font-bold transition-all active:scale-95 shrink-0"
+              >
+                + Adicionar
+              </button>
             </div>
 
             {tempEquipa.length > 0 && (

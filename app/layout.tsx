@@ -20,7 +20,7 @@ export const viewport: Viewport = {
   userScalable: false,
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)",  color: "#0f0f14" },
+    { media: "(prefers-color-scheme: dark)",  color: "#ffffff" },
   ],
   viewportFit: "cover",
 }
@@ -32,7 +32,8 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "JBricolage",
+    title: "JBricolage App",
+    startupImage: ["/apple-icon.png"],
   },
   icons: {
     icon: [
