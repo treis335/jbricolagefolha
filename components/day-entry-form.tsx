@@ -450,20 +450,20 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
           <div className="flex flex-col h-full overflow-hidden">
             {/* Header */}
-            <div className="px-5 pt-3 pb-4 shrink-0">
+            <div className="px-4 pt-2.5 pb-3 shrink-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                    <span className={`inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full ${isEditing ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"}`}>
+                    <span className={`inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${isEditing ? "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"}`}>
                       {isEditing ? "✏️ Editar" : "✨ Novo"}
                     </span>
                     {isWeekend && (
-                      <span className="inline-flex items-center text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
+                      <span className="inline-flex items-center text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400">
                         🔆 Extra
                       </span>
                     )}
                   </div>
-                  {date && <SheetTitle className="text-2xl font-black leading-tight text-foreground capitalize">{date.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</SheetTitle>}
+                  {date && <SheetTitle className="text-lg font-black leading-tight text-foreground capitalize">{date.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</SheetTitle>}
                   {totalHoras > 0 && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
                       ≈ {fmt(totalHoras * data.settings.taxaHoraria)}
@@ -476,11 +476,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 space-y-4 pb-10">
+            <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-6">
 
               {/* ── Horas do dia ── */}
               <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-border/25 flex items-center justify-between">
+                <div className="px-3.5 py-2 border-b border-border/25 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="h-3.5 w-3.5 text-muted-foreground/50" />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Horas do dia</span>
@@ -492,22 +492,22 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     </div>
                   )}
                 </div>
-                <div className="p-4 space-y-3">
+                <div className="p-3 space-y-2.5">
                   {/* Main stepper */}
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
                       onClick={() => adjustHours(-1)}
-                      className="w-14 h-14 rounded-2xl border-2 border-border/40 bg-background hover:bg-muted hover:border-border active:scale-90 flex items-center justify-center transition-all press-effect shadow-sm"
+                      className="w-11 h-11 rounded-2xl border-2 border-border/40 bg-background hover:bg-muted hover:border-border active:scale-90 flex items-center justify-center transition-all press-effect shadow-sm"
                     >
-                      <Minus className="h-5 w-5 text-foreground/60" />
+                      <Minus className="h-4 w-4 text-foreground/60" />
                     </button>
                     <div className="flex-1 flex flex-col items-center">
                       <Input
                         type="number"
                         value={totalHoras}
                         onChange={e => { const v = Number(e.target.value); if (!isNaN(v)) setTotalHoras(Math.max(0, Math.floor(v))) }}
-                        className="w-full h-16 text-center text-5xl font-black border-0 bg-transparent shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tracking-tighter"
+                        className="w-full h-12 text-center text-4xl font-black border-0 bg-transparent shadow-none focus-visible:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none tracking-tighter"
                         min={0}
                         step={1}
                       />
@@ -518,9 +518,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     <button
                       type="button"
                       onClick={() => adjustHours(1)}
-                      className="w-14 h-14 rounded-2xl border-2 border-border/40 bg-background hover:bg-muted hover:border-border active:scale-90 flex items-center justify-center transition-all press-effect shadow-sm"
+                      className="w-11 h-11 rounded-2xl border-2 border-border/40 bg-background hover:bg-muted hover:border-border active:scale-90 flex items-center justify-center transition-all press-effect shadow-sm"
                     >
-                      <Plus className="h-5 w-5 text-foreground/60" />
+                      <Plus className="h-4 w-4 text-foreground/60" />
                     </button>
                   </div>
                   {/* Quick preset chips */}
@@ -530,15 +530,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                         key={h}
                         type="button"
                         onClick={() => setTotalHoras(h)}
-                        className={`py-2 rounded-xl text-xs font-bold transition-all press-effect border ${
-                          totalHoras === h
-                            ? h === 0
-                              ? "bg-orange-100 border-orange-300 text-orange-700 dark:bg-orange-950/40 dark:border-orange-800 dark:text-orange-400 shadow-sm"
-                              : "bg-primary/10 border-primary/30 text-primary shadow-sm"
-                            : "bg-background border-border/40 text-muted-foreground hover:bg-muted/60 hover:border-border"
-                        }`}
+                        className={`py-1.5 rounded-xl text-[11px] font-bold transition-all press-effect border ${totalHoras === h ? h === 0 ? 'bg-orange-100 border-orange-300 text-orange-700 dark:bg-orange-950/40 dark:border-orange-800 dark:text-orange-400 shadow-sm' : 'bg-primary/10 border-primary/30 text-primary shadow-sm' : 'bg-background border-border/40 text-muted-foreground hover:bg-muted/60 hover:border-border'}`}
                       >
-                        {h === 0 ? "Aus." : `${h}h`}
+                        {h === 0 ? "Aus." : h + "h"}
                       </button>
                     ))}
                   </div>
@@ -548,7 +542,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
               {/* ── Serviços ── */}
               <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-border/25 flex items-center justify-between">
+                <div className="px-3.5 py-2 border-b border-border/25 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Hammer className="h-3.5 w-3.5 text-muted-foreground/50" />
                     <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
@@ -578,11 +572,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     )}
 
                     {services.map(s => (
-                      <TabsContent key={s.id} value={s.id} className="p-4 space-y-4 mt-0">
+                      <TabsContent key={s.id} value={s.id} className="px-3 py-3 space-y-3 mt-0">
 
                         {/* ── Obra / Serviço — manual first, list as secondary action ── */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Obra / Serviço</label>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.08em]">Obra</label>
                           
 
                           {s.obraId && s.obraObj ? (
@@ -595,10 +589,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                             />
                           ) : s.obraId && !s.obraObj ? (
                             // A carregar obra
-                            <div className="flex items-center gap-3 p-3.5 rounded-2xl border border-primary/18 bg-primary/[0.02]">
+                            <div className="flex items-center gap-2.5 p-3 rounded-2xl border border-primary/18 bg-primary/[0.02]">
                               <div className="w-10 h-10 rounded-xl bg-muted animate-pulse shrink-0" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate">{s.obraNome}</p>
+                                <p className="text-[13px] font-semibold truncate">{s.obraNome}</p>
                                 <p className="text-[11px] text-primary/40 mt-0.5">A carregar...</p>
                               </div>
                               <button type="button" onClick={() => handleUnlinkAttempt(s.id)} className="w-8 h-8 rounded-lg border border-border/35 bg-background hover:bg-red-50 flex items-center justify-center transition-all shrink-0">
@@ -612,14 +606,14 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 value={s.obraNome}
                                 onChange={e => updateService(s.id, { obraNome: e.target.value })}
                                 placeholder="Nome da obra..."
-                                className="flex-1 h-11 bg-background border-border/45 rounded-xl text-sm focus-visible:ring-primary/20"
+                                className="flex-1 h-9 bg-background border-border/45 rounded-xl text-[13px] focus-visible:ring-primary/20"
                                 autoFocus={false}
                               />
                               <button
                                 type="button"
                                 onClick={() => { setActiveServiceId(s.id); setShowObraPicker(true) }}
                                 title="Escolher da lista de obras"
-                                className="h-11 px-3.5 rounded-xl border border-primary/25 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 flex items-center gap-1.5 transition-all shrink-0 group press-effect"
+                                className="h-9 px-2.5 rounded-xl border border-primary/25 bg-primary/5 hover:bg-primary/10 hover:border-primary/40 flex items-center gap-1.5 transition-all shrink-0 group press-effect"
                               >
                                 <Search className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
                                 <span className="text-xs font-bold text-primary/60 group-hover:text-primary transition-colors">Lista</span>
@@ -629,13 +623,13 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                         </div>
 
                         {/* ── Descrição ── */}
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest">Descrição do trabalho</label>
+                        <div className="space-y-1.5">
+                          <label className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.08em]">Descrição</label>
                           <Textarea
                             value={s.descricao}
                             onChange={e => updateService(s.id, { descricao: e.target.value })}
                             placeholder="O que foi feito..."
-                            className="min-h-[96px] bg-background border-border/45 rounded-xl text-sm resize-none focus-visible:ring-primary/20 leading-relaxed"
+                            className="min-h-[72px] bg-background border-border/45 rounded-xl text-[13px] resize-none focus-visible:ring-primary/20 leading-relaxed"
                           />
                         </div>
 
@@ -648,9 +642,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                         />
 
                         {/* ── Equipa ── */}
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-bold text-muted-foreground/50 uppercase tracking-widest flex items-center gap-1.5">
+                            <label className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.08em] flex items-center gap-1">
                               <Users className="h-3 w-3" /> Equipa
                             </label>
                             {s.equipa.length > 0 && (
@@ -658,7 +652,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 type="button"
                                 onClick={openTeamSelector}
                                 disabled={loadingCollaborators}
-                                className="text-[10px] font-semibold text-primary hover:text-primary/70 transition-colors flex items-center gap-0.5 disabled:opacity-50 px-2 py-0.5 rounded-lg hover:bg-primary/8"
+                                className="text-[9px] font-semibold text-primary hover:text-primary/70 transition-colors flex items-center gap-0.5 disabled:opacity-50 px-1.5 py-0.5 rounded-lg hover:bg-primary/8"
                               >
                                 Editar <ChevronRight className="h-2.5 w-2.5" />
                               </button>
@@ -669,7 +663,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                               type="button"
                               onClick={openTeamSelector}
                               disabled={loadingCollaborators}
-                              className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-dashed border-border/50 bg-muted/20 hover:bg-muted/50 hover:border-border transition-all text-sm text-muted-foreground/50 hover:text-muted-foreground"
+                              className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-border/50 bg-muted/20 hover:bg-muted/50 hover:border-border transition-all text-[12px] text-muted-foreground/50 hover:text-muted-foreground"
                             >
                               <Users className="h-4 w-4" />
                               <span>Tocar para selecionar equipa…</span>
@@ -691,7 +685,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                         : "bg-primary/7 border-primary/15 text-primary"
                                     }`}
                                   >
-                                    <div className={`w-5 h-5 rounded-lg shrink-0 flex items-center justify-center text-white text-[9px] font-bold ${colors[colorIdx]}`}>
+                                    <div className={`w-4 h-4 rounded-md shrink-0 flex items-center justify-center text-white text-[8px] font-bold ${colors[colorIdx]}`}>
                                       {initials || "?"}
                                     </div>
                                     {nome}
