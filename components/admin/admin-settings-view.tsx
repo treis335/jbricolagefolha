@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FirebaseExportButton } from "@/components/admin/FirebaseExportButton"
 import { cn } from "@/lib/utils"
+import { useGlobalSettings, saveGlobalSettings } from "@/lib/useGlobalSettings"
+import { useState } from "react"
+import { Check, Loader2 } from "lucide-react"
 
 // ─── section card wrapper ──────────────────────────────────────────────────────
 function SectionCard({
@@ -84,6 +87,133 @@ function FutureRow({ icon, label, desc }: { icon: React.ReactNode; label: string
 }
 
 // ─── main ─────────────────────────────────────────────────────────────────────
+// ─── Bloqueio de dias card ────────────────────────────────────────────────────
+function DiasBloqueioCard() {
+  const { settings, loading } = useGlobalSettings()
+  const [value,   setValue]   = useState<number | null>(null)
+  const [saving,  setSaving]  = useState(false)
+  const [saved,   setSaved]   = useState(false)
+
+  const current = value !== null ? value : (settings.diasBloqueio ?? 0)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await saveGlobalSettings({ diasBloqueio: current })
+      setValue(null)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const hasChange = value !== null && value !== settings.diasBloqueio
+
+  return (
+    <SectionCard
+      icon={<Lock className="h-4 w-4" />}
+      title="Bloqueio de Dias"
+      description="Define quantos dias os colaboradores têm para editar um registo"
+    >
+      {loading ? (
+        <div className="px-5 py-4 flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">A carregar…</span>
+        </div>
+      ) : (
+        <div className="px-5 py-4 space-y-4">
+          <p className="text-xs text-muted-foreground/70 leading-relaxed">
+            Após este prazo, os colaboradores não conseguem editar nem preencher dias antigos.
+            <strong className="text-foreground"> 0 = sem bloqueio</strong> (comportamento atual).
+          </p>
+
+          {/* Slider + display */}
+          <div className="flex items-center gap-4">
+            <div className="flex-1 space-y-1">
+              <input
+                type="range" min={0} max={30} step={1}
+                value={current}
+                onChange={e => setValue(Number(e.target.value))}
+                className="w-full h-2 appearance-none rounded-full bg-muted accent-primary cursor-pointer"
+              />
+              <div className="flex justify-between">
+                <span className="text-[9px] text-muted-foreground/40 font-bold">Desativado</span>
+                <span className="text-[9px] text-muted-foreground/40 font-bold">30 dias</span>
+              </div>
+            </div>
+            <div className="flex flex-col items-center justify-center w-16 h-14 rounded-xl bg-muted/40 border border-border/50 shrink-0">
+              <span className="text-xl font-black tabular-nums text-foreground leading-none">
+                {current === 0 ? "∞" : current}
+              </span>
+              <span className="text-[9px] text-muted-foreground/50 font-bold uppercase tracking-wide mt-0.5">
+                {current === 0 ? "livre" : current === 1 ? "dia" : "dias"}
+              </span>
+            </div>
+          </div>
+
+          {/* Quick presets */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-muted-foreground/50 font-bold uppercase tracking-wider shrink-0">Rápido:</span>
+            {[0, 3, 5, 7, 14].map(v => (
+              <button key={v} onClick={() => setValue(v)}
+                className={cn(
+                  "px-2.5 py-1 rounded-lg text-xs font-bold border transition-all",
+                  current === v
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-muted/40 text-muted-foreground border-border/50 hover:border-border"
+                )}>
+                {v === 0 ? "Sem limite" : `${v}d`}
+              </button>
+            ))}
+          </div>
+
+          {/* Status / info */}
+          {current > 0 ? (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30">
+              <svg width="14" height="14" className="text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+              <p className="text-[11px] text-amber-700/80 dark:text-amber-400/70 leading-relaxed">
+                Colaboradores têm <strong>{current} dia{current !== 1 ? "s" : ""}</strong> para preencher ou editar cada dia.
+                Após esse prazo, o dia fica 🔒 trancado para eles.
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-muted/30 border border-border/30">
+              <svg width="14" height="14" className="text-muted-foreground/40 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+              </svg>
+              <p className="text-[11px] text-muted-foreground/60">
+                Sem bloqueio — colaboradores podem editar qualquer dia no passado.
+              </p>
+            </div>
+          )}
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            disabled={!hasChange || saving}
+            className={cn(
+              "w-full h-10 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2",
+              hasChange
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                : "bg-muted/50 text-muted-foreground/50 cursor-not-allowed"
+            )}
+          >
+            {saving ? <><Loader2 className="h-4 w-4 animate-spin" />A guardar…</>
+            : saved  ? <><Check className="h-4 w-4" />Guardado!</>
+            : hasChange ? "Guardar alteração"
+            : "Sem alterações"}
+          </button>
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 export function AdminSettingsView() {
   const { user, logout } = useAuth()
 
@@ -195,6 +325,9 @@ export function AdminSettingsView() {
           </div>
         </div>
 
+        {/* ── Bloqueio de dias ── */}
+        <DiasBloqueioCard />
+
         {/* ── Funcionalidades futuras ── */}
         <SectionCard
           icon={<Settings className="h-4 w-4" />}
@@ -203,7 +336,6 @@ export function AdminSettingsView() {
         >
           <div className="space-y-0">
             <FutureRow icon={<Building2 className="h-4 w-4" />} label="Configurações da empresa" desc="Dados e informações organizacionais" />
-            <FutureRow icon={<Lock className="h-4 w-4" />} label="Permissões de utilizadores" desc="Gestão de acessos e funções" />
             <FutureRow icon={<Bell className="h-4 w-4" />} label="Notificações e alertas" desc="Configurar alertas automáticos de pagamento" />
             <FutureRow icon={<HardDrive className="h-4 w-4" />} label="Backup automático" desc="Cópias de segurança programadas" />
           </div>

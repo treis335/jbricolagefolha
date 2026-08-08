@@ -1010,53 +1010,7 @@ export function SettingsView() {
               {/* ── TAXA HORÁRIA ── */}
               <TaxaHorariaCard taxa={data.settings.taxaHoraria} />
 
-              {/* ── BLOQUEIO DE DIAS ── */}
-              <Section
-                icon={<svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>}
-                gradient="from-slate-500 to-slate-700"
-                title="Bloqueio de Dias"
-              >
-                <div className="px-4 py-4 space-y-4">
-                  <p className="text-[12px] text-muted-foreground/60 leading-relaxed">
-                    Define após quantos dias um registo fica trancado para edição. <strong>0 = sem bloqueio.</strong>
-                  </p>
-
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <input
-                        type="range"
-                        min={0}
-                        max={30}
-                        step={1}
-                        value={data.settings.diasBloqueio ?? 0}
-                        onChange={e => updateSettings({ diasBloqueio: Number(e.target.value) })}
-                        className="w-full h-2 appearance-none rounded-full bg-muted accent-primary cursor-pointer"
-                      />
-                      <div className="flex justify-between mt-1">
-                        <span className="text-[9px] text-muted-foreground/40 font-bold">0 dias</span>
-                        <span className="text-[9px] text-muted-foreground/40 font-bold">30 dias</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-center shrink-0 w-16 h-12 rounded-xl bg-muted/30 border border-border/50 justify-center">
-                      <span className="text-lg font-black tabular-nums text-foreground">
-                        {data.settings.diasBloqueio ?? 0}
-                      </span>
-                      <span className="text-[9px] text-muted-foreground/40 font-bold uppercase tracking-wide">
-                        {(data.settings.diasBloqueio ?? 0) === 1 ? "dia" : "dias"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {(data.settings.diasBloqueio ?? 0) > 0 && (
-                    <div className="flex items-start gap-2.5 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30">
-                      <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-amber-500 shrink-0 mt-0.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"/><path strokeLinecap="round" strokeLinejoin="round" d="M12 15.75h.007v.008H12v-.008z"/></svg>
-                      <p className="text-[11px] text-amber-700/80 dark:text-amber-400/70 leading-relaxed">
-                        Dias com mais de <strong>{data.settings.diasBloqueio}</strong> dias ficam trancados 🔒. Apenas o administrador pode desbloquear contactando o suporte.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Section>
+              {/* ── BLOQUEIO DE DIAS — controlado pelo admin ── */}
 
               {/* ── BACKUP & SYNC ── */}
               <Section

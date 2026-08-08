@@ -11,6 +11,7 @@ import { useWorkTracker } from "@/lib/work-tracker-context"
 import { cn, fmt } from "@/lib/utils"
 import { formatLocalDate } from "@/lib/date-utils"
 import { isDayLocked } from "@/lib/utils"
+import { useGlobalSettings } from "@/lib/useGlobalSettings"
 import { ReportsView } from "@/components/reports-view"
 
 interface CalendarViewProps {
@@ -297,7 +298,8 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const { data, paidDates } = useWorkTracker()
-  const diasBloqueio = data?.settings?.diasBloqueio ?? 0
+  const { settings: globalSettings } = useGlobalSettings()
+  const diasBloqueio = globalSettings.diasBloqueio ?? 0
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [modalOpen, setModalOpen] = useState(false)

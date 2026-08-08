@@ -210,7 +210,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
 
   const dateStr = date ? formatLocalDate(date) : ""
-  const diasBloqueio = data?.settings?.diasBloqueio ?? 0
+  const { settings: globalSettings } = useGlobalSettings()
+  const diasBloqueio = globalSettings.diasBloqueio ?? 0
   const isLocked = dateStr ? isDayLocked(dateStr, diasBloqueio) : false
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
