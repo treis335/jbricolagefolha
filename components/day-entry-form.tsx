@@ -10,7 +10,7 @@ import { ObraVinculadaCard } from "@/components/forms/obra-vinculada-card"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { formatLocalDate } from "@/lib/date-utils"
-import { fmt } from "@/lib/utils"
+import { fmt, isDayLocked } from "@/lib/utils"
 import {
   Sheet,
   SheetContent,
@@ -210,6 +210,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
 
   const dateStr = date ? formatLocalDate(date) : ""
+  const diasBloqueio = data?.settings?.diasBloqueio ?? 0
+  const isLocked = dateStr ? isDayLocked(dateStr, diasBloqueio) : false
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
@@ -780,7 +782,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={services.length === 0 || isUploading}
+                  disabled={services.length === 0 || isUploading || isLocked}
                   className="w-full h-14 flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none text-white font-bold text-base transition-all shadow-xl shadow-emerald-600/25 press-effect"
                 >
                   {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}

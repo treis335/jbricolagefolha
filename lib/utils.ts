@@ -29,3 +29,17 @@ export function resolveEntryTaxa(entry: any, currentRate: number): number {
   }
   return currentRate
 }
+
+/**
+ * Returns true if the given date is locked for editing.
+ * diasBloqueio=0 means no locking.
+ * diasBloqueio=5 means days older than 5 days are locked.
+ */
+export function isDayLocked(dateISO: string, diasBloqueio: number): boolean {
+  if (!diasBloqueio || diasBloqueio <= 0) return false
+  const date = new Date(dateISO + "T00:00:00")
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diffDays = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+  return diffDays > diasBloqueio
+}

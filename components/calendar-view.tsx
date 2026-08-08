@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { cn, fmt } from "@/lib/utils"
 import { formatLocalDate } from "@/lib/date-utils"
+import { isDayLocked } from "@/lib/utils"
 import { ReportsView } from "@/components/reports-view"
 
 interface CalendarViewProps {
@@ -296,6 +297,7 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
   const [currentMonth, setCurrentMonth] = useState<Date>(new Date())
   const [reportModalOpen, setReportModalOpen] = useState(false)
   const { data, paidDates } = useWorkTracker()
+  const diasBloqueio = data?.settings?.diasBloqueio ?? 0
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -461,6 +463,7 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
               const isWeekend = date.getDay() === 0 || date.getDay() === 6
               const isPast = dateStr < today
               const isMissingWorkday = isPast && !isToday && !hasEntry && !isWeekend
+              const locked = isDayLocked(dateStr, diasBloqueio)
               const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
 
               return (
@@ -477,6 +480,7 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                     hasEntry && !isToday && !isZeroHours && "border-border bg-card hover:bg-muted/40 shadow-sm",
                     isZeroHours && !isToday && "border-amber-400/50 bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-50/60 dark:hover:bg-amber-950/30",
                     isToday && "border-primary/50 bg-primary/5 hover:bg-primary/10 ring-2 ring-primary/40 ring-offset-1 ring-offset-background shadow-sm",
+                    locked && !isToday && "opacity-60 cursor-not-allowed",
                   )}
                 >
                   {/* Absence X */}
@@ -492,6 +496,13 @@ export function CalendarView({ onSelectDate, onAddToday }: CalendarViewProps) {
                     <span aria-hidden className="absolute inset-0 flex items-center justify-center pointer-events-none select-none"
                       style={{ fontSize: "clamp(1.8rem, 6vw, 2.6rem)", fontWeight: 900, color: "rgba(220, 38, 38, 0.20)", lineHeight: 1 }}>
                       ✕
+                    </span>
+                  )}
+
+                  {/* Lock icon */}
+                  {locked && (
+                    <span aria-hidden className="absolute top-1 right-1 z-20 text-[10px] leading-none select-none pointer-events-none opacity-50">
+                      🔒
                     </span>
                   )}
 
