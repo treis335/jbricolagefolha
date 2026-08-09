@@ -80,8 +80,6 @@ export interface Payment {
 export interface Settings {
   taxaHoraria: number
   equipaComum: string[]
-  /** Nº de dias após o qual o dia fica trancado. 0 = sem bloqueio. */
-  diasBloqueio: number
 }
 
 export interface AppData {
@@ -93,7 +91,6 @@ export interface AppData {
 export const defaultSettings: Settings = {
   taxaHoraria: 10,
   equipaComum: [],
-  diasBloqueio: 0,   // 0 = desativado por defeito
 }
 
 export const defaultAppData: AppData = {

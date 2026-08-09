@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { formatLocalDate } from "@/lib/date-utils"
 import { fmt, isDayLocked } from "@/lib/utils"
+import { useGlobalSettings, isUserUnlocked } from "@/lib/useGlobalSettings"
 import {
   Sheet,
   SheetContent,
@@ -24,6 +25,7 @@ import {
   Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
+import { useAuth } from "@/lib/AuthProvider"
 import { type DayEntry, calculateHours } from "@/lib/types"
 import {
   AlertDialog,
@@ -170,6 +172,7 @@ function serviceHasData(s: Service): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const { getEntry, addEntry, deleteEntry, data } = useWorkTracker()
+  const { user } = useAuth()
   const [isUploading, setIsUploading] = useState(false)
   const { activeCollaborators, loading: loadingCollaborators } = useActiveCollaborators()
 
@@ -212,7 +215,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const dateStr = date ? formatLocalDate(date) : ""
   const { settings: globalSettings } = useGlobalSettings()
   const diasBloqueio = globalSettings.diasBloqueio ?? 0
-  const isLocked = dateStr ? isDayLocked(dateStr, diasBloqueio) : false
+  const userUnlocked = user ? isUserUnlocked(globalSettings, user.uid) : false
+  const isLocked = dateStr && !userUnlocked ? isDayLocked(dateStr, diasBloqueio) : false
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false

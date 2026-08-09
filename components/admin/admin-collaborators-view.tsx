@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
 import { useCollaborators, type Collaborator } from "@/hooks/useCollaborators"
+import { useGlobalSettings, isUserUnlocked, unlockUserUntilEndOfDay, revokeUserUnlock } from "@/lib/useGlobalSettings"
 import { doc, setDoc, getDoc, deleteDoc, collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { cn } from "@/lib/utils"
@@ -412,6 +413,44 @@ function DeleteButton({ collaborator, onDone }: { collaborator: CollaboratorExte
         />
       )}
     </>
+  )
+}
+
+
+// ─── Unlock Button ────────────────────────────────────────────────────────────
+function UnlockButton({ uid }: { uid: string }) {
+  const { settings } = useGlobalSettings()
+  const [loading, setLoading] = useState(false)
+  const unlocked = isUserUnlocked(settings, uid)
+
+  const handle = async () => {
+    setLoading(true)
+    try {
+      if (unlocked) await revokeUserUnlock(uid)
+      else          await unlockUserUntilEndOfDay(uid)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
+  }
+
+  if (!(settings.diasBloqueio ?? 0)) return null  // só mostra se bloqueio ativo
+
+  return (
+    <button
+      onClick={handle}
+      disabled={loading}
+      className={unlocked
+        ? "flex items-center gap-2 px-3 h-9 rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-xs font-semibold hover:bg-amber-100 transition-colors disabled:opacity-50"
+        : "flex items-center gap-2 px-3 h-9 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-100 transition-colors disabled:opacity-50"
+      }
+    >
+      {loading
+        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        : unlocked
+          ? <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+          : <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      }
+      {unlocked ? "Revogar acesso" : "Desbloquear hoje"}
+    </button>
   )
 }
 
