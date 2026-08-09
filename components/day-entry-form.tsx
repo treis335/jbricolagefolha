@@ -443,7 +443,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }
 
   const handleDelete = () => {
-    if (dateStr) deleteEntry(dateStr)
+    if (!dateStr || isLocked) return
+    deleteEntry(dateStr)
     onClose()
   }
 
@@ -754,7 +755,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               )}
 
               {/* ── Apagar dia ── */}
-              {isEditing && (
+              {isEditing && !isLocked && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button type="button" className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-border/25 hover:border-destructive/18 hover:bg-destructive/[0.018] transition-all group">
