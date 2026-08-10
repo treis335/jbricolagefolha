@@ -655,7 +655,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                             <label className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-[0.08em] flex items-center gap-1">
                               <Users className="h-3 w-3" /> Equipa
                             </label>
-                            {s.equipa.length > 0 && (
+                            {s.equipa.length > 0 && !isLocked && (
                               <button
                                 type="button"
                                 onClick={openTeamSelector}
@@ -667,6 +667,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                             )}
                           </div>
                           {s.equipa.length === 0 ? (
+                            !isLocked ? (
                             <button
                               type="button"
                               onClick={openTeamSelector}
@@ -676,6 +677,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                               <Users className="h-4 w-4" />
                               <span>Tocar para selecionar equipa…</span>
                             </button>
+                            ) : (
+                              <p className="text-[11px] text-muted-foreground/30 italic">Sem equipa registada</p>
+                            )
                           ) : (
                             <div className="flex items-center gap-2 flex-wrap">
                               {s.equipa.map((nome, index) => {
@@ -697,6 +701,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                       {initials || "?"}
                                     </div>
                                     {nome}
+                                    {!isLocked && (
                                     <button
                                       type="button"
                                       onClick={() => updateService(s.id, {
@@ -706,10 +711,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                       className="w-4 h-4 rounded-full hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center transition-colors"
                                     >
                                       <X className="h-2.5 w-2.5" />
-                                    </button>
+                                    </button>)}
                                   </div>
                                 )
                               })}
+                              {!isLocked && (
                               <button
                                 type="button"
                                 onClick={openTeamSelector}
@@ -718,7 +724,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                 title="Editar equipa"
                               >
                                 <Plus className="h-3.5 w-3.5 text-primary/60" />
-                              </button>
+                              </button>)}
                             </div>
                           )}
                         </div>
@@ -730,7 +736,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               </div>
 
               {/* ── Remover serviço ── */}
-              {services.length > 1 && activeService && (
+              {services.length > 1 && activeService && !isLocked && (
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <button type="button" className="w-full flex items-center justify-between px-4 py-3 rounded-2xl border border-destructive/12 hover:border-destructive/25 hover:bg-destructive/[0.025] transition-all group">
