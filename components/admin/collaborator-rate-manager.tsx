@@ -25,7 +25,8 @@ import { fmt } from "@/lib/utils"
 export interface RateHistoryEntry {
   taxa: number
   taxaAnterior: number | null
-  data: string
+  data: string           // ISO datetime — quando foi registado
+  dataVigencia: string   // "YYYY-MM-DD" — a partir de que dia vale
   alteradoPor: string
   motivo?: string
 }
@@ -64,6 +65,9 @@ function DeltaBadge({ delta }: { delta: number }) {
 
 function HistoryRow({ h, isLatest }: { h: RateHistoryEntry; isLatest: boolean }) {
   const delta = h.taxaAnterior !== null ? h.taxa - h.taxaAnterior : null
+  const vigLabel = h.dataVigencia
+    ? new Date(h.dataVigencia + "T00:00:00").toLocaleDateString("pt-PT", { day:"2-digit", month:"short", year:"numeric" })
+    : null
   return (
     <div className="flex items-start justify-between gap-3 px-3 py-2.5 rounded-lg bg-muted/40 hover:bg-muted/60 transition-colors">
       <div className="flex-1 min-w-0">
@@ -75,6 +79,11 @@ function HistoryRow({ h, isLatest }: { h: RateHistoryEntry; isLatest: boolean })
           {delta !== null && <DeltaBadge delta={delta} />}
           {isLatest && <Badge variant="outline" className="text-[10px] px-1.5 py-0">atual</Badge>}
         </div>
+        {vigLabel && (
+          <p className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold mt-0.5">
+            A partir de {vigLabel}
+          </p>
+        )}
         {h.motivo && (
           <p className="text-xs text-muted-foreground mt-0.5 italic truncate">{h.motivo}</p>
         )}
@@ -97,6 +106,7 @@ export function CollaboratorRateManager({
   const [isEditing, setIsEditing] = useState(false)
   const [newRate, setNewRate] = useState<string>(currentRate.toFixed(2))
   const [motivo, setMotivo] = useState("")
+  const [vigencia, setVigencia] = useState(() => new Date().toISOString().slice(0, 10))
   const [showConfirm, setShowConfirm] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -118,6 +128,7 @@ export function CollaboratorRateManager({
         taxa: parsedRate,
         taxaAnterior: currentRate,
         data: new Date().toISOString(),
+        dataVigencia: vigencia,    // dia a partir do qual a taxa é válida
         alteradoPor: "admin",
         ...(motivo.trim() ? { motivo: motivo.trim() } : {}),
       }
@@ -187,7 +198,7 @@ export function CollaboratorRateManager({
               ) : (
                 <div className="flex gap-1.5">
                   <Button size="icon" variant="ghost" className="h-8 w-8"
-                    onClick={() => { setIsEditing(false); setMotivo(""); setError(null) }}>
+                    onClick={() => { setIsEditing(false); setMotivo(""); setError(null); setVigencia(new Date().toISOString().slice(0, 10)) }}>
                     <X className="h-3.5 w-3.5" />
                   </Button>
                   <Button size="sm" className="h-8 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -200,16 +211,33 @@ export function CollaboratorRateManager({
             </div>
           </div>
 
-          {/* Motivo */}
+          {/* Vigência + Motivo */}
           {isEditing && (
-            <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Motivo (opcional)</Label>
-              <Input
-                placeholder="ex: Aumento anual, Promoção..."
-                value={motivo}
-                onChange={e => setMotivo(e.target.value)}
-                className="h-9 text-sm"
-              />
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-semibold flex items-center gap-1.5">
+                  <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+                  A partir de que dia?
+                </Label>
+                <input
+                  type="date"
+                  value={vigencia}
+                  onChange={e => setVigencia(e.target.value)}
+                  className="w-full h-9 px-3 rounded-lg border border-border/50 bg-background text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+                />
+                <p className="text-[10px] text-muted-foreground/60">
+                  A nova taxa aplica-se a registos <strong>a partir deste dia</strong>. Dias anteriores mantêm a taxa que tinham.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Motivo (opcional)</Label>
+                <Input
+                  placeholder="ex: Aumento anual, Promoção, Destacamento..."
+                  value={motivo}
+                  onChange={e => setMotivo(e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
             </div>
           )}
 
@@ -287,12 +315,16 @@ export function CollaboratorRateManager({
                 <p>Alterar taxa de <strong className="text-foreground">{collaboratorName}</strong>:</p>
                 <div className="bg-muted rounded-xl px-4 py-3 space-y-1.5 text-sm">
                   <div className="flex justify-between">
-                    <span>Atual:</span>
+                    <span>Taxa atual:</span>
                     <strong className="text-foreground">{formatCurrency(currentRate)}/h</strong>
                   </div>
                   <div className="flex justify-between">
-                    <span>Nova:</span>
+                    <span>Nova taxa:</span>
                     <strong className="text-emerald-600">{formatCurrency(parsedRate)}/h</strong>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>A partir de:</span>
+                    <strong className="text-foreground">{new Date(vigencia + "T00:00:00").toLocaleDateString("pt-PT", { day:"2-digit", month:"short", year:"numeric" })}</strong>
                   </div>
                   {motivo && (
                     <div className="flex justify-between gap-4">
@@ -301,7 +333,7 @@ export function CollaboratorRateManager({
                     </div>
                   )}
                 </div>
-                <p className="text-xs">Os dias já registados <strong>mantêm a taxa histórica</strong>. A nova taxa aplica-se apenas a registos futuros.</p>
+                <p className="text-xs">Dias <strong>anteriores a {new Date(vigencia + "T00:00:00").toLocaleDateString("pt-PT", { day:"2-digit", month:"short" })}</strong> mantêm a taxa que tinham. A nova taxa aplica-se apenas a partir daí.</p>
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
