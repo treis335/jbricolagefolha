@@ -389,7 +389,8 @@ export function CalendarView(
   const selectedDateStr = selectedDate ? formatLocalDate(selectedDate) : null
   const selectedEntry = selectedDateStr ? entryMap.get(selectedDateStr) ?? null : null
   const selectedIsPaid = selectedDateStr ? paidDates.has(selectedDateStr) : false
-  const taxa = data.settings?.taxaHoraria ?? 0
+  // taxa usada no detalhe do dia — usa a taxa gravada na entry; fallback para global
+  const taxa = selectedEntry?.taxaHoraria ?? data.settings?.taxaHoraria ?? 0
 
   const selectedDateLabel = useMemo(() => {
     if (!selectedDate) return ""
