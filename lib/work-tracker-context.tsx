@@ -114,12 +114,30 @@ export function WorkTrackerProvider({ children }: { children: ReactNode }) {
               }, { merge: true })
             }
           } else if (workData) {
-            finalData = {
-              entries: Array.isArray(workData.entries) ? workData.entries : [],
-              payments: Array.isArray(workData.payments) ? workData.payments : [],
-              settings: workData.settings
-                ? { ...defaultAppData.settings, ...workData.settings }
-                : defaultAppData.settings,
+            const settings = workData.settings
+              ? { ...defaultAppData.settings, ...workData.settings }
+              : defaultAppData.settings
+            const currentRate = settings.taxaHoraria ?? 0
+
+            // ── Migração silenciosa de entries antigas sem taxaHoraria ──
+            // Estampa a taxa actual em entries que não têm o campo.
+            // Isto garante que um aumento futuro da taxa global NÃO afecta
+            // dias já registados — cada dia fica com o valor que devia ter.
+            const rawEntries = Array.isArray(workData.entries) ? workData.entries : []
+            const needsMigration = rawEntries.some((e: any) => typeof e.taxaHoraria !== "number")
+            const entries = rawEntries.map((e: any) => ({
+              ...e,
+              taxaHoraria: typeof e.taxaHoraria === "number" ? e.taxaHoraria : currentRate,
+            }))
+
+            finalData = { entries, payments: Array.isArray(workData.payments) ? workData.payments : [], settings }
+
+            // Persiste a migração no Firebase se necessário
+            if (needsMigration && currentRate > 0) {
+              // JSON roundtrip elimina undefined — equivalente a removeUndefined
+              const clean = JSON.parse(JSON.stringify(finalData))
+              setDoc(userDocRef, { workData: clean }, { merge: true })
+                .catch(() => {}) // silencioso — não bloqueia o carregamento
             }
           } else {
           }
