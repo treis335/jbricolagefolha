@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { X, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, TrendingUp, Clock, Euro, Users } from "lucide-react"
 import { cn, fmt } from "@/lib/utils"
 import { useCollaborators } from "@/hooks/useCollaborators"
-import { buildCollabMonthData, resolveEntryTaxaFull } from "@/lib/report-utils"
+import { buildCollabMonthData } from "@/lib/report-utils"
 
 function currentYear() { return new Date().getFullYear() }
 

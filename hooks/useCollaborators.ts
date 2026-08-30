@@ -10,7 +10,7 @@ export interface RateHistoryEntry {
   taxa: number
   taxaAnterior: number | null
   data: string           // ISO datetime — quando foi registado
-  dataVigencia: string   // "YYYY-MM-DD" — a partir de que dia vale
+  dataVigencia?: string  // "YYYY-MM-DD" — a partir de que dia vale (opcional)
   alteradoPor: string
   motivo?: string
 }

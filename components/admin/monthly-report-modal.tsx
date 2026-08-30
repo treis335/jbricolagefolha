@@ -5,7 +5,6 @@ import { useState, useMemo, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { X, FileSpreadsheet, FileText, ChevronLeft, ChevronRight, Clock, Euro, CheckCircle2, AlertCircle, Users } from "lucide-react"
 import { cn, fmt } from "@/lib/utils"
-import { useCollaborators } from "@/hooks/useCollaborators"
 import { buildMonthRows, type MonthRow } from "@/lib/report-utils"
 
 function getTodayKey() { return new Date().toISOString().slice(0, 7) }
