@@ -217,6 +217,7 @@ export function AnnualReportModal({ open, onClose, collaborators = [] }: { open:
               <p className="text-sm font-medium">Sem dados para {year}</p>
             </div>
           ) : tab==="mensal" ? (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[500px]">
               <thead className="sticky top-0 bg-muted/60 backdrop-blur-sm">
                 <tr className="border-b border-border/30">
@@ -254,7 +255,9 @@ export function AnnualReportModal({ open, onClose, collaborators = [] }: { open:
                 </tr>
               </tfoot>
             </table>
+            </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[500px]">
               <thead className="sticky top-0 bg-muted/60 backdrop-blur-sm">
                 <tr className="border-b border-border/30">

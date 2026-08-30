@@ -85,7 +85,7 @@ function Lightbox({ fotos, start, onClose }: {
         </button>
       </div>
 
-      <div className="flex-1 flex items-center justify-center px-6 min-h-0 relative" onClick={e => e.stopPropagation()}>
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 min-h-0 relative" onClick={e => e.stopPropagation()}>
         {cur > 0 && (
           <button onClick={() => setCur(c => c-1)}
             className="absolute left-2 z-10 w-10 h-10 rounded-2xl bg-white/8 hover:bg-white/16 flex items-center justify-center transition-all">

@@ -140,7 +140,8 @@ export function MonthlyReportModal({ open, onClose, collaborators = [] }: { open
               <p className="text-sm font-medium">Sem registos para {label}</p>
             </div>
           ) : (
-            <table className="w-full text-sm min-w-[640px]">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
               <thead className="sticky top-0 bg-muted/60 backdrop-blur-sm">
                 <tr className="border-b border-border/30">
                   {["Colaborador","Taxa","H. Norm.","H. Extra","Total H.","Custo","Pago","Pendente"].map(h=>(

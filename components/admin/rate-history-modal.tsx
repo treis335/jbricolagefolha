@@ -166,6 +166,7 @@ export function RateHistoryModal({ open, onClose, collaborators = [] }: { open: 
               <p className="text-sm font-medium">{search ? "Sem resultados" : "Sem histórico de taxas"}</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[560px]">
               <thead className="sticky top-0 bg-muted/60 backdrop-blur-sm">
                 <tr className="border-b border-border/30">
