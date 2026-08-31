@@ -285,8 +285,8 @@ export function AnnualReportModal({ open, onClose, collaborators = [] }: { open:
                 ))}
               </tbody>
             </table>
+            </div>
           )}
-        </div>
 
         {/* Footer */}
         {hasData && (

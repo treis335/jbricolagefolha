@@ -213,8 +213,8 @@ export function RateHistoryModal({ open, onClose, collaborators = [] }: { open: 
                 ))}
               </tbody>
             </table>
+            </div>
           )}
-        </div>
 
         {/* Footer */}
         <div className="shrink-0 px-5 py-4 border-t bg-background flex items-center justify-between gap-3">

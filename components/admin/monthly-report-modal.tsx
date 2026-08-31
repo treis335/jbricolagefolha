@@ -182,8 +182,8 @@ export function MonthlyReportModal({ open, onClose, collaborators = [] }: { open
                 </tr>
               </tfoot>
             </table>
+            </div>
           )}
-        </div>
 
         {rows.length>0 && (
           <div className="shrink-0 px-5 py-4 border-t bg-background flex items-center justify-between gap-3">
