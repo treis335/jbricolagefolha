@@ -90,8 +90,9 @@ export interface MonthData {
  * com taxa histórica correcta e pendente acumulado real
  */
 export function buildCollabMonthData(collab: any): MonthData[] {
-  const entries: any[]  = collab.entries  || []
-  const payments: any[] = [...(collab.payments || [])].sort(
+  if (!collab) return []
+  const entries: any[]  = Array.isArray(collab.entries)  ? collab.entries  : []
+  const payments: any[] = [...(Array.isArray(collab.payments) ? collab.payments : [])].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   )
   const rateHistory: RateHistoryEntry[] = collab.rateHistory || []
@@ -138,6 +139,7 @@ export function buildCollabMonthData(collab: any): MonthData[] {
  * Constrói as linhas do relatório mensal para um mês específico
  */
 export function buildMonthRows(collaborators: any[], monthKey: string): MonthRow[] {
+  if (!Array.isArray(collaborators)) return []
   return collaborators
     .filter(c => c.ativo !== false)
     .map(collab => {

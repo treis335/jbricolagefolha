@@ -1,7 +1,7 @@
 // components/admin/admin-reports-view.tsx
 "use client"
 
-import { useState } from "react"
+import { useState, Component, type ReactNode } from "react"
 import { useCollaborators } from "@/hooks/useCollaborators"
 import { Calendar, BarChart3, History, Clock, FileBarChart, Download, ChevronRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -154,6 +154,7 @@ export function AdminReportsView() {
   const { collaborators } = useCollaborators()
 
   return (
+    <ReportsBoundary>
     <>
       <MonthlyReportModal     open={open==="monthly"}     onClose={()=>setOpen(null)} collaborators={collaborators} />
       <AnnualReportModal      open={open==="annual"}       onClose={()=>setOpen(null)} collaborators={collaborators} />
@@ -230,5 +231,6 @@ export function AdminReportsView() {
         </div>
       </div>
     </>
+    </ReportsBoundary>
   )
 }
