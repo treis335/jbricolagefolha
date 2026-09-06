@@ -30,6 +30,7 @@ export interface Collaborator {
   createdAt: string | null
   migrated?: boolean
   ativo: boolean
+  pendingAmount: number
   entries: DayEntry[]
   payments: Array<{ id: string; date: string; valor: number; metodo: string }>
 }
@@ -110,6 +111,7 @@ export function useCollaborators(): UseCollaboratorsReturn {
           createdAt:         d.createdAt || null,
           migrated:          d.migrated  || false,
           ativo,
+          pendingAmount: 0,
           entries,
           payments,
         }

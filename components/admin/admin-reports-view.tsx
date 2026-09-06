@@ -148,6 +148,32 @@ function ReportCard({ report, onClick }: { report: typeof REPORTS[0]; onClick?: 
   )
 }
 
+// ── Error Boundary ──────────────────────────────────────────────────────────
+class ReportsBoundary extends Component<{ children: ReactNode }, { err: string | null }> {
+  state = { err: null }
+  static getDerivedStateFromError(e: Error) { return { err: e.message } }
+  render() {
+    if (this.state.err) return (
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+        <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/30 flex items-center justify-center">
+          <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-red-500">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+        </div>
+        <div>
+          <p className="text-sm font-bold">Erro ao carregar relatórios</p>
+          <p className="text-xs text-muted-foreground mt-1 max-w-xs opacity-70">{this.state.err}</p>
+        </div>
+        <button onClick={() => this.setState({ err: null })}
+          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold">
+          Tentar novamente
+        </button>
+      </div>
+    )
+    return this.props.children
+  }
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export function AdminReportsView() {
   const [open, setOpen] = useState<string|null>(null)
