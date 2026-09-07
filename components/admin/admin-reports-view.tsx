@@ -1,160 +1,26 @@
 // components/admin/admin-reports-view.tsx
 "use client"
 
-import { useState, Component, type ReactNode } from "react"
+import { useState, Suspense, Component, type ReactNode } from "react"
+import dynamic from "next/dynamic"
 import { useCollaborators } from "@/hooks/useCollaborators"
-import { Calendar, BarChart3, History, Clock, FileBarChart, Download, ChevronRight, Sparkles } from "lucide-react"
+import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { MonthlyReportModal }     from "@/components/admin/monthly-report-modal"
-import { AnnualReportModal }      from "@/components/admin/annual-report-modal"
-import { RateHistoryModal }       from "@/components/admin/rate-history-modal"
-import { HoursReportModal }       from "@/components/admin/hours-report-modal"
-import { PerformanceReportModal } from "@/components/admin/performance-report-modal"
 
-// ── Report definitions ────────────────────────────────────────────────────────
-const REPORTS = [
-  {
-    id: "monthly",
-    icon: Calendar,
-    title: "Relatório Mensal",
-    description: "Horas, custos e pagamentos por colaborador. Taxa histórica correta, pendente real.",
-    gradient: "from-blue-500 to-indigo-600",
-    glow: "shadow-blue-500/20",
-    badge: "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20",
-    tags: ["Horas", "Custos", "Pendente"],
-    formats: ["Excel", "PDF"],
-    ready: true,
-  },
-  {
-    id: "annual",
-    icon: BarChart3,
-    title: "Relatório Anual",
-    description: "Análise do ano completo com tendências mensais e ranking de colaboradores.",
-    gradient: "from-violet-500 to-purple-600",
-    glow: "shadow-violet-500/20",
-    badge: "bg-violet-500/10 text-violet-600 dark:text-violet-400 border-violet-500/20",
-    tags: ["Anual", "Tendências", "KPIs"],
-    formats: ["Excel", "PDF"],
-    ready: true,
-  },
-  {
-    id: "rates",
-    icon: History,
-    title: "Histórico de Taxas",
-    description: "Registo completo de todas as alterações de taxas horárias com auditoria.",
-    gradient: "from-amber-500 to-orange-500",
-    glow: "shadow-amber-500/20",
-    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
-    tags: ["Taxas", "Histórico", "Auditoria"],
-    formats: ["PDF"],
-    ready: true,
-  },
-  {
-    id: "hours",
-    icon: Clock,
-    title: "Relatório de Horas",
-    description: "Detalhe de todas as entradas de horas com filtros avançados por período e colaborador.",
-    gradient: "from-emerald-500 to-teal-500",
-    glow: "shadow-emerald-500/20",
-    badge: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
-    tags: ["Horas", "Detalhado", "Filtros"],
-    formats: ["CSV"],
-    ready: true,
-  },
-  {
-    id: "performance",
-    icon: FileBarChart,
-    title: "Análise de Performance",
-    description: "Métricas de performance da equipa com comparação entre períodos e evolução.",
-    gradient: "from-rose-500 to-pink-600",
-    glow: "shadow-rose-500/20",
-    badge: "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20",
-    tags: ["Performance", "Comparação", "KPIs"],
-    formats: ["CSV"],
-    ready: true,
-  },
-]
+// ── Lazy load every modal — if any fails, only that modal crashes ─────────────
+const MonthlyReportModal     = dynamic(() => import("./monthly-report-modal").then(m => ({ default: m.MonthlyReportModal })),     { ssr: false })
+const AnnualReportModal      = dynamic(() => import("./annual-report-modal").then(m => ({ default: m.AnnualReportModal })),      { ssr: false })
+const RateHistoryModal       = dynamic(() => import("./rate-history-modal").then(m => ({ default: m.RateHistoryModal })),        { ssr: false })
+const HoursReportModal       = dynamic(() => import("./hours-report-modal").then(m => ({ default: m.HoursReportModal })),       { ssr: false })
+const PerformanceReportModal = dynamic(() => import("./performance-report-modal").then(m => ({ default: m.PerformanceReportModal })), { ssr: false })
 
-// ── Report Card ───────────────────────────────────────────────────────────────
-function ReportCard({ report, onClick }: { report: typeof REPORTS[0]; onClick?: () => void }) {
-  const Icon = report.icon
-  return (
-    <div className={cn(
-      "group relative rounded-3xl border bg-card overflow-hidden transition-all duration-200",
-      report.ready
-        ? "border-border/60 hover:border-border hover:shadow-lg cursor-pointer active:scale-[0.99]"
-        : "border-border/30 opacity-60"
-    )}
-      onClick={report.ready ? onClick : undefined}
-    >
-      {/* Top gradient bar */}
-      <div className={cn("h-1 w-full bg-gradient-to-r", report.gradient)} />
-
-      <div className="p-5 space-y-4">
-        {/* Icon + title */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "w-11 h-11 rounded-2xl bg-gradient-to-br flex items-center justify-center shadow-lg shrink-0",
-              report.gradient, report.glow
-            )}>
-              <Icon className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-bold leading-tight">{report.title}</p>
-              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                {report.formats.map(f => (
-                  <span key={f} className={cn(
-                    "text-[10px] font-bold px-1.5 py-0.5 rounded-md border",
-                    report.badge
-                  )}>{f}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-          {report.ready ? (
-            <div className="w-8 h-8 rounded-xl bg-muted/50 group-hover:bg-muted flex items-center justify-center transition-colors shrink-0">
-              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-            </div>
-          ) : (
-            <span className="text-[10px] font-bold px-2 py-1 rounded-lg bg-muted text-muted-foreground/50 shrink-0 whitespace-nowrap">Em breve</span>
-          )}
-        </div>
-
-        {/* Description */}
-        <p className="text-[13px] text-muted-foreground leading-relaxed">{report.description}</p>
-
-        {/* Tags */}
-        <div className="flex gap-1.5 flex-wrap">
-          {report.tags.map(tag => (
-            <span key={tag} className="text-[11px] text-muted-foreground/50 bg-muted/40 px-2 py-0.5 rounded-lg font-medium">
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        {/* CTA */}
-        {report.ready && (
-          <div className={cn(
-            "flex items-center gap-2 pt-1 text-sm font-semibold transition-colors",
-            "text-muted-foreground group-hover:text-foreground"
-          )}>
-            <Download className="h-4 w-4" />
-            Gerar relatório
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Error Boundary ──────────────────────────────────────────────────────────
+// ── Error Boundary ─────────────────────────────────────────────────────────────
 class ReportsBoundary extends Component<{ children: ReactNode }, { err: string | null }> {
   state = { err: null }
   static getDerivedStateFromError(e: Error) { return { err: e.message } }
   render() {
     if (this.state.err) return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center">
+      <div className="flex flex-col items-center justify-center h-full gap-4 p-8 text-center min-h-[300px]">
         <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-950/30 flex items-center justify-center">
           <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" className="text-red-500">
             <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
@@ -174,89 +40,141 @@ class ReportsBoundary extends Component<{ children: ReactNode }, { err: string |
   }
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Report cards config ────────────────────────────────────────────────────────
+const REPORTS = [
+  {
+    id: "monthly",
+    icon: Calendar,
+    title: "Relatório Mensal",
+    description: "Horas, custos e pendentes por colaborador com taxa histórica correcta.",
+    accent: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/40",
+    tags: ["Horas", "Custos", "Pendente"],
+  },
+  {
+    id: "annual",
+    icon: BarChart3,
+    title: "Relatório Anual",
+    description: "Análise do ano fiscal com tendências mensais e ranking de colaboradores.",
+    accent: "text-violet-600 dark:text-violet-400",
+    bg: "bg-violet-50 dark:bg-violet-950/20 border-violet-100 dark:border-violet-900/40",
+    tags: ["Anual", "Tendências", "KPIs"],
+  },
+  {
+    id: "rates",
+    icon: History,
+    title: "Histórico de Taxas",
+    description: "Registo de todas as alterações de taxas horárias por colaborador.",
+    accent: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/40",
+    tags: ["Taxas", "Histórico", "Auditoria"],
+  },
+  {
+    id: "hours",
+    icon: Clock,
+    title: "Relatório de Horas",
+    description: "Detalhe de todas as entradas com filtros por colaborador, data e tipo.",
+    accent: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/40",
+    tags: ["Horas", "Detalhado", "Filtros"],
+  },
+  {
+    id: "performance",
+    icon: FileBarChart,
+    title: "Análise de Performance",
+    description: "Ranking da equipa com sparklines e evolução mensal comparativa.",
+    accent: "text-rose-600 dark:text-rose-400",
+    bg: "bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/40",
+    tags: ["Performance", "Ranking", "Evolução"],
+  },
+] as const
+
+// ── Main ───────────────────────────────────────────────────────────────────────
 export function AdminReportsView() {
-  const [open, setOpen] = useState<string|null>(null)
+  const [open, setOpen] = useState<string | null>(null)
   const { collaborators } = useCollaborators()
 
   return (
     <ReportsBoundary>
-    <>
-      <MonthlyReportModal     open={open==="monthly"}     onClose={()=>setOpen(null)} collaborators={collaborators} />
-      <AnnualReportModal      open={open==="annual"}       onClose={()=>setOpen(null)} collaborators={collaborators} />
-      <RateHistoryModal       open={open==="rates"}        onClose={()=>setOpen(null)} collaborators={collaborators} />
-      <HoursReportModal       open={open==="hours"}        onClose={()=>setOpen(null)} collaborators={collaborators} />
-      <PerformanceReportModal open={open==="performance"}  onClose={()=>setOpen(null)} collaborators={collaborators} />
+      <div className="p-4 sm:p-5 pb-24 space-y-4 max-w-2xl mx-auto">
 
-      <div className="h-full w-full overflow-y-auto overflow-x-hidden">
-        <div className="px-4 sm:px-6 py-6 pb-28 md:py-10 md:pb-12 max-w-5xl mx-auto w-full space-y-8">
-
-          {/* ── Hero header ── */}
-          <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
-            <div className="px-5 py-5 sm:px-6 sm:py-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center">
-                      <Sparkles className="h-3.5 w-3.5 text-primary/70" />
-                    </div>
-                    <span className="text-muted-foreground/50 text-[11px] font-bold uppercase tracking-widest">Centro de Relatórios</span>
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">Relatórios</h1>
-                  <p className="text-muted-foreground/70 text-sm mt-1.5 max-w-md leading-relaxed">
-                    Exporta, analisa e audita todos os dados da empresa em múltiplos formatos.
-                  </p>
-                </div>
-                <div className="shrink-0 hidden sm:flex flex-col items-end gap-1.5">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">5 disponíveis</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick access */}
-              <div className="grid grid-cols-3 gap-2.5 mt-5">
-                {[
-                  { label: "Mensal", desc: "Horas & custos",    color: "text-blue-600 dark:text-blue-400",    bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50",       id: "monthly" },
-                  { label: "Anual",  desc: "Tendências & KPIs", color: "text-violet-600 dark:text-violet-400", bg: "bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/50", id: "annual" },
-                  { label: "Taxas",  desc: "Auditoria",         color: "text-amber-600 dark:text-amber-400",  bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50",   id: "rates" },
-                ].map(s => (
-                  <button key={s.id} onClick={() => setOpen(s.id)}
-                    className={cn("rounded-xl border px-3 py-3 text-left hover:shadow-sm active:scale-95 transition-all", s.bg)}>
-                    <p className={cn("text-xs font-black", s.color)}>{s.label}</p>
-                    <p className="text-muted-foreground/50 text-[10px] mt-0.5 truncate">{s.desc}</p>
-                  </button>
-                ))}
-              </div>
+        {/* Header */}
+        <div className="rounded-2xl border border-border/50 bg-card p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-4 w-4 text-primary/70" />
+            </div>
+            <div>
+              <h1 className="text-xl font-black tracking-tight">Relatórios</h1>
+              <p className="text-xs text-muted-foreground/60 mt-0.5">Exporta e analisa os dados da equipa</p>
+            </div>
+            <div className="ml-auto shrink-0">
+              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                {REPORTS.length} disponíveis
+              </span>
             </div>
           </div>
 
-          {/* ── Available reports ── */}
-          <div className="space-y-3">
-            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/50 px-1">Disponíveis · {REPORTS.filter(r=>r.ready).length}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {REPORTS.filter(r => r.ready).map(r => (
-                <ReportCard key={r.id} report={r} onClick={() => setOpen(r.id)} />
-              ))}
-            </div>
+          {/* Quick access */}
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { id: "monthly", label: "Mensal",  color: "bg-blue-50   dark:bg-blue-950/30   border-blue-100   dark:border-blue-900/50   text-blue-600   dark:text-blue-400"   },
+              { id: "annual",  label: "Anual",   color: "bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/50 text-violet-600 dark:text-violet-400" },
+              { id: "rates",   label: "Taxas",   color: "bg-amber-50  dark:bg-amber-950/30  border-amber-100  dark:border-amber-900/50  text-amber-600  dark:text-amber-400"  },
+            ].map(s => (
+              <button key={s.id} onClick={() => setOpen(s.id)}
+                className={cn("rounded-xl border px-3 py-2.5 text-left hover:shadow-sm active:scale-95 transition-all", s.color)}>
+                <p className="text-xs font-black">{s.label}</p>
+                <p className="text-[9px] text-muted-foreground/50 mt-0.5 truncate">abrir</p>
+              </button>
+            ))}
           </div>
+        </div>
 
-          {/* ── Coming soon — only if any ── */}
-          {REPORTS.some(r => !r.ready) && (
-            <div className="space-y-3">
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground/50 px-1">Em breve</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {REPORTS.filter(r => !r.ready).map(r => (
-                  <ReportCard key={r.id} report={r} />
-                ))}
-              </div>
-            </div>
-          )}
-
+        {/* Report cards */}
+        <div className="space-y-2.5">
+          {REPORTS.map(r => {
+            const Icon = r.icon
+            return (
+              <button
+                key={r.id}
+                onClick={() => setOpen(r.id)}
+                className={cn(
+                  "w-full text-left flex items-center gap-4 p-4 rounded-2xl border transition-all",
+                  "hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 active:shadow-none",
+                  r.bg
+                )}
+              >
+                <div className={cn("w-10 h-10 rounded-xl bg-white/60 dark:bg-black/20 flex items-center justify-center shrink-0", r.accent)}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-foreground">{r.title}</p>
+                  <p className="text-xs text-muted-foreground/70 mt-0.5 leading-relaxed">{r.description}</p>
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {r.tags.map(tag => (
+                      <span key={tag} className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-white/50 dark:bg-white/5 border border-border/30 text-muted-foreground/60">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+              </button>
+            )
+          })}
         </div>
       </div>
-    </>
+
+      {/* Modals — lazy loaded, isolated crashes */}
+      <Suspense fallback={null}>
+        {open === "monthly"     && <MonthlyReportModal     open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "annual"      && <AnnualReportModal      open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "rates"       && <RateHistoryModal       open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "hours"       && <HoursReportModal       open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "performance" && <PerformanceReportModal open onClose={() => setOpen(null)} collaborators={collaborators} />}
+      </Suspense>
     </ReportsBoundary>
   )
 }
