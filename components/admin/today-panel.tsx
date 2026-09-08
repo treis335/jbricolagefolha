@@ -18,8 +18,10 @@ import {
 const toKey = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`
 
-const fmtDay = (d: Date) =>
-  d.toLocaleDateString("pt-PT", { weekday:"long", day:"numeric", month:"long" })
+const fmtDay = (d: Date, short = false) =>
+  short
+    ? d.toLocaleDateString("pt-PT", { weekday:"short", day:"numeric", month:"short" })
+    : d.toLocaleDateString("pt-PT", { weekday:"long", day:"numeric", month:"long" })
 
 const isToday   = (key: string) => key === toKey(new Date())
 const isWeekend = (d: Date)     => { const w = d.getDay(); return w === 0 || w === 6 }
@@ -421,7 +423,8 @@ export function TodayPanel({ collaborators }: { collaborators: Collaborator[] })
 
           <div className="flex-1 text-center min-w-0">
             <div className="flex items-center justify-center gap-2 flex-wrap">
-              <p className="text-sm font-black text-foreground capitalize truncate">{fmtDay(selectedDate)}</p>
+              <span className="sm:hidden text-sm font-black text-foreground capitalize">{fmtDay(selectedDate, true)}</span>
+              <span className="hidden sm:inline text-sm font-black text-foreground capitalize">{fmtDay(selectedDate)}</span>
               {isTodayDay && (
                 <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 shrink-0">
                   Hoje
