@@ -16,8 +16,8 @@ const tabs = [
   { id: "collaborators" as AdminTabType, label: "Equipa",     icon: Users           },
   { id: "obras"         as AdminTabType, label: "Obras",      icon: HardHat         },
   { id: "finance"       as AdminTabType, label: "Finanças",   icon: Euro            },
-  { id: "reports"       as AdminTabType, label: "Relat.", icon: FileText        },
-  { id: "settings"      as AdminTabType, label: "Config.",    icon: Settings        },
+  { id: "reports"       as AdminTabType, label: "Relat.", icon: FileText },
+  { id: "settings"      as AdminTabType, label: "Config.", icon: Settings },
 ]
 
 export function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNavProps) {
@@ -30,7 +30,7 @@ export function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNavProps) 
       />
 
       <div className="relative grid grid-cols-6 max-w-2xl mx-auto px-0.5 pb-safe"
-           style={{ height: "60px" }}>
+           style={{ height: "64px" }}>
         {tabs.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
@@ -49,7 +49,7 @@ export function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNavProps) 
               {/* Active pill */}
               {isActive && (
                 <span
-                  className="absolute inset-x-1 top-2 bottom-2 rounded-xl bg-primary/10 animate-scale-in"
+                  className="absolute inset-x-0.5 top-1.5 bottom-1.5 rounded-xl bg-primary/12 dark:bg-primary/15 animate-scale-in"
                   aria-hidden
                 />
               )}

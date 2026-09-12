@@ -64,7 +64,7 @@ function EntryDetail({
           ? "bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500"
           : isPaid
             ? "bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-600"
-            : "bg-gradient-to-br from-slate-700 via-slate-800 to-slate-900"
+            : "bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900"
       )}>
         {/* Decorative rings */}
         <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full border-2 border-white/10 pointer-events-none" />
@@ -151,7 +151,7 @@ function EntryDetail({
       </div>
 
       {/* ── Scrollable body ── */}
-      <div className="flex-1 overflow-y-auto overscroll-contain bg-slate-50/60 dark:bg-slate-900/40 min-h-0">
+      <div className="flex-1 overflow-y-auto overscroll-contain bg-muted/30 min-h-0">
         <div className="px-4 pt-5 pb-4 space-y-4">
 
           {/* Services section header */}
@@ -429,7 +429,7 @@ export function CalendarView(
       </div>
 
       {/* ── Stats strip ── */}
-      <div className="grid grid-cols-3 divide-x divide-border border-b bg-card">
+      <div className="grid grid-cols-3 divide-x divide-border/50 border-b bg-card shadow-sm">
         <StatCell value={monthStats.diasTrabalhados.toString()} label="dias" color="default" />
         <StatCell value={`${monthStats.totalHoras}h`} label="horas" color="blue" />
         <StatCell
@@ -662,18 +662,18 @@ function StatCell({ value, label, color }: {
     green:   "text-emerald-600 dark:text-emerald-400",
     amber:   "text-amber-500 dark:text-amber-400",
   }
-  const bgColors = {
-    default: "",
-    blue:    "",
-    green:   "",
-    amber:   "",
+  const bgs = {
+    default: "hover:bg-muted/30",
+    blue:    "hover:bg-blue-50/60 dark:hover:bg-blue-950/20",
+    green:   "hover:bg-emerald-50/60 dark:hover:bg-emerald-950/20",
+    amber:   "hover:bg-amber-50/60 dark:hover:bg-amber-950/20",
   }
   return (
-    <div className="flex flex-col items-center py-3.5 gap-1 group transition-colors duration-200 hover:bg-muted/30 cursor-default select-none">
-      <span className={cn("text-xl font-bold leading-none tabular-nums transition-transform duration-200 group-hover:scale-110", colors[color])}>
+    <div className={cn("flex flex-col items-center py-3 gap-0.5 group transition-colors duration-200 cursor-default select-none", bgs[color])}>
+      <span className={cn("text-lg font-black leading-none tabular-nums transition-all duration-200 group-hover:scale-110", colors[color])}>
         {value}
       </span>
-      <span className="text-[10px] uppercase tracking-widest text-muted-foreground/60 font-semibold">{label}</span>
+      <span className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">{label}</span>
     </div>
   )
 }
