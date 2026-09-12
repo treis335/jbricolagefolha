@@ -472,9 +472,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     )}
                   </div>
                   {date && <SheetTitle className="text-lg font-black leading-tight text-foreground capitalize">{date.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</SheetTitle>}
-                  {totalHoras > 0 && (
-                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1">
-                      ≈ {fmt(totalHoras * data.settings.taxaHoraria)}
+                  {totalHoras > 0 && data.settings.taxaHoraria > 0 && (
+                    <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1.5">
+                      <span>≈ {fmt(totalHoras * data.settings.taxaHoraria)}</span>
+                      <span className="text-[10px] text-muted-foreground/50 font-normal">({data.settings.taxaHoraria}€/h)</span>
                     </p>
                   )}
                 </div>
@@ -520,7 +521,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                         step={1}
                       />
                       <p className="text-[10px] text-muted-foreground/40 -mt-1">
-                        {totalHoras === 0 ? "Ausência / Ocorrência" : "horas"}
+                        {totalHoras === 0 ? "Ausência / Sem registo de horas" : "horas"}
                       </p>
                     </div>
                     <button
