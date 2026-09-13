@@ -412,16 +412,16 @@ export function CollaboratorFinanceView({
         :             "border-border"
       )}>
         <div className={cn(
-          "px-5 py-5",
+          "px-4 py-4",
           hasOverdue  ? "bg-red-50 dark:bg-red-950/20"
           : isDevendo ? "bg-amber-50 dark:bg-amber-950/20"
           : isQuitado ? "bg-emerald-50 dark:bg-emerald-950/20"
           :             "bg-muted/30"
         )}>
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className={cn(
-                "text-[10px] font-bold uppercase tracking-widest mb-1.5",
+                "text-[10px] font-bold uppercase tracking-widest mb-1 leading-tight",
                 hasOverdue  ? "text-red-600 dark:text-red-400"
                 : isDevendo ? "text-amber-600 dark:text-amber-400"
                 : isQuitado ? "text-emerald-600 dark:text-emerald-400"
@@ -430,7 +430,7 @@ export function CollaboratorFinanceView({
                 {hasOverdue ? "Pagamentos em atraso" : isDevendo ? "Pendente de recebimento" : isQuitado ? "Conta liquidada" : "Sem atividade"}
               </p>
               <p className={cn(
-                "text-4xl font-black tracking-tight tabular-nums",
+                "text-2xl sm:text-3xl md:text-4xl font-black tracking-tight tabular-nums",
                 hasOverdue  ? "text-red-700 dark:text-red-300"
                 : isDevendo ? "text-amber-700 dark:text-amber-300"
                 : isQuitado ? "text-emerald-700 dark:text-emerald-300"
@@ -445,7 +445,7 @@ export function CollaboratorFinanceView({
               onClick={openPayDialog}
               disabled={globalStats.totalPending === 0}
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-4 rounded-xl shrink-0 shadow-md shadow-emerald-600/20 disabled:opacity-40"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white h-10 px-4 rounded-xl shrink-0 shadow-md shadow-emerald-600/20 disabled:opacity-40 self-start sm:self-auto"
             >
               <Plus className="h-4 w-4 mr-1.5" />
               Pagar
@@ -466,9 +466,9 @@ export function CollaboratorFinanceView({
             { label: "Pago",     value: fmt(globalStats.totalPaid),    icon: <TrendingDown className="h-3.5 w-3.5 text-emerald-500" /> },
             { label: "Horas",   value: `${globalStats.totalHours.toFixed(1)}h`, icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" /> },
           ].map(s => (
-            <div key={s.label} className="px-3 py-3 min-w-0 overflow-hidden">
-              <div className="flex items-center gap-1 mb-1 min-w-0">{s.icon}<span className="text-[10px] text-muted-foreground truncate">{s.label}</span></div>
-              <p className="text-sm font-bold tabular-nums truncate">{s.value}</p>
+            <div key={s.label} className="px-2 sm:px-3 py-2.5 min-w-0 overflow-hidden">
+              <div className="flex items-center gap-1 mb-0.5 min-w-0">{s.icon}<span className="text-[9px] sm:text-[10px] text-muted-foreground truncate">{s.label}</span></div>
+              <p className="text-xs sm:text-sm font-bold tabular-nums truncate">{s.value}</p>
             </div>
           ))}
         </div>
@@ -503,7 +503,7 @@ export function CollaboratorFinanceView({
                 ].map(s => (
                   <div key={s.label} className="bg-muted/40 rounded-xl px-3 py-2.5">
                     <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium">{s.label}</p>
-                    <p className={cn("text-sm font-bold tabular-nums mt-0.5", s.color)}>{s.value}</p>
+                    <p className={cn("text-sm font-bold tabular-nums mt-0.5 truncate", s.color)}>{s.value}</p>
                   </div>
                 ))}
               </div>
