@@ -17,7 +17,7 @@ import { isAuthorizedAdmin } from "@/lib/admin-config"
 import { cn } from "@/lib/utils"
 
 const SkeletonView = () => (
-  <div className="p-6 space-y-4 max-w-5xl mx-auto animate-fade-in">
+  <div className="p-4 sm:p-6 space-y-4 max-w-5xl mx-auto animate-fade-in">
     <div className="skeleton h-8 w-48 rounded-xl" />
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {[...Array(4)].map((_, i) => (

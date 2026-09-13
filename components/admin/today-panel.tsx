@@ -477,7 +477,7 @@ export function TodayPanel({ collaborators }: { collaborators: Collaborator[] })
             <div key={label} className={cn("rounded-xl border px-2 py-2.5 text-center min-w-0 overflow-hidden", bg)}>
               <Icon className={cn("h-3.5 w-3.5 mx-auto mb-1.5 opacity-60", color)} />
               <p className={cn("text-sm font-black tabular-nums leading-none truncate", color)}>{value}</p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/50 mt-1 truncate">{label}</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground/50 mt-0.5 truncate w-full text-center">{label}</p>
             </div>
           ))}
         </div>

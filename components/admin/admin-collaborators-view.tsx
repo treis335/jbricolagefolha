@@ -699,9 +699,9 @@ export function AdminCollaboratorsView() {
             { label: "Inativos", value: stats.suspensos,                color: stats.suspensos > 0 ? "text-red-500 dark:text-red-400" : "text-muted-foreground/50", icon: "⛔" },
             { label: "Taxa Média", value: `${stats.avgRate}€/h`,  color: "text-blue-600 dark:text-blue-400", icon: "💶" },
           ].map(k => (
-            <div key={k.label} className="rounded-2xl border border-border/50 p-4 bg-card space-y-1">
+            <div key={k.label} className="rounded-2xl border border-border/50 p-3 sm:p-4 bg-card space-y-1">
               <span className="text-lg">{k.icon}</span>
-              <p className={`text-2xl font-black leading-none ${k.color}`}>{k.value}</p>
+              <p className={`text-xl sm:text-2xl font-black leading-none tabular-nums ${k.color}`}>{k.value}</p>
               <p className="text-xs font-semibold text-muted-foreground/60">{k.label}</p>
             </div>
           ))}

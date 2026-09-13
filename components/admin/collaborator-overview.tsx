@@ -118,8 +118,8 @@ export function CollaboratorOverview({ collaborator, onRateUpdated, selectedMont
               </span>
             )}
             {collaborator.email && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground truncate">
-                <Mail className="h-3 w-3 shrink-0" />{collaborator.email}
+              <span className="flex items-center gap-1 text-xs text-muted-foreground min-w-0 overflow-hidden">
+                <Mail className="h-3 w-3 shrink-0" /><span className="truncate">{collaborator.email}</span>
               </span>
             )}
           </div>
@@ -169,7 +169,7 @@ export function CollaboratorOverview({ collaborator, onRateUpdated, selectedMont
           {[
             { icon: Clock,    label: "Total horas",   value: `${stats.totalH.toFixed(0)}h`,       color: "text-blue-600 dark:text-blue-400"    },
             { icon: BarChart3, label: "Média/dia",    value: `${stats.avgH.toFixed(1)}h`,          color: "text-violet-600 dark:text-violet-400" },
-            { icon: Euro,     label: "Custo total",   value: `${fmt2(stats.totalCost)}€`,          color: "text-emerald-600 dark:text-emerald-400"},
+            { icon: Euro,     label: "Custo total",   value: fmt2(stats.totalCost) + "€",           color: "text-emerald-600 dark:text-emerald-400"},
           ].map(({ icon: Icon, label, value, color }) => (
             <div key={label} className="px-3 py-3 flex flex-col items-center text-center gap-1">
               <Icon className={cn("h-3.5 w-3.5 opacity-50", color)} />

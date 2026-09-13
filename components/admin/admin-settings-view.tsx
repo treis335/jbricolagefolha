@@ -155,7 +155,7 @@ function DiasBloqueioCard() {
           </div>
 
           {/* Quick presets */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1 flex-wrap">
             <span className="text-[10px] text-muted-foreground/50 font-bold uppercase tracking-wider shrink-0">Rápido:</span>
             {[0, 3, 5, 7, 14].map(v => (
               <button key={v} onClick={() => setValue(v)}

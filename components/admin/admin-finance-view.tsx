@@ -314,7 +314,7 @@ function CollabRow({ f, isActive, onSelect, onPay, onNav }: {
           {fmt(f.totalPendingAll)}
         </span>
       </td>
-      <td className="py-3 px-3 w-[110px]"><MiniBar paid={m.paid} cost={m.cost} /></td>
+      <td className="py-3 px-3 w-[90px] sm:w-[110px]"><MiniBar paid={m.paid} cost={m.cost} /></td>
       <td className="py-3 px-3"><StatusPill status={f.status} /></td>
       <td className="py-3 pl-3 pr-4" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1.5">
@@ -375,7 +375,7 @@ function DetailPanel({ collab, selectedMonthKey, onClose, onPay, onDeletePayment
 
       {/* Summary */}
       <div className="px-3 sm:px-4 py-3 border-b bg-muted/30 shrink-0">
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
           {[
             { label: "Em dívida", value: fmt(collab.totalPendingAll), color: collab.totalPendingAll > 0 ? "text-amber-600 dark:text-amber-400" : "text-emerald-600" },
             { label: "Em atraso", value: fmt(collab.overdueAmount), color: collab.overdueAmount > 0 ? "text-red-600" : "text-muted-foreground" },
