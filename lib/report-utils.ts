@@ -25,15 +25,15 @@ export function resolveTaxaForDate(
   // Ordena por dataVigencia DESC (mais recente primeiro)
   // Fallback para data (primeiros registos sem dataVigencia)
   const sorted = [...rateHistory].sort((a, b) => {
-    const va = a.dataVigencia ?? a.data.slice(0, 10)
-    const vb = b.dataVigencia ?? b.data.slice(0, 10)
+    const va = a.dataVigencia ?? (a.data ? a.data.slice(0, 10) : "")
+    const vb = b.dataVigencia ?? (b.data ? b.data.slice(0, 10) : "")
     return vb.localeCompare(va)
   })
 
   // Encontra a taxa cuja vigência é <= à data do registo
   for (const h of sorted) {
-    const vigencia = h.dataVigencia ?? h.data.slice(0, 10)
-    if (vigencia <= date) return h.taxa
+    const vigencia = h.dataVigencia ?? (h.data ? h.data.slice(0, 10) : "")
+    if (vigencia && vigencia <= date) return h.taxa
   }
 
   // Antes de qualquer registo de taxa — usa a taxa mais antiga conhecida
