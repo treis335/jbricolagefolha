@@ -393,7 +393,7 @@ export function CollaboratorFinanceView({
   }, [hasMbway, hasTransferencia, mbwayData])
 
   return (
-    <div className="space-y-5 pb-8 overflow-x-hidden min-w-0 w-full">
+    <div className="space-y-5 pb-8 min-w-0 w-full" style={{overflowX:"hidden", maxWidth:"100%"}}>
 
       {/* ── MBWay Banner (sempre visível se ativo) ── */}
       {!mbwayLoading && hasMbway && (

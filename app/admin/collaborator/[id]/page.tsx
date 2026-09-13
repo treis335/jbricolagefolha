@@ -8,7 +8,6 @@ import { db } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   ArrowLeft, Calendar as CalendarIcon, FileText, User,
   Euro, Clock, TrendingUp, Mail, AtSign, Layers,
@@ -769,9 +768,9 @@ export default function CollaboratorDetailPage() {
         />
       )}
 
-      <div className="min-h-screen bg-background overflow-x-hidden">
-        <ScrollArea className="h-screen overflow-x-hidden">
-          <div className="max-w-6xl mx-auto w-full overflow-x-hidden">
+      <div className="min-h-screen bg-background overflow-x-hidden w-full">
+        <div className="h-screen overflow-y-auto overflow-x-hidden w-full" style={{overflowX:"hidden"}}>
+          <div className="max-w-6xl mx-auto w-full overflow-x-hidden" style={{overflowX:"hidden"}}>
 
             {/* ── Top Bar ── */}
             <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b">
@@ -882,7 +881,7 @@ export default function CollaboratorDetailPage() {
             </div>
 
             {/* ── Tabs ── */}
-            <div className="pb-10 overflow-x-hidden min-w-0 w-full">
+            <div className="pb-10 overflow-x-hidden min-w-0 w-full" style={{overflowX:"hidden"}}>
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full min-w-0">
                 <div className="px-4 md:px-8"><TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex h-11 rounded-xl bg-muted/50 p-1 mb-6 gap-0.5">
                   {tabs.map(({ value, label, Icon }) => (
@@ -897,7 +896,7 @@ export default function CollaboratorDetailPage() {
                   ))}
                 </TabsList></div>
 
-                <TabsContent value="overview" className="focus-visible:outline-none mt-0 px-4 md:px-8">
+                <TabsContent value="overview" className="focus-visible:outline-none mt-0 px-4 md:px-8 w-full overflow-x-hidden">
                   <CollaboratorOverview
                     collaborator={collaborator}
                     onRateUpdated={handleRateUpdated}
@@ -908,7 +907,7 @@ export default function CollaboratorDetailPage() {
                   />
                 </TabsContent>
 
-                <TabsContent value="finance" className="focus-visible:outline-none mt-0 px-4 md:px-8 overflow-x-hidden min-w-0 w-full">
+                <TabsContent value="finance" className="focus-visible:outline-none mt-0 px-4 md:px-8 w-full overflow-x-hidden overflow-x-hidden min-w-0 w-full">
                   <CollaboratorFinanceView
                     collaboratorId={collaborator.id}
                     collaboratorName={collaborator.name}
@@ -919,7 +918,7 @@ export default function CollaboratorDetailPage() {
                   />
                 </TabsContent>
 
-                <TabsContent value="calendar" className="focus-visible:outline-none mt-0 px-4 md:px-8">
+                <TabsContent value="calendar" className="focus-visible:outline-none mt-0 px-4 md:px-8 w-full overflow-x-hidden">
                   <CollaboratorCalendarView
                     collaboratorId={collaborator.id}
                     collaboratorName={collaborator.name}
@@ -933,7 +932,7 @@ export default function CollaboratorDetailPage() {
             </div>
 
           </div>
-        </ScrollArea>
+        </div>
       </div>
 
       {/* ── Admin Edit Modal ── */}
