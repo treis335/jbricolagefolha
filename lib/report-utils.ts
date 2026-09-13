@@ -141,35 +141,38 @@ export function buildCollabMonthData(collab: any): MonthData[] {
  */
 export function buildMonthRows(collaborators: any[], monthKey: string): MonthRow[] {
   if (!Array.isArray(collaborators)) return []
+  const safe = (v: number) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : 0)
+
   return collaborators
     .filter(c => c.ativo !== false)
     .map(collab => {
-      const entries = (collab.entries || []).filter((e: any) => (e.date || "").startsWith(monthKey))
       const rateHistory: RateHistoryEntry[] = collab.rateHistory || []
       const currentRate = collab.currentRate || 0
 
+      // ── Horas do mês seleccionado ────────────────────────────────────────
+      const monthEntries = (collab.entries || []).filter((e: any) => (e.date || "").startsWith(monthKey))
       let normalHoras = 0, extraHoras = 0, totalHoras = 0, custo = 0
 
-      entries.forEach((e: any) => {
-        const h    = e.totalHoras || 0
+      monthEntries.forEach((e: any) => {
+        const h    = Number.isFinite(e.totalHoras) ? e.totalHoras : 0
         const taxa = resolveEntryTaxaFull(e, rateHistory, currentRate)
-        totalHoras += h
+        totalHoras  += h
         normalHoras += typeof e.normalHoras === "number" ? e.normalHoras : Math.min(h, 8)
         extraHoras  += typeof e.extraHoras  === "number" ? e.extraHoras  : Math.max(0, h - 8)
-        custo += h * taxa
+        custo       += h * (Number.isFinite(taxa) ? taxa : 0)
       })
 
-      // Pagamentos deste mês
-      const monthPayments = (collab.payments || []).filter((p: any) => (p.date || "").startsWith(monthKey))
-      const pago = monthPayments.reduce((s: number, p: any) => s + (Number(p.valor) || 0), 0)
-      const pendente = Math.max(0, custo - pago)
+      // ── Pago/Pendente via FIFO cronológico (igual ao financeiro) ─────────
+      // Distribui todos os pagamentos pelos meses por ordem cronológica
+      // e extrai o pago/pendente do mês seleccionado
+      const monthData = buildCollabMonthData(collab)
+      const md = monthData.find(m => m.periodo === monthKey)
+      const pago     = md ? md.paid    : 0
+      const pendente = md ? md.pending : Math.max(0, custo - pago)
 
-      // Taxa representativa do mês (última taxa ativa nesse mês)
+      // Taxa representativa do mês
       const monthEnd = `${monthKey}-28`
       const taxa = resolveTaxaForDate(monthEnd, rateHistory, currentRate)
-
-      // Ensure every numeric field is a finite number (never NaN / undefined)
-      const safe = (v: number) => (Number.isFinite(v) ? Math.round(v * 100) / 100 : 0)
 
       return {
         name:        collab.name  || "—",
