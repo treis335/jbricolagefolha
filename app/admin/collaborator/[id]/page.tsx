@@ -908,7 +908,7 @@ export default function CollaboratorDetailPage() {
                   />
                 </TabsContent>
 
-                <TabsContent value="finance" className="focus-visible:outline-none mt-0 px-4 md:px-8 overflow-x-hidden min-w-0">
+                <TabsContent value="finance" className="focus-visible:outline-none mt-0 px-4 md:px-8 overflow-x-hidden min-w-0 w-full">
                   <CollaboratorFinanceView
                     collaboratorId={collaborator.id}
                     collaboratorName={collaborator.name}

@@ -115,7 +115,7 @@ function MonthNav({ current, months, onChange }: {
   }, [current])
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1.5 w-full min-w-0">
       <button
         onClick={() => idx > 0 && onChange(months[idx - 1])}
         disabled={idx === 0}
@@ -393,7 +393,7 @@ export function CollaboratorFinanceView({
   }, [hasMbway, hasTransferencia, mbwayData])
 
   return (
-    <div className="space-y-5 pb-8 overflow-x-hidden min-w-0">
+    <div className="space-y-5 pb-8 overflow-x-hidden min-w-0 w-full">
 
       {/* ── MBWay Banner (sempre visível se ativo) ── */}
       {!mbwayLoading && hasMbway && (
@@ -418,8 +418,8 @@ export function CollaboratorFinanceView({
           : isQuitado ? "bg-emerald-50 dark:bg-emerald-950/20"
           :             "bg-muted/30"
         )}>
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div className="flex-1 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 w-full min-w-0">
+            <div className="flex-1 min-w-0 w-full">
               <p className={cn(
                 "text-[10px] font-bold uppercase tracking-widest mb-1 leading-tight",
                 hasOverdue  ? "text-red-600 dark:text-red-400"
@@ -460,7 +460,7 @@ export function CollaboratorFinanceView({
           )}
         </div>
 
-        <div className="grid grid-cols-3 divide-x bg-card overflow-hidden">
+        <div className="grid grid-cols-3 divide-x bg-card overflow-hidden w-full">
           {[
             { label: "Devido",   value: fmt(globalStats.totalCost),    icon: <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" /> },
             { label: "Pago",     value: fmt(globalStats.totalPaid),    icon: <TrendingDown className="h-3.5 w-3.5 text-emerald-500" /> },
@@ -475,12 +475,12 @@ export function CollaboratorFinanceView({
       </div>
 
       {/* ── Month Selector ── */}
-      <div className="rounded-2xl border bg-card overflow-hidden">
+      <div className="rounded-2xl border bg-card overflow-hidden w-full">
         <div className="px-4 py-3 border-b bg-muted/20 flex items-center gap-2 min-w-0">
           <Calendar className="h-3.5 w-3.5 text-muted-foreground/50" />
           <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Período</span>
         </div>
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 overflow-hidden">
           <MonthNav current={selectedMonth} months={availableMonths} onChange={setSelectedMonth} />
         </div>
 
@@ -644,7 +644,7 @@ export function CollaboratorFinanceView({
                 <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center shrink-0">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 w-full">
                   <p className="text-sm font-bold tabular-nums">{fmt(p.valor)}</p>
                   <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                     <span className="text-[10px] text-muted-foreground">
@@ -684,7 +684,7 @@ export function CollaboratorFinanceView({
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-md shadow-violet-500/30">
                   <Phone className="h-4 w-4 text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 w-full">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500 dark:text-violet-400">Enviar para</p>
                   <p className="text-base font-black text-violet-800 dark:text-violet-200 tabular-nums tracking-wide leading-tight">
                     {mbwayData!.mbwayTelemovel}
