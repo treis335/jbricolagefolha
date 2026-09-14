@@ -43,7 +43,6 @@ import { getObras } from "@/lib/obras-service"
 import type { Obra } from "@/lib/obras-service"
 
 import { useActiveCollaborators } from "@/hooks/useActiveCollaborators"
-import { getNomesColaboradores } from "@/lib/colaboradores"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -176,26 +175,15 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const [isUploading, setIsUploading] = useState(false)
   const { activeCollaborators, loading: loadingCollaborators } = useActiveCollaborators()
 
-  const nomesLegados = useMemo(() => getNomesColaboradores(), [])
-
   const allCollaborators = useMemo((): Collaborator[] => {
-    const activeMap = new Map(activeCollaborators.map(c => [c.nome.toLowerCase().trim(), c]))
-
-    const combined: Collaborator[] = activeCollaborators.map(c => ({
+    return activeCollaborators.map(c => ({
       uid: c.uid,
       nome: c.nome,
       isLegacy: false,
     }))
 
-    nomesLegados.forEach(nome => {
-      const nomeLower = nome.toLowerCase().trim()
-      if (!activeMap.has(nomeLower)) {
-        combined.push({ uid: null, nome, isLegacy: true })
-      }
-    })
-
-    return combined.sort((a, b) => a.nome.localeCompare(b.nome))
-  }, [activeCollaborators, nomesLegados])
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+  }, [activeCollaborators])
 
   const [totalHoras, setTotalHoras] = useState(8)
   const [services, setServices] = useState<Service[]>([])

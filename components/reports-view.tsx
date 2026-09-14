@@ -18,7 +18,6 @@ import { useAuth } from "@/lib/AuthProvider"
 import { db } from "@/lib/firebase"
 import { doc, getDoc } from "firebase/firestore"
 import { type DayEntry, calculateHours } from "@/lib/types"
-import { getNomesColaboradores } from "@/lib/colaboradores"
 import { fmt } from "@/lib/utils"
 
 type Period = "daily" | "weekly" | "monthly"
@@ -103,7 +102,6 @@ export function ReportsView({ initialDate }: { initialDate?: Date } = {}) {
   }, [filteredEntries, data.settings.taxaHoraria])
 
   const horasPorColaborador = useMemo(() => {
-    const nomesOficiais = new Set(getNomesColaboradores())
     const horas: Record<string, number> = {}
     filteredEntries.forEach((entry) => {
       const nomesUnicos = new Set<string>()
@@ -113,7 +111,7 @@ export function ReportsView({ initialDate }: { initialDate?: Date } = {}) {
         )
       const h = entry.totalHoras ?? 0
       nomesUnicos.forEach((nome) => {
-        if (nomesOficiais.has(nome)) horas[nome] = (horas[nome] || 0) + h
+        if (nome) horas[nome] = (horas[nome] || 0) + h
       })
     })
     return Object.entries(horas)
