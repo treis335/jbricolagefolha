@@ -39,6 +39,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { v4 as uuidv4 } from "uuid"
+import { sendSuggestions } from "@/lib/suggestions"
 import { getObras } from "@/lib/obras-service"
 import type { Obra } from "@/lib/obras-service"
 
@@ -426,6 +427,22 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       materiais: services.flatMap(s => s.materiais),
       taxaHoraria: taxa,
     })
+
+    // ── Sugestões de equipa — fire and forget, nunca bloqueia o save ──
+    if (user && services.some(s => (s.equipaUids || []).some(Boolean))) {
+      sendSuggestions(
+        services.map(s => ({
+          obraNome:  s.obraNome,
+          descricao: s.descricao,
+          materiais: s.materiais,
+          equipa:    s.equipa,
+          equipaUids: s.equipaUids || [],
+        })),
+        dateStr,
+        user.displayName || user.email || "Colega",
+        user.uid,
+      ).catch(() => {}) // silencioso — nunca quebra o fluxo normal
+    }
 
     onClose()
   }

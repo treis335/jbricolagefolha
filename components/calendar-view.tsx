@@ -1,5 +1,6 @@
 "use client"
 
+import { SuggestionBanner } from "@/components/suggestion-banner"
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
