@@ -429,6 +429,9 @@ export function CalendarView(
         </div>
       </div>
 
+      {/* ── Sugestões de equipa ── */}
+      <SuggestionBanner />
+
       {/* ── Stats strip ── */}
       <div className="grid grid-cols-3 divide-x divide-border/50 border-b bg-card shadow-sm">
         <StatCell value={monthStats.diasTrabalhados.toString()} label="dias" color="default" />
