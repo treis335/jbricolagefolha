@@ -1,6 +1,6 @@
 "use client"
 
-import { SuggestionBanner } from "@/components/suggestion-banner"
+// import { SuggestionBanner } from "@/components/suggestion-banner" // temporariamente oculto
 import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import {
@@ -429,8 +429,8 @@ export function CalendarView(
         </div>
       </div>
 
-      {/* ── Sugestões de equipa ── */}
-      <SuggestionBanner />
+      {/* ── Sugestões de equipa — temporariamente oculto ── */}
+      {/* <SuggestionBanner /> */}
 
       {/* ── Stats strip ── */}
       <div className="grid grid-cols-3 divide-x divide-border/50 border-b bg-card shadow-sm">
