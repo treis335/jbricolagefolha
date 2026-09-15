@@ -2,6 +2,7 @@
 "use client"
 
 import { useMemo, useState, useRef, useCallback, useEffect } from "react"
+import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { resolveEntryTaxa } from "@/lib/utils"
@@ -56,9 +57,10 @@ function Lightbox({ fotos, start, onClose }: {
   }, [onClose, fotos.length])
 
   if (!f) return null
-  return (
+
+  const content = (
     <div
-      className="fixed inset-0 z-[400] bg-black/95 flex flex-col"
+      className="fixed inset-0 z-[9999] bg-black/95 flex flex-col"
       onClick={onClose}
       onTouchStart={e => { tx.current = e.touches[0].clientX }}
       onTouchEnd={e => {
@@ -117,6 +119,9 @@ function Lightbox({ fotos, start, onClose }: {
       )}
     </div>
   )
+
+  if (typeof document === "undefined") return null
+  return createPortal(content, document.body)
 }
 
 // ── Avatar ────────────────────────────────────────────────────────────────────
