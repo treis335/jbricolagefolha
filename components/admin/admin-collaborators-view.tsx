@@ -2,6 +2,7 @@
 "use client"
 import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,38 +44,32 @@ function ConfirmSuspendDialog({
   onCancel: () => void
 }) {
   return (
-    <>
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex justify-center pt-7 pb-4">
-            <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
-              <ShieldOff className="h-7 w-7 text-red-500" />
-            </div>
-          </div>
-          <div className="px-4 pb-2 text-center">
-            <p className="text-base font-bold">Inativar {collaborator.name}?</p>
-            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-              O colaborador perde o acesso imediatamente. Os dados e histórico ficam preservados.
-            </p>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-3">
-            <button
-              onClick={onCancel}
-              className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onConfirm}
-              className="h-11 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-red-500/30"
-            >
-              Inativar
-            </button>
+    <Dialog open onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-sm rounded-3xl p-0 gap-0 [&>button]:hidden">
+        <DialogTitle className="sr-only">Inativar {collaborator.name}</DialogTitle>
+        <div className="flex justify-center pt-7 pb-4">
+          <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+            <ShieldOff className="h-7 w-7 text-red-500" />
           </div>
         </div>
-      </div>
-    </>
+        <div className="px-6 pb-2 text-center">
+          <p className="text-base font-bold">Inativar {collaborator.name}?</p>
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+            O colaborador perde o acesso imediatamente. Os dados e histórico ficam preservados.
+          </p>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-3">
+          <button onClick={onCancel}
+            className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="h-11 rounded-xl bg-red-500 hover:bg-red-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-red-500/30">
+            Inativar
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -88,38 +83,32 @@ function ConfirmReactivateDialog({
   onCancel: () => void
 }) {
   return (
-    <>
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex justify-center pt-7 pb-4">
-            <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
-              <UserCheck className="h-7 w-7 text-emerald-500" />
-            </div>
-          </div>
-          <div className="px-4 pb-2 text-center">
-            <p className="text-base font-bold">Reativar {collaborator.name}?</p>
-            <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
-              O colaborador recupera o acesso imediatamente.
-            </p>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-3">
-            <button
-              onClick={onCancel}
-              className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={onConfirm}
-              className="h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-emerald-500/30"
-            >
-              Reativar
-            </button>
+    <Dialog open onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-sm rounded-3xl p-0 gap-0 [&>button]:hidden">
+        <DialogTitle className="sr-only">Reativar {collaborator.name}</DialogTitle>
+        <div className="flex justify-center pt-7 pb-4">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
+            <UserCheck className="h-7 w-7 text-emerald-500" />
           </div>
         </div>
-      </div>
-    </>
+        <div className="px-6 pb-2 text-center">
+          <p className="text-base font-bold">Reativar {collaborator.name}?</p>
+          <p className="text-sm text-muted-foreground mt-1.5 leading-relaxed">
+            O colaborador recupera o acesso imediatamente.
+          </p>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-3">
+          <button onClick={onCancel}
+            className="h-11 rounded-xl border border-border/50 text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors active:scale-95">
+            Cancelar
+          </button>
+          <button onClick={onConfirm}
+            className="h-11 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-semibold transition-colors active:scale-95 shadow-sm shadow-emerald-500/30">
+            Reativar
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -137,40 +126,38 @@ function ConfirmDeleteDialog({
   deleting: boolean
 }) {
   return (
-    <>
-      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <div className="flex justify-center pt-7 pb-4">
-            <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
-              <Trash2 className="h-7 w-7 text-red-500" />
-            </div>
-          </div>
-          <div className="px-5 pb-2 text-center space-y-2">
-            <p className="text-base font-bold">Eliminar {collaborator.name}?</p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Esta ação é <strong>irreversível</strong>. Serão apagados todos os dados, registos de horas, pagamentos e conta do utilizador.
-            </p>
-            <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-3 py-2.5 text-left mt-2">
-              <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
-                Referências a este colaborador em registos de outros (equipa, serviços) serão mantidas como texto histórico.
-              </p>
-            </div>
-          </div>
-          <div className="p-5 grid grid-cols-2 gap-3">
-            <button onClick={onCancel} disabled={deleting}
-              className="h-11 rounded-2xl border border-border/50 text-sm font-semibold hover:bg-muted/50 transition-colors disabled:opacity-50">
-              Cancelar
-            </button>
-            <button onClick={onConfirm} disabled={deleting}
-              className="h-11 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-              {deleting ? <><Loader2 className="h-4 w-4 animate-spin" />A eliminar…</> : <><Trash2 className="h-4 w-4" />Eliminar</>}
-            </button>
+    <Dialog open onOpenChange={v => !v && onCancel()}>
+      <DialogContent className="max-w-sm rounded-3xl p-0 gap-0 [&>button]:hidden">
+        <DialogTitle className="sr-only">Eliminar {collaborator.name}</DialogTitle>
+        <div className="flex justify-center pt-7 pb-4">
+          <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+            <Trash2 className="h-7 w-7 text-red-500" />
           </div>
         </div>
-      </div>
-    </>
+        <div className="px-6 pb-2 text-center space-y-2">
+          <p className="text-base font-bold">Eliminar {collaborator.name}?</p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Esta ação é <strong>irreversível</strong>. Serão apagados todos os dados, registos de horas, pagamentos e conta do utilizador.
+          </p>
+          <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 rounded-2xl px-3 py-2.5 text-left">
+            <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+            <p className="text-[11px] text-amber-700 dark:text-amber-400 leading-relaxed">
+              Referências a este colaborador em registos de outros (equipa, serviços) serão mantidas como texto histórico.
+            </p>
+          </div>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-3">
+          <button onClick={onCancel} disabled={deleting}
+            className="h-11 rounded-2xl border border-border/50 text-sm font-semibold hover:bg-muted/50 transition-colors disabled:opacity-50">
+            Cancelar
+          </button>
+          <button onClick={onConfirm} disabled={deleting}
+            className="h-11 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {deleting ? <><Loader2 className="h-4 w-4 animate-spin" />A eliminar…</> : <><Trash2 className="h-4 w-4" />Eliminar</>}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
