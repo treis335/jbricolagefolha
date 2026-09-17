@@ -3,7 +3,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { doc, updateDoc } from "firebase/firestore"
+import { doc, updateDoc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { Euro, X, Check, Loader2, AlertTriangle, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -47,13 +47,17 @@ export function EntryRateOverride({
 
     setLoading(true)
     try {
-      // Read current entries, patch the ones that match
       const newTaxa = mode === "override" ? Number(taxa) : undefined
 
-      const updatedEntries = allEntries.map(entry => {
+      // ── Lê as entries frescas do Firebase para não sobrescrever edições recentes ──
+      const freshSnap = await getDoc(doc(db, "users", collaboratorId))
+      const freshEntries: any[] = freshSnap.exists()
+        ? (freshSnap.data()?.workData?.entries ?? allEntries)
+        : allEntries
+
+      const updatedEntries = freshEntries.map((entry: any) => {
         if (!selectedDates.includes(entry.date)) return entry
         if (mode === "reset") {
-          // Remove taxaHoraria field — use spread and delete
           const { taxaHoraria, ...rest } = entry
           return rest
         }
