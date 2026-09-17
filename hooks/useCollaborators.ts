@@ -31,6 +31,7 @@ export interface Collaborator {
   migrated?: boolean
   ativo: boolean
   pendingAmount: number
+  unlockedDays: import("@/lib/useGlobalSettings").UnlockedDay[]
   entries: DayEntry[]
   payments: Array<{ id: string; date: string; valor: number; metodo: string }>
 }
@@ -112,6 +113,7 @@ export function useCollaborators(): UseCollaboratorsReturn {
           migrated:          d.migrated  || false,
           ativo,
           pendingAmount: 0,
+          unlockedDays: Array.isArray(d.unlockedDays) ? d.unlockedDays : [],
           entries,
           payments,
         }

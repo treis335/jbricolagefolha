@@ -925,6 +925,7 @@ export default function CollaboratorDetailPage() {
                     currentRate={collaborator.currentRate}
                     entries={collaborator.entries}
                     isAdmin={true}
+                    unlockedDays={collaborator.unlockedDays ?? []}
                   />
                 </TabsContent>
 

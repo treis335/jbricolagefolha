@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { formatLocalDate } from "@/lib/date-utils"
 import { fmt, isDayLocked } from "@/lib/utils"
-import { useGlobalSettings, isUserUnlocked } from "@/lib/useGlobalSettings"
+import { useGlobalSettings, isUserUnlocked, isDayUnlocked, type UnlockedDay } from "@/lib/useGlobalSettings"
 import {
   Sheet,
   SheetContent,
