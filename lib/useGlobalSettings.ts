@@ -4,7 +4,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore"
+import { doc, getDoc, setDoc, onSnapshot, updateDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
 export interface GlobalSettings {
@@ -73,4 +73,64 @@ export async function revokeUserUnlock(uid: string): Promise<void> {
   const unlockedUsers = { ...(current.unlockedUsers ?? {}) }
   delete unlockedUsers[uid]
   await setDoc(ref, { ...current, unlockedUsers }, { merge: true })
+}
+
+// ── Desbloqueio de dias específicos por colaborador ──────────────────────────
+// Guardado em users/{uid}.unlockedDays — separado do config/global
+// O global define o prazo; o per-day define excepções pontuais
+
+export interface UnlockedDay {
+  date: string        // "YYYY-MM-DD"
+  unlockedUntil: string  // ISO timestamp — expira automaticamente
+  unlockedByUid: string  // quem desbloqueou
+}
+
+/** Verifica se um dia específico está desbloqueado e a janela não expirou */
+export function isDayUnlocked(unlockedDays: UnlockedDay[], date: string): boolean {
+  if (!Array.isArray(unlockedDays)) return false
+  const entry = unlockedDays.find(u => u.date === date)
+  if (!entry) return false
+  return new Date(entry.unlockedUntil) > new Date()
+}
+
+/** Admin: desbloqueia dias específicos de um colaborador por N horas */
+export async function unlockDaysForUser(
+  collaboratorUid: string,
+  dates: string[],
+  hours: number,
+  adminUid: string
+): Promise<void> {
+  const until = new Date()
+  until.setHours(until.getHours() + hours)
+  const untilISO = until.toISOString()
+
+  const ref = doc(db, "users", collaboratorUid)
+  const snap = await getDoc(ref)
+  const current: UnlockedDay[] = snap.exists()
+    ? (snap.data().unlockedDays ?? [])
+    : []
+
+  // Replace or add each date
+  const filtered = current.filter(u => !dates.includes(u.date))
+  const newEntries: UnlockedDay[] = dates.map(date => ({
+    date,
+    unlockedUntil: untilISO,
+    unlockedByUid: adminUid,
+  }))
+
+  await updateDoc(ref, { unlockedDays: [...filtered, ...newEntries] })
+}
+
+/** Admin: volta a trancar dias específicos (remove o desbloqueio) */
+export async function relockDaysForUser(
+  collaboratorUid: string,
+  dates: string[]
+): Promise<void> {
+  const ref = doc(db, "users", collaboratorUid)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return
+  const current: UnlockedDay[] = snap.data().unlockedDays ?? []
+  await updateDoc(ref, {
+    unlockedDays: current.filter(u => !dates.includes(u.date))
+  })
 }
