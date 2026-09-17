@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { formatLocalDate } from "@/lib/date-utils"
 import { fmt, isDayLocked } from "@/lib/utils"
+import { doc, onSnapshot } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { useGlobalSettings, isUserUnlocked, isDayUnlocked, type UnlockedDay } from "@/lib/useGlobalSettings"
 import {
   Sheet,
@@ -205,7 +207,18 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const { settings: globalSettings } = useGlobalSettings()
   const diasBloqueio = globalSettings.diasBloqueio ?? 0
   const userUnlocked = user ? isUserUnlocked(globalSettings, user.uid) : false
-  const isLocked = dateStr && !userUnlocked ? isDayLocked(dateStr, diasBloqueio) : false
+
+  const [unlockedDays, setUnlockedDays] = useState<UnlockedDay[]>([])
+  useEffect(() => {
+    if (!user) return
+    const unsub = onSnapshot(doc(db, "users", user.uid), snap => {
+      setUnlockedDays(snap.exists() ? (snap.data().unlockedDays ?? []) : [])
+    })
+    return unsub
+  }, [user])
+
+  const dayUnlocked = isDayUnlocked(unlockedDays, dateStr)
+  const isLocked = dateStr && !userUnlocked && !dayUnlocked ? isDayLocked(dateStr, diasBloqueio) : false
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
