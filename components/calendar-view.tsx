@@ -1,7 +1,8 @@
 "use client"
 
 // import { SuggestionBanner } from "@/components/suggestion-banner" // temporariamente oculto
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { doc, onSnapshot } from "firebase/firestore"
 import { Button } from "@/components/ui/button"
 import {
   ChevronLeft, ChevronRight, Plus, Calendar, Clock, Zap, Users, Package, Briefcase, HardHat,
@@ -13,7 +14,8 @@ import { useWorkTracker } from "@/lib/work-tracker-context"
 import { cn, fmt } from "@/lib/utils"
 import { formatLocalDate } from "@/lib/date-utils"
 import { isDayLocked } from "@/lib/utils"
-import { useGlobalSettings, isUserUnlocked } from "@/lib/useGlobalSettings"
+import { db } from "@/lib/firebase"
+import { useGlobalSettings, isUserUnlocked, isDayUnlocked } from "@/lib/useGlobalSettings"
 import { ReportsView } from "@/components/reports-view"
 
 interface CalendarViewProps {

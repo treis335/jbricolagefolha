@@ -16,6 +16,7 @@ import { EntryRateOverride } from "@/components/admin/entry-rate-override"
 import { DayUnlockPanel } from "@/components/admin/day-unlock-panel"
 import { isDayUnlocked, type UnlockedDay } from "@/lib/useGlobalSettings"
 import { useGlobalSettings } from "@/lib/useGlobalSettings"
+import { isDayLocked } from "@/lib/utils"
 
 interface CollaboratorCalendarViewProps {
   collaboratorId: string
@@ -300,6 +301,9 @@ export function CollaboratorCalendarView({
   // ── Unlock mode (admin only) ──
   const [unlockMode,      setUnlockMode]      = useState(false)
   const [unlockDates,     setUnlockDates]     = useState<string[]>([])
+
+  const { settings: globalSettings } = useGlobalSettings()
+  const diasBloqueio = globalSettings.diasBloqueio ?? 0
 
   const entryMap = useMemo(() => {
     const map = new Map<string, any>()
