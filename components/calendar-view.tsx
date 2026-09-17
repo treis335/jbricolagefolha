@@ -306,16 +306,6 @@ export function CalendarView(
   const diasBloqueio = globalSettings.diasBloqueio ?? 0
   const userUnlocked = user ? isUserUnlocked(globalSettings, user.uid) : false
 
-  // ── Dias desbloqueados manualmente pelo admin ─────────────────────────────
-  const [unlockedDays, setUnlockedDays] = useState<import("@/lib/useGlobalSettings").UnlockedDay[]>([])
-  useEffect(() => {
-    if (!user) return
-    const unsub = onSnapshot(doc(db, "users", user.uid), snap => {
-      setUnlockedDays(snap.exists() ? (snap.data().unlockedDays ?? []) : [])
-    }, () => setUnlockedDays([]))
-    return unsub
-  }, [user])
-
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
@@ -484,7 +474,7 @@ export function CalendarView(
               const isWeekend = date.getDay() === 0 || date.getDay() === 6
               const isPast = dateStr < today
               const isMissingWorkday = isPast && !isToday && !hasEntry && !isWeekend
-              const locked = !userUnlocked && isDayLocked(dateStr, diasBloqueio) && !isDayUnlocked(unlockedDays, dateStr)
+              const locked = !userUnlocked && isDayLocked(dateStr, diasBloqueio)
               const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
 
               return (

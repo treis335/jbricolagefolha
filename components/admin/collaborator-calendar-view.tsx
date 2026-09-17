@@ -13,9 +13,6 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { formatLocalDate } from "@/lib/date-utils"
 import { CollaboratorReportsView } from "@/components/admin/collaborator-reports-view"
 import { EntryRateOverride } from "@/components/admin/entry-rate-override"
-import { DayUnlockPanel } from "@/components/admin/day-unlock-panel"
-import { isDayUnlocked, type UnlockedDay } from "@/lib/useGlobalSettings"
-import { useGlobalSettings } from "@/lib/useGlobalSettings"
 
 interface CollaboratorCalendarViewProps {
   collaboratorId: string
@@ -23,7 +20,6 @@ interface CollaboratorCalendarViewProps {
   currentRate: number
   entries: any[]
   isAdmin?: boolean   // mostra botão "Alterar Taxa" e multi-select
-  unlockedDays?: UnlockedDay[]  // dias desbloqueados manualmente pelo admin
 }
 
 
@@ -286,7 +282,6 @@ export function CollaboratorCalendarView({
   currentRate,
   entries,
   isAdmin = false,
-  unlockedDays = [],
 }: CollaboratorCalendarViewProps) {
 
   const [currentMonth,    setCurrentMonth]    = useState<Date>(new Date())
@@ -297,9 +292,6 @@ export function CollaboratorCalendarView({
   const [rateMode,        setRateMode]        = useState(false)   // multi-select active
   const [selectedDates,   setSelectedDates]   = useState<string[]>([])
   const [lastSelected,    setLastSelected]    = useState<string | null>(null)
-  // ── Unlock mode (admin only) ──
-  const [unlockMode,      setUnlockMode]      = useState(false)
-  const [unlockDates,     setUnlockDates]     = useState<string[]>([])
 
   const entryMap = useMemo(() => {
     const map = new Map<string, any>()
@@ -352,18 +344,21 @@ export function CollaboratorCalendarView({
     if (!date) return
     const dateStr = formatLocalDate(date)
 
-    // Multi-select para rate ou unlock mode
-    if (rateMode || unlockMode) {
-      const setter = rateMode ? setSelectedDates : setUnlockDates
-      const current = rateMode ? selectedDates : unlockDates
+    if (rateMode) {
+      // Multi-select: shift-click = range, normal click = toggle
       if (shiftKey && lastSelected) {
         const allDays = calendarDays.filter(Boolean).map(d => formatLocalDate(d!.date))
         const a = allDays.indexOf(lastSelected)
         const b = allDays.indexOf(dateStr)
         const range = allDays.slice(Math.min(a, b), Math.max(a, b) + 1)
-        setter(prev => Array.from(new Set([...prev, ...range])))
+        setSelectedDates(prev => {
+          const set = new Set([...prev, ...range])
+          return Array.from(set)
+        })
       } else {
-        setter(prev => prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr])
+        setSelectedDates(prev =>
+          prev.includes(dateStr) ? prev.filter(d => d !== dateStr) : [...prev, dateStr]
+        )
         setLastSelected(dateStr)
       }
       return
@@ -420,10 +415,7 @@ export function CollaboratorCalendarView({
           return (
             <button
               key={`${dateStr}-${index}`}
-              onClick={e => {
-                if (unlockMode && !isDayLocked(dateStr, diasBloqueio)) return
-                handleDayClick(date, e.shiftKey)
-              }}
+              onClick={e => handleDayClick(date, e.shiftKey)}
               disabled={!rateMode && !hasEntry}
               className={cn(
                 "flex flex-col items-center justify-center relative transition-all select-none border-r border-b",
@@ -434,11 +426,6 @@ export function CollaboratorCalendarView({
                 rateMode && selectedDates.includes(dateStr) && "bg-primary/15 ring-inset ring-2 ring-primary/40",
                 rateMode && !selectedDates.includes(dateStr) && hasEntry && "hover:bg-primary/5",
                 rateMode && !hasEntry && "opacity-30 cursor-default",
-                // Unlock mode — highlight locked days
-                unlockMode && isDayLocked(dateStr, diasBloqueio) && !isDayUnlocked(unlockedDays, dateStr) && "cursor-pointer bg-amber-50/60 dark:bg-amber-950/10 hover:bg-amber-100/60",
-                unlockMode && isDayUnlocked(unlockedDays, dateStr) && "cursor-pointer bg-emerald-50/60 dark:bg-emerald-950/10 ring-inset ring-2 ring-emerald-400/40",
-                unlockMode && unlockDates.includes(dateStr) && "ring-inset ring-2 ring-amber-500/60 bg-amber-100/60 dark:bg-amber-950/20",
-                unlockMode && !isDayLocked(dateStr, diasBloqueio) && "opacity-25 cursor-default",
                 // Normal mode styles
                 !rateMode && !hasEntry && "cursor-default",
                 !rateMode && isWeekend && !hasEntry && (compact ? "bg-muted/20" : "bg-muted/30"),
@@ -509,23 +496,9 @@ export function CollaboratorCalendarView({
             </button>
           </div>
           {/* Admin: Alterar Taxa button */}
-          {isAdmin && diasBloqueio > 0 && (
-            <button
-              onClick={() => { setUnlockMode(m => !m); setUnlockDates([]); setRateMode(false) }}
-              className={cn(
-                "shrink-0 flex items-center gap-1.5 px-2.5 h-9 rounded-xl border transition-colors text-xs font-medium",
-                unlockMode
-                  ? "bg-amber-500 text-white border-amber-500"
-                  : "bg-card text-foreground border-border hover:bg-muted"
-              )}
-            >
-              <span className="text-sm">{unlockMode ? "🔒" : "🔓"}</span>
-              <span className="hidden xs:inline">{unlockMode ? "Cancelar" : "Dias"}</span>
-            </button>
-          )}
           {isAdmin && (
             <button
-              onClick={() => { setRateMode(r => !r); setSelectedDates([]); setUnlockMode(false) }}
+              onClick={() => { setRateMode(r => !r); setSelectedDates([]) }}
               className={cn(
                 "shrink-0 flex items-center gap-1.5 px-2.5 h-9 rounded-xl border transition-colors text-xs font-medium",
                 rateMode
@@ -588,14 +561,6 @@ export function CollaboratorCalendarView({
           </div>
         )}
 
-        {/* Unlock mode tip */}
-        {unlockMode && isAdmin && (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 text-xs text-amber-700 dark:text-amber-400 font-medium">
-            <span className="shrink-0">🔓</span>
-            Toca nos dias 🔒 trancados para seleccionar · Shift+toque para intervalo
-          </div>
-        )}
-
         <CalendarGrid compact={false} />
 
         {/* Rate override panel */}
@@ -607,17 +572,6 @@ export function CollaboratorCalendarView({
             allEntries={entries}
             defaultRate={currentRate}
             onDone={() => { setSelectedDates([]); setRateMode(false) }}
-          />
-        )}
-
-        {/* Unlock panel */}
-        {unlockMode && isAdmin && unlockDates.length > 0 && (
-          <DayUnlockPanel
-            collaboratorId={collaboratorId}
-            collaboratorName={collaboratorName}
-            selectedDates={unlockDates}
-            unlockedDays={unlockedDays}
-            onDone={() => { setUnlockDates([]); setUnlockMode(false) }}
           />
         )}
 
