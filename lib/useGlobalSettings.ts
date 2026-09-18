@@ -11,9 +11,11 @@ export interface GlobalSettings {
   diasBloqueio: number           // 0 = desativado, N = dias de janela de edição
   /** UIDs com desbloqueio temporário — admin pode conceder acesso a dias antigos */
   unlockedUsers?: Record<string, string>  // uid → ISO date "unlock until"
+  /** Emails autorizados a criar conta na app — se vazio/undefined, ninguém novo pode registar-se */
+  allowedEmails?: string[]
 }
 
-const DEFAULT: GlobalSettings = { diasBloqueio: 0, unlockedUsers: {} }
+const DEFAULT: GlobalSettings = { diasBloqueio: 0, unlockedUsers: {}, allowedEmails: [] }
 const REF = () => doc(db, "config", "global")
 
 /** Hook de leitura em tempo real — para colaboradores e admin */
@@ -132,5 +134,41 @@ export async function relockDaysForUser(
   const current: UnlockedDay[] = snap.data().unlockedDays ?? []
   await updateDoc(ref, {
     unlockedDays: current.filter(u => !dates.includes(u.date))
+  })
+}
+
+// ── Emails autorizados a registar-se ────────────────────────────────────────
+// Guardado em config/global.allowedEmails — controla quem pode criar conta nova.
+// Contas já existentes nunca são afetadas por esta lista.
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+/** Verifica se um email está autorizado a criar conta nova */
+export function isEmailAllowed(settings: GlobalSettings, email: string | null | undefined): boolean {
+  if (!email) return false
+  const list = settings.allowedEmails ?? []
+  return list.includes(normalizeEmail(email))
+}
+
+/** Admin: adiciona um email à lista de autorizados */
+export async function addAllowedEmail(email: string): Promise<void> {
+  const ref = REF()
+  const snap = await getDoc(ref)
+  const current: string[] = snap.exists() ? (snap.data().allowedEmails ?? []) : []
+  const normalized = normalizeEmail(email)
+  if (current.includes(normalized)) return
+  await setDoc(ref, { allowedEmails: [...current, normalized] }, { merge: true })
+}
+
+/** Admin: remove um email da lista de autorizados */
+export async function removeAllowedEmail(email: string): Promise<void> {
+  const ref = REF()
+  const snap = await getDoc(ref)
+  if (!snap.exists()) return
+  const current: string[] = snap.data().allowedEmails ?? []
+  await updateDoc(ref, {
+    allowedEmails: current.filter(e => e !== normalizeEmail(email))
   })
 }

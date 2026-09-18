@@ -12,9 +12,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { FirebaseExportButton } from "@/components/admin/FirebaseExportButton"
 import { cn } from "@/lib/utils"
-import { useGlobalSettings, saveGlobalSettings } from "@/lib/useGlobalSettings"
+import { useGlobalSettings, saveGlobalSettings, addAllowedEmail, removeAllowedEmail } from "@/lib/useGlobalSettings"
 import { useState } from "react"
-import { Check, Loader2 } from "lucide-react"
+import { Check, Loader2, Mail, Trash2, UserPlus } from "lucide-react"
 
 // ─── section card wrapper ──────────────────────────────────────────────────────
 function SectionCard({
@@ -214,6 +214,142 @@ function DiasBloqueioCard() {
   )
 }
 
+// ─── Emails autorizados a registar-se ─────────────────────────────────────────
+function AcessosCard() {
+  const { settings, loading } = useGlobalSettings()
+  const [novoEmail, setNovoEmail] = useState("")
+  const [adding,    setAdding]    = useState(false)
+  const [removing,  setRemoving]  = useState<string | null>(null)
+  const [errorMsg,  setErrorMsg]  = useState("")
+
+  const emails = settings.allowedEmails ?? []
+
+  const handleAdd = async () => {
+    const email = novoEmail.trim().toLowerCase()
+    setErrorMsg("")
+    if (!email || !email.includes("@") || !email.includes(".")) {
+      setErrorMsg("Insere um email válido")
+      return
+    }
+    if (emails.includes(email)) {
+      setErrorMsg("Este email já está autorizado")
+      return
+    }
+    setAdding(true)
+    try {
+      await addAllowedEmail(email)
+      setNovoEmail("")
+    } catch (e) {
+      console.error(e)
+      setErrorMsg("Erro ao adicionar. Tenta novamente.")
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  const handleRemove = async (email: string) => {
+    setRemoving(email)
+    try {
+      await removeAllowedEmail(email)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setRemoving(null)
+    }
+  }
+
+  return (
+    <SectionCard
+      icon={<UserPlus className="h-4 w-4" />}
+      title="Acessos & Registos"
+      description="Só emails autorizados podem criar conta nova na app"
+      accent="blue"
+    >
+      {loading ? (
+        <div className="px-5 py-4 flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm">A carregar…</span>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-xs text-muted-foreground/70 leading-relaxed">
+            Contas já existentes nunca são afetadas por esta lista — isto só controla quem
+            pode criar conta <strong className="text-foreground">pela primeira vez</strong>.
+          </p>
+
+          {/* Adicionar email */}
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/40" />
+                <input
+                  type="email"
+                  placeholder="email@exemplo.com"
+                  value={novoEmail}
+                  onChange={e => { setNovoEmail(e.target.value); setErrorMsg("") }}
+                  onKeyDown={e => e.key === "Enter" && handleAdd()}
+                  className={cn(
+                    "w-full h-10 pl-9 pr-3 rounded-xl border border-border/50 bg-background",
+                    "text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                  )}
+                />
+              </div>
+              <button
+                onClick={handleAdd}
+                disabled={adding || !novoEmail.trim()}
+                className={cn(
+                  "h-10 px-4 rounded-xl font-bold text-sm transition-all shrink-0 flex items-center gap-1.5",
+                  "bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed"
+                )}
+              >
+                {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Autorizar"}
+              </button>
+            </div>
+            {errorMsg && (
+              <p className="text-[11px] text-red-500 font-medium">{errorMsg}</p>
+            )}
+          </div>
+
+          {/* Lista de emails autorizados */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">
+              {emails.length} email{emails.length !== 1 ? "s" : ""} autorizado{emails.length !== 1 ? "s" : ""}
+            </p>
+            {emails.length === 0 ? (
+              <div className="px-3 py-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30 text-center">
+                <p className="text-[11px] text-amber-700/80 dark:text-amber-400/70">
+                  Nenhum email autorizado — neste momento, ninguém consegue criar conta nova.
+                </p>
+              </div>
+            ) : (
+              <div className="max-h-64 overflow-y-auto space-y-1">
+                {emails.map(email => (
+                  <div
+                    key={email}
+                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-muted/30 border border-border/30"
+                  >
+                    <span className="text-xs font-medium truncate">{email}</span>
+                    <button
+                      onClick={() => handleRemove(email)}
+                      disabled={removing === email}
+                      className="w-7 h-7 rounded-lg hover:bg-red-100 dark:hover:bg-red-950/30 flex items-center justify-center shrink-0 transition-colors group"
+                    >
+                      {removing === email
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                        : <Trash2 className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-red-500" />
+                      }
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  )
+}
+
 export function AdminSettingsView() {
   const { user, logout } = useAuth()
 
@@ -327,6 +463,9 @@ export function AdminSettingsView() {
 
         {/* ── Bloqueio de dias ── */}
         <DiasBloqueioCard />
+
+        {/* ── Acessos & Registos ── */}
+        <AcessosCard />
 
         {/* ── Funcionalidades futuras ── */}
         <SectionCard

@@ -18,6 +18,7 @@ import {
 } from "firebase/auth"
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { usePathname, useRouter } from "next/navigation"
+import { isEmailAllowed, type GlobalSettings } from "@/lib/useGlobalSettings"
 
 interface AuthContextType {
   user: User | null
@@ -77,12 +78,58 @@ function ContaSuspensaScreen({ onLogout }: { onLogout: () => void }) {
   )
 }
 
+// ── Ecrã de acesso não autorizado ──────────────────────────────────────────────
+// Mostrada quando o email da conta Google não está na lista de emails autorizados.
+
+function AcessoNaoAutorizadoScreen({ onLogout }: { onLogout: () => void }) {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 px-5">
+      <div className="w-full max-w-sm text-center space-y-6">
+        <div className="flex justify-center">
+          <div className="w-20 h-20 rounded-3xl bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-10 w-10 text-red-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <h1 className="text-2xl font-bold text-foreground">Acesso não autorizado</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Este email não tem permissão para criar conta nesta app.
+            Contacta o teu administrador para pedires acesso.
+          </p>
+        </div>
+
+        <button
+          onClick={onLogout}
+          className="w-full h-12 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all"
+        >
+          Voltar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── AuthProvider ──────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [isSuspended, setIsSuspended] = useState(false)
+  const [isUnauthorized, setIsUnauthorized] = useState(false)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -99,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut(auth)
     setUser(null)
     setIsSuspended(false)
+    setIsUnauthorized(false)
     // Redireciona para o logout do Google para limpar a sessão em cache
     // Ao voltar, o login page vai pedir para selecionar conta novamente
     router.push("/login")
@@ -111,7 +159,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const snap = await getDoc(userRef)
 
         if (!snap.exists()) {
-          // Conta nova
+          // Conta nova — verifica se o email está autorizado antes de criar seja o que for
+          const globalSnap = await getDoc(doc(db, "config", "global"))
+          const globalSettings = (globalSnap.exists() ? globalSnap.data() : {}) as GlobalSettings
+
+          if (!isEmailAllowed(globalSettings, firebaseUser.email)) {
+            console.warn(`[Auth] Email não autorizado a registar-se: ${firebaseUser.email}`)
+            await signOut(auth)
+            setUser(null)
+            setIsUnauthorized(true)
+            setIsAuthLoading(false)
+            return
+          }
+
           const suggestedUsername =
             firebaseUser.displayName?.trim() ||
             (firebaseUser.email ? firebaseUser.email.split("@")[0].trim() : "utilizador")
@@ -128,8 +188,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           console.log(`[Auth] Nova conta criada → username: ${suggestedUsername}`)
           setIsSuspended(false)
+          setIsUnauthorized(false)
         } else {
           const data = snap.data()
+
+          setIsUnauthorized(false)
 
           // ✅ Verifica se a conta foi suspensa pelo admin
           // ativo: undefined ou true → conta normal
@@ -195,6 +258,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // ✅ Conta suspensa — bloqueia toda a app, mostra ecrã informativo
   if (isSuspended) {
     return <ContaSuspensaScreen onLogout={performLogout} />
+  }
+
+  // ✅ Email não autorizado a criar conta — bloqueia antes de sequer entrar
+  if (isUnauthorized) {
+    return <AcessoNaoAutorizadoScreen onLogout={performLogout} />
   }
 
   return (
