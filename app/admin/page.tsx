@@ -33,6 +33,7 @@ const AdminDashboardView     = dynamic(() => import("@/components/admin/admin-da
 const AdminCollaboratorsView = dynamic(() => import("@/components/admin/admin-collaborators-view").then(m => ({ default: m.AdminCollaboratorsView })), { loading: SkeletonView })
 const AdminFinanceView       = dynamic(() => import("@/components/admin/admin-finance-view").then(m => ({ default: m.AdminFinanceView })), { loading: SkeletonView })
 const AdminObrasView         = dynamic(() => import("@/components/admin/admin-obras-view").then(m => ({ default: m.AdminObrasView })), { loading: SkeletonView })
+const AdminEscalasView       = dynamic(() => import("@/components/admin/admin-escalas-view").then(m => ({ default: m.AdminEscalasView })), { loading: SkeletonView })
 const AdminReportsView       = dynamic(() => import("@/components/admin/admin-reports-view").then(m => ({ default: m.AdminReportsView })), { loading: SkeletonView })
 const AdminSettingsView      = dynamic(() => import("@/components/admin/admin-settings-view").then(m => ({ default: m.AdminSettingsView })), { loading: SkeletonView })
 
@@ -118,6 +119,9 @@ function AdminContent() {
           </AdminTabPane>
           <AdminTabPane active={activeTab === "obras"}>
             <AdminObrasView />
+          </AdminTabPane>
+          <AdminTabPane active={activeTab === "escalas"}>
+            <AdminEscalasView />
           </AdminTabPane>
           <AdminTabPane active={activeTab === "reports"}>
             <AdminReportsView />

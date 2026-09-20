@@ -17,6 +17,7 @@ import { isDayLocked } from "@/lib/utils"
 import { db } from "@/lib/firebase"
 import { useGlobalSettings, isUserUnlocked, isDayUnlocked } from "@/lib/useGlobalSettings"
 import { ReportsView } from "@/components/reports-view"
+import { EscalaDoDia } from "@/components/escala-do-dia"
 
 interface CalendarViewProps {
   onSelectDate: (date: Date) => void
@@ -428,6 +429,7 @@ export function CalendarView(
           )}
         </div>
         <div className="flex items-center gap-1">
+          <EscalaDoDia />
           <button
             onClick={() => setReportModalOpen(true)}
             className="flex items-center gap-1.5 px-2 h-8 rounded-xl bg-muted/60 hover:bg-muted border border-border/40 text-xs font-medium text-foreground transition-colors shrink-0"
