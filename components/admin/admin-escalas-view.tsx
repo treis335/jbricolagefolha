@@ -141,26 +141,53 @@ export function AdminEscalasView() {
     docPdf.setDrawColor(220)
     docPdf.line(14, 30, 283, 30)
 
-    // Uma linha por colaborador — obra e morada, tal como na folha de papel
-    const linhas = equipasValidas.flatMap(eq =>
-      eq.colaboradorUids.map(uid => [
-        nomeById.get(uid) ?? uid,
-        eq.obraNome,
-        eq.obraMorada || "—",
-      ])
-    ).sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]))
+    // Um bloco por obra: nome da obra em cima, toda a equipa por baixo — sem morada
+    const grupos = equipasValidas
+      .map(eq => ({
+        obra: eq.obraNome,
+        equipa: eq.colaboradorUids.map(uid => nomeById.get(uid) ?? uid).join("   ·   "),
+      }))
+      .sort((a, b) => a.obra.localeCompare(b.obra))
+
+    const contentWidth = 269
+    const innerWidth = contentWidth - 10
+    docPdf.setFont("helvetica", "normal")
+    docPdf.setFontSize(10.5)
+    const linhasPorGrupo = grupos.map(g => docPdf.splitTextToSize(g.equipa, innerWidth) as string[])
 
     autoTable(docPdf, {
       startY: 36,
-      head: [["Colaborador", "Obra", "Morada"]],
-      body: linhas,
+      body: grupos.map(() => [""]),
+      showHead: false,
       theme: "grid",
-      styles: { fontSize: 10, cellPadding: 4, lineColor: [225, 225, 225], lineWidth: 0.2 },
-      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: "bold", fontSize: 10 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: {
-        0: { fontStyle: "bold", cellWidth: 70 },
-        1: { cellWidth: 90 },
+      styles: { cellPadding: 0, lineColor: [225, 225, 225], lineWidth: 0.2 },
+      columnStyles: { 0: { cellWidth: contentWidth } },
+      didParseCell: (data) => {
+        const linhas = linhasPorGrupo[data.row.index] ?? [""]
+        data.cell.styles.minCellHeight = 13 + linhas.length * 5.2
+      },
+      didDrawCell: (data) => {
+        const g = grupos[data.row.index]
+        const linhas = linhasPorGrupo[data.row.index] ?? [""]
+        if (data.row.index % 2 === 1) {
+          docPdf.setFillColor(248, 250, 252)
+          docPdf.rect(data.cell.x, data.cell.y, data.cell.width, data.cell.height, "F")
+        }
+        docPdf.setFillColor(217, 119, 6)
+        docPdf.rect(data.cell.x, data.cell.y, 1.6, data.cell.height, "F")
+
+        const x = data.cell.x + 6
+        let y = data.cell.y + 8
+        docPdf.setFont("helvetica", "bold")
+        docPdf.setFontSize(12.5)
+        docPdf.setTextColor(20)
+        docPdf.text(g.obra, x, y)
+
+        y += 6.5
+        docPdf.setFont("helvetica", "normal")
+        docPdf.setFontSize(10.5)
+        docPdf.setTextColor(90)
+        docPdf.text(linhas, x, y)
       },
     })
 
