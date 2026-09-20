@@ -97,35 +97,71 @@ export function AdminEscalasView() {
   }
 
   const handleExportPdf = async () => {
-    const { jsPDF } = await import("jspdf")
-    const docPdf = new jsPDF()
+    const { default: jsPDF } = await import("jspdf")
+    const { default: autoTable } = await import("jspdf-autotable")
+    const docPdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" })
+
     const [y, m, d] = date.split("-").map(Number)
     const dataFmt = new Date(y, m - 1, d).toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
 
-    docPdf.setFontSize(16)
-    docPdf.text("Escala do dia", 14, 18)
-    docPdf.setFontSize(11)
-    docPdf.setTextColor(100)
-    docPdf.text(dataFmt, 14, 26)
+    // Logótipo no canto superior esquerdo
+    try {
+      const res = await fetch("/apple-icon.png")
+      const blob = await res.blob()
+      const logoDataUrl: string = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+      docPdf.addImage(logoDataUrl, "PNG", 14, 10, 16, 16)
+    } catch (err) {
+      console.warn("[Escala PDF] logótipo não carregado:", err)
+    }
 
-    let cursorY = 40
-    equipasValidas.forEach(eq => {
-      docPdf.setFontSize(13)
-      docPdf.setTextColor(20)
-      docPdf.text(eq.obraNome, 14, cursorY)
-      if (eq.obraMorada) {
-        docPdf.setFontSize(9)
-        docPdf.setTextColor(120)
-        docPdf.text(eq.obraMorada, 14, cursorY + 5)
-        cursorY += 5
-      }
-      cursorY += 8
-      docPdf.setFontSize(10)
-      docPdf.setTextColor(40)
-      const nomes = eq.colaboradorUids.map(uid => nomeById.get(uid) ?? uid).join(", ")
-      const linhas = docPdf.splitTextToSize(nomes, 180)
-      docPdf.text(linhas, 18, cursorY)
-      cursorY += linhas.length * 5 + 10
+    docPdf.setFont("helvetica", "bold")
+    docPdf.setFontSize(16)
+    docPdf.setTextColor(20)
+    docPdf.text("JBRICOLAGE", 34, 17)
+    docPdf.setFont("helvetica", "normal")
+    docPdf.setFontSize(9)
+    docPdf.setTextColor(120)
+    docPdf.text("Escala do dia", 34, 23)
+
+    docPdf.setFont("helvetica", "bold")
+    docPdf.setFontSize(11)
+    docPdf.setTextColor(20)
+    const dataLabel = dataFmt.charAt(0).toUpperCase() + dataFmt.slice(1)
+    docPdf.text(dataLabel, 283, 17, { align: "right" })
+    docPdf.setFont("helvetica", "normal")
+    docPdf.setFontSize(8)
+    docPdf.setTextColor(140)
+    docPdf.text(`${equipasValidas.length} obra${equipasValidas.length !== 1 ? "s" : ""} · ${equipasValidas.reduce((s, eq) => s + eq.colaboradorUids.length, 0)} colaboradores`, 283, 22, { align: "right" })
+
+    docPdf.setDrawColor(220)
+    docPdf.line(14, 30, 283, 30)
+
+    // Uma linha por colaborador — obra e morada, tal como na folha de papel
+    const linhas = equipasValidas.flatMap(eq =>
+      eq.colaboradorUids.map(uid => [
+        nomeById.get(uid) ?? uid,
+        eq.obraNome,
+        eq.obraMorada || "—",
+      ])
+    ).sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]))
+
+    autoTable(docPdf, {
+      startY: 36,
+      head: [["Colaborador", "Obra", "Morada"]],
+      body: linhas,
+      theme: "grid",
+      styles: { fontSize: 10, cellPadding: 4, lineColor: [225, 225, 225], lineWidth: 0.2 },
+      headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: "bold", fontSize: 10 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { fontStyle: "bold", cellWidth: 70 },
+        1: { cellWidth: 90 },
+      },
     })
 
     docPdf.save(`escala-${date}.pdf`)
@@ -134,27 +170,27 @@ export function AdminEscalasView() {
   const teamSheetEquipa = teamSheetForIndex !== null ? equipas[teamSheetForIndex] : null
 
   return (
-    <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4 pb-28">
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-5 pb-28">
 
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
+        <div className="w-11 h-11 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
           <CalendarDays className="h-5 w-5 text-amber-600 dark:text-amber-400" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-lg font-black tracking-tight">Escala do dia</h1>
-          <p className="text-xs text-muted-foreground/70">Quem vai para onde — sem folha de papel</p>
+          <h1 className="text-xl font-black tracking-tight">Escala do dia</h1>
+          <p className="text-xs text-muted-foreground/70 mt-0.5">Quem vai para onde — sem folha de papel</p>
         </div>
       </div>
 
       {/* Seletor de data — chips rápidos + data específica */}
-      <div className="flex items-center gap-2 p-1 rounded-2xl border border-border/60 bg-card">
+      <div className="flex items-center gap-2 p-1.5 rounded-2xl border border-border/60 bg-card">
         {[{ label: "Hoje", value: hojeStr() }, { label: "Amanhã", value: amanhaStr() }].map(opt => (
           <button
             key={opt.value}
             onClick={() => setDate(opt.value)}
             className={cn(
-              "flex-1 h-9 rounded-xl text-sm font-semibold transition-all",
+              "flex-1 h-10 rounded-xl text-sm font-semibold transition-all",
               date === opt.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
             )}
           >
@@ -166,11 +202,33 @@ export function AdminEscalasView() {
           value={date}
           onChange={e => setDate(e.target.value)}
           className={cn(
-            "h-9 px-3 rounded-xl text-sm font-semibold bg-transparent transition-all cursor-pointer shrink-0",
+            "h-10 px-3 rounded-xl text-sm font-semibold bg-transparent transition-all cursor-pointer shrink-0",
             date !== hojeStr() && date !== amanhaStr() ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
           )}
         />
       </div>
+
+      {/* Resumo rápido do dia selecionado */}
+      {!loading && equipasValidas.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-amber-100 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/25 p-4">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <HardHat className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Obras</span>
+            </div>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{equipasValidas.length}</p>
+          </div>
+          <div className="rounded-2xl border border-violet-100 dark:border-violet-900/40 bg-violet-50 dark:bg-violet-950/25 p-4">
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <Users className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Colaboradores</span>
+            </div>
+            <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+              {equipasValidas.reduce((s, eq) => s + eq.colaboradorUids.length, 0)}
+            </p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="py-16 flex items-center justify-center text-muted-foreground gap-2">
@@ -178,9 +236,9 @@ export function AdminEscalasView() {
           <span className="text-sm">A carregar…</span>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {equipas.length === 0 && (
-            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 flex flex-col items-center justify-center py-12 text-center gap-2">
+            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 flex flex-col items-center justify-center py-14 text-center gap-2.5">
               <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center">
                 <HardHat className="h-6 w-6 text-muted-foreground/30" />
               </div>
@@ -194,7 +252,7 @@ export function AdminEscalasView() {
             return (
               <div key={idx} className="rounded-2xl border border-border/60 bg-card overflow-hidden">
                 {!temObra ? (
-                  <div className="p-4 space-y-2.5">
+                  <div className="p-5 space-y-3">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Nova obra</p>
                     <div className="flex gap-2">
                       <button
@@ -224,14 +282,14 @@ export function AdminEscalasView() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex items-center gap-3 p-4">
-                      <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
-                        <HardHat className="h-[18px] w-[18px] text-amber-600 dark:text-amber-400" />
+                    <div className="flex items-center gap-3 p-5">
+                      <div className="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
+                        <HardHat className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="font-bold text-sm leading-tight truncate">{eq.obraNome}</p>
+                        <p className="font-bold text-base leading-tight truncate">{eq.obraNome}</p>
                         {eq.obraMorada && (
-                          <p className="text-[11px] text-muted-foreground/60 flex items-center gap-1 mt-0.5 truncate">
+                          <p className="text-xs text-muted-foreground/60 flex items-center gap-1 mt-1 truncate">
                             <MapPin className="h-3 w-3 shrink-0" /> {eq.obraMorada}
                           </p>
                         )}
@@ -239,20 +297,20 @@ export function AdminEscalasView() {
                       <button
                         onClick={() => setPickerForIndex(idx)}
                         title="Trocar obra"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted shrink-0"
+                        className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-muted shrink-0"
                       >
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground/50" />
+                        <Pencil className="h-4 w-4 text-muted-foreground/50" />
                       </button>
                       <button
                         onClick={() => removeEquipa(idx)}
                         title="Remover"
-                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/30 shrink-0 group"
+                        className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/30 shrink-0 group"
                       >
-                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-red-500" />
+                        <Trash2 className="h-4 w-4 text-muted-foreground/50 group-hover:text-red-500" />
                       </button>
                     </div>
 
-                    <div className="px-4 pb-4 space-y-2 border-t border-border/40 pt-3">
+                    <div className="px-5 pb-5 space-y-2.5 border-t border-border/40 pt-4">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1">
                           <Users className="h-3 w-3" /> Equipa
@@ -267,7 +325,7 @@ export function AdminEscalasView() {
                       {eq.colaboradorUids.length === 0 ? (
                         <button
                           onClick={() => setTeamSheetForIndex(idx)}
-                          className="w-full h-9 rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                          className="w-full h-10 rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
                         >
                           + Adicionar colaboradores
                         </button>
