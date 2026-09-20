@@ -37,6 +37,7 @@ export function AdminEscalasView() {
   const [saved, setSaved] = useState(false)
   const [pickerForIndex, setPickerForIndex] = useState<number | null>(null)
   const [teamSheetForIndex, setTeamSheetForIndex] = useState<number | null>(null)
+  const [manualDraft, setManualDraft] = useState<Record<number, string>>({})
 
   useEffect(() => {
     limparEscalasPassadas(hojeStr()).catch(err => console.error(err))
@@ -57,10 +58,24 @@ export function AdminEscalasView() {
 
   const removeEquipa = (idx: number) => {
     setEquipas(prev => prev.filter((_, i) => i !== idx))
+    setManualDraft(prev => {
+      const next: Record<number, string> = {}
+      Object.entries(prev).forEach(([k, v]) => {
+        const i = Number(k)
+        if (i < idx) next[i] = v
+        else if (i > idx) next[i - 1] = v
+      })
+      return next
+    })
   }
 
   const setObraManual = (idx: number, nome: string) => {
     setEquipas(prev => prev.map((eq, i) => i === idx ? { ...eq, obraId: null, obraNome: nome, obraMorada: "" } : eq))
+  }
+
+  const confirmarObraManual = (idx: number) => {
+    const nome = (manualDraft[idx] ?? "").trim()
+    if (nome) setObraManual(idx, nome)
   }
 
   const setObraFromPicker = (idx: number, obra: Obra) => {
@@ -300,12 +315,24 @@ export function AdminEscalasView() {
                       <span className="text-[10px] text-muted-foreground/50 font-semibold uppercase">ou</span>
                       <div className="flex-1 h-px bg-border/50" />
                     </div>
-                    <input
-                      type="text"
-                      placeholder="Escreve o nome da obra…"
-                      onChange={e => setObraManual(idx, e.target.value)}
-                      className="w-full h-11 px-3 rounded-xl border border-border/40 bg-background text-sm font-medium"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Escreve o nome da obra…"
+                        value={manualDraft[idx] ?? ""}
+                        onChange={e => setManualDraft(prev => ({ ...prev, [idx]: e.target.value }))}
+                        onBlur={() => confirmarObraManual(idx)}
+                        onKeyDown={e => { if (e.key === "Enter") { e.currentTarget.blur() } }}
+                        className="flex-1 h-11 px-3 rounded-xl border border-border/40 bg-background text-sm font-medium"
+                      />
+                      <button
+                        onClick={() => confirmarObraManual(idx)}
+                        disabled={!(manualDraft[idx] ?? "").trim()}
+                        className="h-11 px-4 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-30 shrink-0"
+                      >
+                        OK
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <>
