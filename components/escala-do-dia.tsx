@@ -57,13 +57,18 @@ export function EscalaDoDia() {
       <button
         onClick={() => { setIndex(0); setOpen(true) }}
         className={cn(
-          "flex items-center gap-2 px-3 h-9 rounded-xl shrink-0 transition-all press-effect",
+          "relative flex items-center justify-center w-8 h-8 rounded-xl shrink-0 transition-all press-effect",
           "bg-amber-100 dark:bg-amber-950/40 border border-amber-300/60 dark:border-amber-800/50",
-          "text-amber-800 dark:text-amber-300 text-xs font-bold hover:bg-amber-200/60 dark:hover:bg-amber-900/50"
+          "text-amber-700 dark:text-amber-400 hover:bg-amber-200/60 dark:hover:bg-amber-900/50"
         )}
+        title="Escala do dia"
       >
         <CalendarDays className="h-3.5 w-3.5" />
-        <span>Escala{escalas.length > 1 ? `s (${escalas.length})` : ""}</span>
+        {escalas.length > 1 && (
+          <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold flex items-center justify-center leading-none">
+            {escalas.length}
+          </span>
+        )}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

@@ -2,8 +2,11 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Plus, Trash2, HardHat, Users, Download, Loader2, CalendarDays } from "lucide-react"
-import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Plus, Trash2, HardHat, Users, Download, Loader2, CalendarDays,
+  Pencil, X, ChevronRight, MapPin,
+} from "lucide-react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { ObraPicker } from "@/components/forms/obra-picker"
 import { useCollaborators } from "@/hooks/useCollaborators"
 import { formatLocalDate } from "@/lib/date-utils"
@@ -14,20 +17,29 @@ import {
   type EscalaEquipa,
 } from "@/lib/escalas-service"
 
+const hojeStr = () => formatLocalDate(new Date())
+const amanhaStr = () => formatLocalDate(new Date(Date.now() + 86400000))
+
+function formatDataChip(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })
+}
+
 export function AdminEscalasView() {
   const { collaborators } = useCollaborators()
   const ativos = useMemo(() => collaborators.filter(c => c.ativo), [collaborators])
+  const nomeById = useMemo(() => new Map(collaborators.map(c => [c.id, c.name])), [collaborators])
 
-  const [date, setDate] = useState(() => formatLocalDate(new Date()))
+  const [date, setDate] = useState(hojeStr)
   const [equipas, setEquipas] = useState<EscalaEquipa[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [pickerForIndex, setPickerForIndex] = useState<number | null>(null)
+  const [teamSheetForIndex, setTeamSheetForIndex] = useState<number | null>(null)
 
-  // Limpeza de escalas passadas — corre uma vez, quando o admin abre esta ferramenta
   useEffect(() => {
-    limparEscalasPassadas(formatLocalDate(new Date())).catch(err => console.error(err))
+    limparEscalasPassadas(hojeStr()).catch(err => console.error(err))
   }, [])
 
   useEffect(() => {
@@ -67,13 +79,14 @@ export function AdminEscalasView() {
     }))
   }
 
+  const equipasValidas = equipas.filter(eq => eq.obraNome.trim() && eq.colaboradorUids.length > 0)
+
   const handleSave = async () => {
     setSaving(true)
     setSaved(false)
     try {
-      const validas = equipas.filter(eq => eq.obraNome.trim() && eq.colaboradorUids.length > 0)
-      await saveEscalaDia(date, validas)
-      setEquipas(validas)
+      await saveEscalaDia(date, equipasValidas)
+      setEquipas(equipasValidas)
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } catch (err) {
@@ -96,8 +109,7 @@ export function AdminEscalasView() {
     docPdf.text(dataFmt, 14, 26)
 
     let cursorY = 40
-    equipas.forEach(eq => {
-      if (!eq.obraNome.trim() || eq.colaboradorUids.length === 0) return
+    equipasValidas.forEach(eq => {
       docPdf.setFontSize(13)
       docPdf.setTextColor(20)
       docPdf.text(eq.obraNome, 14, cursorY)
@@ -110,9 +122,7 @@ export function AdminEscalasView() {
       cursorY += 8
       docPdf.setFontSize(10)
       docPdf.setTextColor(40)
-      const nomes = eq.colaboradorUids
-        .map(uid => collaborators.find(c => c.id === uid)?.name ?? uid)
-        .join(", ")
+      const nomes = eq.colaboradorUids.map(uid => nomeById.get(uid) ?? uid).join(", ")
       const linhas = docPdf.splitTextToSize(nomes, 180)
       docPdf.text(linhas, 18, cursorY)
       cursorY += linhas.length * 5 + 10
@@ -121,97 +131,180 @@ export function AdminEscalasView() {
     docPdf.save(`escala-${date}.pdf`)
   }
 
+  const teamSheetEquipa = teamSheetForIndex !== null ? equipas[teamSheetForIndex] : null
+
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4 pb-24">
-      <div className="flex items-center gap-2">
-        <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
-          <CalendarDays className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 space-y-4 pb-28">
+
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
+          <CalendarDays className="h-5 w-5 text-amber-600 dark:text-amber-400" />
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className="text-lg font-black tracking-tight">Escala do dia</h1>
-          <p className="text-xs text-muted-foreground/70">Quem vai para onde, sem folha de papel</p>
+          <p className="text-xs text-muted-foreground/70">Quem vai para onde — sem folha de papel</p>
         </div>
       </div>
 
-      {/* Seletor de data */}
-      <div className="flex items-center gap-2">
+      {/* Seletor de data — chips rápidos + data específica */}
+      <div className="flex items-center gap-2 p-1 rounded-2xl border border-border/60 bg-card">
+        {[{ label: "Hoje", value: hojeStr() }, { label: "Amanhã", value: amanhaStr() }].map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setDate(opt.value)}
+            className={cn(
+              "flex-1 h-9 rounded-xl text-sm font-semibold transition-all",
+              date === opt.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
         <input
           type="date"
           value={date}
           onChange={e => setDate(e.target.value)}
-          className="h-11 px-3 rounded-xl border border-border/50 bg-card text-sm font-medium flex-1"
+          className={cn(
+            "h-9 px-3 rounded-xl text-sm font-semibold bg-transparent transition-all cursor-pointer shrink-0",
+            date !== hojeStr() && date !== amanhaStr() ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+          )}
         />
       </div>
 
       {loading ? (
-        <div className="py-10 flex items-center justify-center text-muted-foreground gap-2">
+        <div className="py-16 flex items-center justify-center text-muted-foreground gap-2">
           <Loader2 className="h-4 w-4 animate-spin" />
           <span className="text-sm">A carregar…</span>
         </div>
       ) : (
         <div className="space-y-3">
-          {equipas.map((eq, idx) => (
-            <div key={idx} className="rounded-2xl border border-border/50 bg-card p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <HardHat className="h-4 w-4 text-amber-500 shrink-0" />
-                <input
-                  type="text"
-                  placeholder="Nome da obra (ou escolhe uma existente)"
-                  value={eq.obraNome}
-                  onChange={e => setObraManual(idx, e.target.value)}
-                  className="flex-1 h-9 px-2 rounded-lg border border-border/40 bg-background text-sm font-medium"
-                />
-                <button
-                  onClick={() => setPickerForIndex(idx)}
-                  className="h-9 px-2.5 rounded-lg bg-muted/60 hover:bg-muted text-xs font-medium shrink-0"
-                >
-                  Escolher
-                </button>
-                <button
-                  onClick={() => removeEquipa(idx)}
-                  className="w-9 h-9 rounded-lg flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/30 shrink-0 group"
-                >
-                  <Trash2 className="h-4 w-4 text-muted-foreground/50 group-hover:text-red-500" />
-                </button>
+          {equipas.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-border/60 bg-muted/10 flex flex-col items-center justify-center py-12 text-center gap-2">
+              <div className="w-14 h-14 rounded-2xl bg-muted/50 flex items-center justify-center">
+                <HardHat className="h-6 w-6 text-muted-foreground/30" />
               </div>
-
-              {eq.obraMorada && (
-                <p className="text-[11px] text-muted-foreground/60 pl-6">{eq.obraMorada}</p>
-              )}
-
-              <div className="pl-6 space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1">
-                  <Users className="h-3 w-3" /> Equipa ({eq.colaboradorUids.length})
-                </p>
-                <div className="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto pt-1">
-                  {ativos.map(col => (
-                    <label
-                      key={col.id}
-                      className={cn(
-                        "flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-colors",
-                        eq.colaboradorUids.includes(col.id) ? "bg-primary/10" : "hover:bg-muted/50"
-                      )}
-                    >
-                      <Checkbox
-                        checked={eq.colaboradorUids.includes(col.id)}
-                        onCheckedChange={() => toggleColaborador(idx, col.id)}
-                      />
-                      <span className="truncate font-medium">{col.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
+              <p className="text-sm text-muted-foreground">Ainda sem obras marcadas para {formatDataChip(date)}</p>
             </div>
-          ))}
+          )}
+
+          {equipas.map((eq, idx) => {
+            const temObra = eq.obraNome.trim().length > 0
+
+            return (
+              <div key={idx} className="rounded-2xl border border-border/60 bg-card overflow-hidden">
+                {!temObra ? (
+                  <div className="p-4 space-y-2.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Nova obra</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setPickerForIndex(idx)}
+                        className="flex-1 h-11 rounded-xl bg-primary/8 border border-primary/20 hover:bg-primary/12 text-primary text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+                      >
+                        <HardHat className="h-4 w-4" /> Escolher obra existente
+                      </button>
+                      <button
+                        onClick={() => removeEquipa(idx)}
+                        className="w-11 h-11 rounded-xl flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/30 shrink-0 group"
+                      >
+                        <Trash2 className="h-4 w-4 text-muted-foreground/50 group-hover:text-red-500" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px bg-border/50" />
+                      <span className="text-[10px] text-muted-foreground/50 font-semibold uppercase">ou</span>
+                      <div className="flex-1 h-px bg-border/50" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Escreve o nome da obra…"
+                      onChange={e => setObraManual(idx, e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border/40 bg-background text-sm font-medium"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 p-4">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center shrink-0">
+                        <HardHat className="h-[18px] w-[18px] text-amber-600 dark:text-amber-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold text-sm leading-tight truncate">{eq.obraNome}</p>
+                        {eq.obraMorada && (
+                          <p className="text-[11px] text-muted-foreground/60 flex items-center gap-1 mt-0.5 truncate">
+                            <MapPin className="h-3 w-3 shrink-0" /> {eq.obraMorada}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setPickerForIndex(idx)}
+                        title="Trocar obra"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-muted shrink-0"
+                      >
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground/50" />
+                      </button>
+                      <button
+                        onClick={() => removeEquipa(idx)}
+                        title="Remover"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-red-100 dark:hover:bg-red-950/30 shrink-0 group"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-red-500" />
+                      </button>
+                    </div>
+
+                    <div className="px-4 pb-4 space-y-2 border-t border-border/40 pt-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1">
+                          <Users className="h-3 w-3" /> Equipa
+                        </p>
+                        <button
+                          onClick={() => setTeamSheetForIndex(idx)}
+                          className="text-[11px] font-semibold text-primary flex items-center gap-0.5"
+                        >
+                          Editar <ChevronRight className="h-3 w-3" />
+                        </button>
+                      </div>
+                      {eq.colaboradorUids.length === 0 ? (
+                        <button
+                          onClick={() => setTeamSheetForIndex(idx)}
+                          className="w-full h-9 rounded-xl border border-dashed border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                        >
+                          + Adicionar colaboradores
+                        </button>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {eq.colaboradorUids.map(uid => (
+                            <span key={uid} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/8 border border-primary/15 text-xs font-medium text-primary">
+                              {nomeById.get(uid) ?? "…"}
+                              <button onClick={() => toggleColaborador(idx, uid)} className="w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center">
+                                <X className="h-2.5 w-2.5" />
+                              </button>
+                            </span>
+                          ))}
+                          <button
+                            onClick={() => setTeamSheetForIndex(idx)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
+                          >
+                            <Plus className="h-3 w-3" /> Adicionar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })}
 
           <button
             onClick={addEquipa}
-            className="w-full h-11 rounded-2xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary transition-all"
+            className="w-full h-12 rounded-2xl border-2 border-dashed border-border/60 hover:border-primary/40 hover:bg-primary/5 flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground hover:text-primary transition-all"
           >
             <Plus className="h-4 w-4" /> Adicionar obra ao dia
           </button>
 
-          <div className="flex gap-2 pt-2">
+          {/* Barra de ações */}
+          <div className="flex gap-2 pt-1">
             <button
               onClick={handleSave}
               disabled={saving}
@@ -225,7 +318,7 @@ export function AdminEscalasView() {
             </button>
             <button
               onClick={handleExportPdf}
-              disabled={equipas.length === 0}
+              disabled={equipasValidas.length === 0}
               className="h-12 px-4 rounded-2xl bg-muted/60 hover:bg-muted disabled:opacity-40 flex items-center justify-center gap-2 text-sm font-semibold shrink-0"
             >
               <Download className="h-4 w-4" /> PDF
@@ -241,6 +334,53 @@ export function AdminEscalasView() {
           onSelect={obra => setObraFromPicker(pickerForIndex, obra)}
         />
       )}
+
+      {/* Sheet de seleção de equipa */}
+      <Sheet open={teamSheetForIndex !== null} onOpenChange={v => !v && setTeamSheetForIndex(null)}>
+        <SheetContent
+          side="bottom"
+          className="rounded-t-3xl border-0 bg-background max-h-[85dvh] flex flex-col p-0 shadow-2xl [&>button]:hidden sm:max-w-md sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl"
+        >
+          <div className="flex justify-center pt-3 shrink-0">
+            <div className="w-10 h-1 rounded-full bg-border/50" />
+          </div>
+          <SheetHeader className="text-left px-5 pt-4 pb-2 space-y-0">
+            <SheetTitle className="text-lg font-bold">Quem vai para {teamSheetEquipa?.obraNome || "esta obra"}?</SheetTitle>
+            <SheetDescription className="text-xs text-muted-foreground">Toca para marcar/desmarcar</SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-3 pb-3">
+            {ativos.map(col => {
+              const checked = teamSheetForIndex !== null && equipas[teamSheetForIndex]?.colaboradorUids.includes(col.id)
+              return (
+                <button
+                  key={col.id}
+                  onClick={() => teamSheetForIndex !== null && toggleColaborador(teamSheetForIndex, col.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-3 rounded-xl text-left transition-colors",
+                    checked ? "bg-primary/8" : "hover:bg-muted/50"
+                  )}
+                >
+                  <div className={cn(
+                    "w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-colors",
+                    checked ? "bg-primary border-primary" : "border-border"
+                  )}>
+                    {checked && <div className="w-2 h-2 rounded-sm bg-primary-foreground" />}
+                  </div>
+                  <span className="text-sm font-medium">{col.name}</span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="p-4 pt-2 border-t border-border/40 shrink-0">
+            <button
+              onClick={() => setTeamSheetForIndex(null)}
+              className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm"
+            >
+              Concluído
+            </button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
