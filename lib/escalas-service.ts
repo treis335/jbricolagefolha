@@ -67,7 +67,8 @@ export async function limparEscalasPassadas(hojeStr: string): Promise<void> {
 
 /**
  * Colaborador: escalas a partir de hoje onde o seu UID está presente numa equipa.
- * Devolve só a equipa relevante (com colegas), não a escala inteira do dia.
+ * Um colaborador pode estar em mais do que uma obra no mesmo dia — devolve
+ * uma entrada por cada equipa em que apareça (não só a primeira).
  */
 export async function getMinhasEscalas(
   uid: string,
@@ -76,8 +77,10 @@ export async function getMinhasEscalas(
   const dias = await getEscalasFuturas(hojeStr)
   const minhas: { date: string; equipa: EscalaEquipa }[] = []
   for (const dia of dias) {
-    const equipa = dia.equipas.find(eq => eq.colaboradorUids.includes(uid))
-    if (equipa) minhas.push({ date: dia.date, equipa })
+    const minhasEquipas = dia.equipas.filter(eq => eq.colaboradorUids.includes(uid))
+    for (const equipa of minhasEquipas) {
+      minhas.push({ date: dia.date, equipa })
+    }
   }
   return minhas.sort((a, b) => a.date.localeCompare(b.date))
 }

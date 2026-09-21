@@ -385,14 +385,18 @@ export function AdminEscalasView() {
                         </button>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
-                          {eq.colaboradorUids.map(uid => (
-                            <span key={uid} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/8 border border-primary/15 text-xs font-medium text-primary">
-                              {nomeById.get(uid) ?? "…"}
-                              <button onClick={() => toggleColaborador(idx, uid)} className="w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center">
-                                <X className="h-2.5 w-2.5" />
-                              </button>
-                            </span>
-                          ))}
+                          {eq.colaboradorUids.map(uid => {
+                            const emOutra = equipas.some((e, i) => i !== idx && e.colaboradorUids.includes(uid) && e.obraNome.trim())
+                            return (
+                              <span key={uid} className="inline-flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full bg-primary/8 border border-primary/15 text-xs font-medium text-primary">
+                                {emOutra && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" title="Também noutra obra hoje" />}
+                                {nomeById.get(uid) ?? "…"}
+                                <button onClick={() => toggleColaborador(idx, uid)} className="w-4 h-4 rounded-full hover:bg-primary/20 flex items-center justify-center">
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </span>
+                            )
+                          })}
                           <button
                             onClick={() => setTeamSheetForIndex(idx)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full border border-dashed border-border/60 text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors"
@@ -461,8 +465,18 @@ export function AdminEscalasView() {
             <SheetDescription className="text-xs text-muted-foreground">Toca para marcar/desmarcar</SheetDescription>
           </SheetHeader>
           <div className="flex-1 overflow-y-auto px-3 pb-3">
-            {ativos.map(col => {
+            {[...ativos]
+              .sort((a, b) => {
+                const aChecked = teamSheetForIndex !== null && equipas[teamSheetForIndex]?.colaboradorUids.includes(a.id)
+                const bChecked = teamSheetForIndex !== null && equipas[teamSheetForIndex]?.colaboradorUids.includes(b.id)
+                if (aChecked !== bChecked) return aChecked ? -1 : 1
+                return a.name.localeCompare(b.name)
+              })
+              .map(col => {
               const checked = teamSheetForIndex !== null && equipas[teamSheetForIndex]?.colaboradorUids.includes(col.id)
+              const outraObra = teamSheetForIndex !== null && !checked
+                ? equipas.find((eq, i) => i !== teamSheetForIndex && eq.colaboradorUids.includes(col.id) && eq.obraNome.trim())
+                : undefined
               return (
                 <button
                   key={col.id}
@@ -478,7 +492,14 @@ export function AdminEscalasView() {
                   )}>
                     {checked && <div className="w-2 h-2 rounded-sm bg-primary-foreground" />}
                   </div>
-                  <span className="text-sm font-medium">{col.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-sm font-medium block truncate">{col.name}</span>
+                    {outraObra && (
+                      <span className="text-[10px] text-amber-600/80 dark:text-amber-500/70 font-medium">
+                        também em {outraObra.obraNome}
+                      </span>
+                    )}
+                  </div>
                 </button>
               )
             })}

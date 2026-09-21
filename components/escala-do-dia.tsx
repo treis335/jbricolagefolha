@@ -112,7 +112,7 @@ export function EscalaDoDia() {
                 </p>
                 {escalas.length > 1 && (
                   <p className="text-[10px] text-amber-600/60 dark:text-amber-500/50 font-semibold mt-0.5">
-                    {index + 1} de {escalas.length} dias agendados
+                    {index + 1} de {escalas.length} {new Set(escalas.map(e => e.date)).size > 1 ? "dias agendados" : "obras hoje"}
                   </p>
                 )}
               </div>
