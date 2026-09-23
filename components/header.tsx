@@ -11,6 +11,7 @@ import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { EscalaDoDia } from "@/components/escala-do-dia"
+import { AlertaHorasButton } from "@/components/admin/alerta-horas-button"
 
 export function Header() {
   const { user } = useAuth()
@@ -83,6 +84,9 @@ export function Header() {
 
           {/* Escala do dia — só do lado colaborador */}
           {!isOnAdminPage && <EscalaDoDia />}
+
+          {/* Divergências de horas — só admin */}
+          {isAdmin && <AlertaHorasButton />}
 
           {/* Greeting — hidden on very small screens */}
           {firstName && (
