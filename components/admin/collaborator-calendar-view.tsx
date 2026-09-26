@@ -810,7 +810,7 @@ export function CollaboratorCalendarView({
               {isAdmin && (
                 <div className="p-4 border-t border-border/40 shrink-0">
                   <button
-                    onClick={() => setEditModalOpen(true)}
+                    onClick={() => { setModalOpen(false); setEditModalOpen(true) }}
                     className={cn(
                       "w-full h-11 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-colors",
                       selectedEntry.editadoPorAdmin
@@ -828,7 +828,7 @@ export function CollaboratorCalendarView({
             <div className="py-16 text-center space-y-3">
               <p className="text-muted-foreground text-sm">Sem registo para este dia.</p>
               <button
-                onClick={() => setEditModalOpen(true)}
+                onClick={() => { setModalOpen(false); setEditModalOpen(true) }}
                 className="h-11 px-5 rounded-2xl bg-primary/10 text-primary font-bold text-sm inline-flex items-center gap-2 hover:bg-primary/15"
               >
                 <Plus className="h-4 w-4" /> Adicionar registo

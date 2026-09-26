@@ -9,6 +9,11 @@ import { db } from "@/lib/firebase"
 import type { DayEntry } from "@/lib/types"
 import { calculateHours } from "@/lib/types"
 
+/** Remove chaves com valor undefined (a Firestore rejeita undefined em updateDoc/setDoc) */
+function limparUndefined<T>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj))
+}
+
 /** Lê as entries mais recentes diretamente da Firestore (evita sobrescrever edições concorrentes) */
 export async function getEntriesFrescas(uid: string): Promise<DayEntry[]> {
   const snap = await getDoc(doc(db, "users", uid))
@@ -30,14 +35,14 @@ export async function salvarEdicaoAdmin(
   const entries = await getEntriesFrescas(uid)
   const { normalHoras, extraHoras } = calculateHours(entryEditada.date, entryEditada.totalHoras)
 
-  const nova: DayEntry = {
+  const nova: DayEntry = limparUndefined({
     ...entryEditada,
     normalHoras,
     extraHoras,
     editadoPorAdmin: true,
     editadoPorAdminInfo: { adminUid, adminNome, em: new Date().toISOString() },
     notificacaoVista: false,
-  }
+  })
 
   const outras = entries.filter(e => e.date !== entryEditada.date)
   const novasEntries = [...outras, nova].sort((a, b) => a.date.localeCompare(b.date))
