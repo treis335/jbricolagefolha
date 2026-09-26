@@ -283,10 +283,15 @@ export function CollaboratorFinanceView({
     }
 
     const totalPending = sorted.reduce((s, m) => s + m.pending, 0)
-    const totalPaid = sorted.reduce((s, m) => s + m.paid, 0)
+    const totalPaidAplicado = sorted.reduce((s, m) => s + m.paid, 0)
     const totalCost = sorted.reduce((s, m) => s + m.cost, 0)
     const overdue = sorted.filter(m => m.periodo < NOW).reduce((s, m) => s + m.pending, 0)
     const totalHours = sorted.reduce((s, m) => s + m.hours, 0)
+
+    // ✅ Total realmente pago (soma bruta dos pagamentos) — pode ser maior do que o
+    // total devido, se o admin pagou adiantado. Essa diferença é o "crédito".
+    const totalPaid = payments.reduce((s, p) => s + (p.valor || 0), 0)
+    const credito = Math.max(0, totalPaid - totalCost)
 
     const monthsSet = new Set([NOW, ...sorted.map(m => m.periodo)])
     const available = Array.from(monthsSet).sort()
@@ -294,7 +299,7 @@ export function CollaboratorFinanceView({
     return {
       allMonths: sorted,
       availableMonths: available,
-      globalStats: { totalPending, totalPaid, totalCost, overdue, totalHours },
+      globalStats: { totalPending, totalPaid, totalPaidAplicado, totalCost, overdue, totalHours, credito },
     }
   }, [entries, rawPayments, currentRate, NOW])
 
@@ -458,12 +463,20 @@ export function CollaboratorFinanceView({
               {fmt(globalStats.overdue)} em atraso de meses anteriores
             </div>
           )}
+
+          {globalStats.credito > 0 && (
+            <div className="mt-4 flex items-center gap-2 text-xs text-blue-700 dark:text-blue-400 font-semibold bg-blue-100 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl px-3 py-2">
+              <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+              {fmt(globalStats.credito)} em crédito — pago adiantado, será usado nos próximos meses
+            </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-3 divide-x bg-card overflow-hidden w-full">
+        <div className={cn("grid divide-x bg-card overflow-hidden w-full", globalStats.credito > 0 ? "grid-cols-4" : "grid-cols-3")}>
           {[
             { label: "Devido",   value: fmt(globalStats.totalCost),    icon: <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" /> },
             { label: "Pago",     value: fmt(globalStats.totalPaid),    icon: <TrendingDown className="h-3.5 w-3.5 text-emerald-500" /> },
+            ...(globalStats.credito > 0 ? [{ label: "Crédito", value: fmt(globalStats.credito), icon: <TrendingUp className="h-3.5 w-3.5 text-blue-500" /> }] : []),
             { label: "Horas",   value: `${globalStats.totalHours.toFixed(1)}h`, icon: <Clock className="h-3.5 w-3.5 text-muted-foreground" /> },
           ].map(s => (
             <div key={s.label} className="px-2 sm:px-3 py-2.5 min-w-0 overflow-hidden">
