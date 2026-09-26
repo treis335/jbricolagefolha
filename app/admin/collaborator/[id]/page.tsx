@@ -926,6 +926,7 @@ export default function CollaboratorDetailPage() {
                     entries={collaborator.entries}
                     isAdmin={true}
                     unlockedDays={collaborator.unlockedDays ?? []}
+                    onEntryUpdated={fetchCollaborator}
                   />
                 </TabsContent>
 

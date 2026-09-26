@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Plus, Minus, X, Trash2, Users, UserPlus, Check, Loader2,
-  Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight,
+  Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight, ShieldCheck,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -218,9 +218,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }, [user])
 
   const dayUnlocked = isDayUnlocked(unlockedDays, dateStr)
-  const isLocked = dateStr && !userUnlocked && !dayUnlocked ? isDayLocked(dateStr, diasBloqueio) : false
   const existingEntry = dateStr ? getEntry(dateStr) : undefined
   const isEditing = !!existingEntry
+  const editadoPorAdmin = existingEntry?.editadoPorAdmin === true
+  const isLocked = editadoPorAdmin
+    ? true
+    : (dateStr && !userUnlocked && !dayUnlocked ? isDayLocked(dateStr, diasBloqueio) : false)
   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
 
   const { normalHoras, extraHoras } = useMemo(() =>
@@ -504,6 +507,18 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-6">
+
+              {editadoPorAdmin && (
+                <div className="rounded-2xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/25 px-3.5 py-3 flex items-start gap-2.5">
+                  <ShieldCheck className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">Este dia foi corrigido pelo admin</p>
+                    <p className="text-[11px] text-amber-600/70 dark:text-amber-500/60 mt-0.5">
+                      Os valores foram revistos e já não podem ser alterados. Fala com o admin se achares que há algum erro.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* ── Horas do dia ── */}
               <div className="rounded-2xl border border-border/40 bg-card overflow-hidden">

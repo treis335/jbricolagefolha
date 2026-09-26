@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { EscalaDoDia } from "@/components/escala-do-dia"
 import { AlertaHorasButton } from "@/components/admin/alerta-horas-button"
+import { AvisoEdicaoAdmin } from "@/components/aviso-edicao-admin"
 
 export function Header() {
   const { user } = useAuth()
@@ -84,6 +85,9 @@ export function Header() {
 
           {/* Escala do dia — só do lado colaborador */}
           {!isOnAdminPage && <EscalaDoDia />}
+
+          {/* Aviso de dias corrigidos pelo admin — só do lado colaborador */}
+          {!isOnAdminPage && <AvisoEdicaoAdmin />}
 
           {/* Divergências de horas — só admin */}
           {isAdmin && <AlertaHorasButton />}

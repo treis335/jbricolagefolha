@@ -42,6 +42,12 @@ export interface DayEntry {
 
   // Serviços detalhados (opcional — dados antigos não têm)
   services?: Service[]
+
+  // ✅ Edição por admin — quando true, o colaborador já não pode editar este dia
+  editadoPorAdmin?: boolean
+  editadoPorAdminInfo?: { adminUid: string; adminNome?: string; em: string }
+  /** false enquanto o colaborador ainda não viu o aviso desta edição */
+  notificacaoVista?: boolean
 }
 
 // Calculate normal and extra hours based on weekday rules

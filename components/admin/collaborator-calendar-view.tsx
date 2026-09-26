@@ -6,7 +6,7 @@ import { useState, useMemo } from "react"
 import {
   ChevronLeft, ChevronRight, Calendar, Clock, Euro,
   TrendingUp, Zap, Users, Package, Briefcase,
-  HardHat, X, CheckCircle2, FileText,
+  HardHat, X, CheckCircle2, FileText, Pencil, Plus, ShieldCheck,
 } from "lucide-react"
 import { cn, fmt, resolveEntryTaxa } from "@/lib/utils"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -14,6 +14,7 @@ import { formatLocalDate } from "@/lib/date-utils"
 import { CollaboratorReportsView } from "@/components/admin/collaborator-reports-view"
 import { EntryRateOverride } from "@/components/admin/entry-rate-override"
 import { DayUnlockPanel } from "@/components/admin/day-unlock-panel"
+import { EditDayModal } from "@/components/admin/edit-day-modal"
 import { isDayUnlocked, type UnlockedDay } from "@/lib/useGlobalSettings"
 import { useGlobalSettings } from "@/lib/useGlobalSettings"
 import { isDayLocked } from "@/lib/utils"
@@ -25,6 +26,7 @@ interface CollaboratorCalendarViewProps {
   entries: any[]
   isAdmin?: boolean   // mostra botão "Alterar Taxa" e multi-select
   unlockedDays?: UnlockedDay[]  // dias desbloqueados manualmente pelo admin
+  onEntryUpdated?: () => void   // chamado depois do admin editar/desbloquear um dia
 }
 
 
@@ -88,10 +90,18 @@ function EntryDetail({
         </button>
 
         {/* Date pill */}
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 border border-white/20 mb-4 max-w-full">
-          <Calendar className="h-3 w-3 text-white/80 shrink-0" />
-          {/* ✅ truncate + break-words para datas muito longas em mobile */}
-          <span className="text-xs font-semibold text-white capitalize tracking-wide truncate">{dateLabel}</span>
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 border border-white/20 max-w-full">
+            <Calendar className="h-3 w-3 text-white/80 shrink-0" />
+            {/* ✅ truncate + break-words para datas muito longas em mobile */}
+            <span className="text-xs font-semibold text-white capitalize tracking-wide truncate">{dateLabel}</span>
+          </div>
+          {entry.editadoPorAdmin && (
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-400/90 border border-amber-300/50">
+              <ShieldCheck className="h-3 w-3 text-amber-950 shrink-0" />
+              <span className="text-[10px] font-bold text-amber-950 uppercase tracking-wide">Editado por Admin</span>
+            </div>
+          )}
         </div>
 
         <div className="flex items-end justify-between gap-3 min-w-0">
@@ -288,11 +298,14 @@ export function CollaboratorCalendarView({
   entries,
   isAdmin = false,
   unlockedDays = [],
+  onEntryUpdated,
 }: CollaboratorCalendarViewProps) {
 
   const [currentMonth,    setCurrentMonth]    = useState<Date>(new Date())
   const [selectedEntry,   setSelectedEntry]   = useState<any>(null)
+  const [selectedDateStr, setSelectedDateStr] = useState<string>("")
   const [modalOpen,       setModalOpen]       = useState(false)
+  const [editModalOpen,   setEditModalOpen]   = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState(false)
   // ── Rate override (admin only) ──
   const [rateMode,        setRateMode]        = useState(false)   // multi-select active
@@ -374,7 +387,15 @@ export function CollaboratorCalendarView({
     }
 
     const entry = entryMap.get(dateStr)
-    if (entry) { setSelectedEntry(entry); setModalOpen(true) }
+    setSelectedDateStr(dateStr)
+    if (entry) {
+      setSelectedEntry(entry)
+      setModalOpen(true)
+    } else if (isAdmin) {
+      // Admin pode abrir dias sem registo para os preencher
+      setSelectedEntry(null)
+      setModalOpen(true)
+    }
   }
 
   const weekDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
@@ -382,11 +403,11 @@ export function CollaboratorCalendarView({
   const monthLabel = currentMonth.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })
 
   const selectedDateLabel = useMemo(() => {
-    if (!selectedEntry?.date) return ""
-    return new Date(selectedEntry.date + "T12:00:00").toLocaleDateString("pt-PT", {
+    if (!selectedDateStr) return ""
+    return new Date(selectedDateStr + "T12:00:00").toLocaleDateString("pt-PT", {
       weekday: "long", day: "numeric", month: "long", year: "numeric",
     })
-  }, [selectedEntry])
+  }, [selectedDateStr])
 
   // ── Calendar Grid ──────────────────────────────────────────────────────────
   const CalendarGrid = ({ compact = false }: { compact?: boolean }) => (
@@ -778,13 +799,41 @@ export function CollaboratorCalendarView({
           </DialogTitle>
 
           {selectedEntry ? (
-            <EntryDetail
-              entry={selectedEntry}
-              currentRate={currentRate}
-              collaboratorName={collaboratorName}
-              dateLabel={selectedDateLabel}
-              onClose={() => setModalOpen(false)}
-            />
+            <>
+              <EntryDetail
+                entry={selectedEntry}
+                currentRate={currentRate}
+                collaboratorName={collaboratorName}
+                dateLabel={selectedDateLabel}
+                onClose={() => setModalOpen(false)}
+              />
+              {isAdmin && (
+                <div className="p-4 border-t border-border/40 shrink-0">
+                  <button
+                    onClick={() => setEditModalOpen(true)}
+                    className={cn(
+                      "w-full h-11 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-colors",
+                      selectedEntry.editadoPorAdmin
+                        ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 hover:bg-amber-200/60"
+                        : "bg-primary/10 text-primary hover:bg-primary/15"
+                    )}
+                  >
+                    <Pencil className="h-4 w-4" />
+                    {selectedEntry.editadoPorAdmin ? "Ver / alterar edição do admin" : "Corrigir este dia"}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : isAdmin ? (
+            <div className="py-16 text-center space-y-3">
+              <p className="text-muted-foreground text-sm">Sem registo para este dia.</p>
+              <button
+                onClick={() => setEditModalOpen(true)}
+                className="h-11 px-5 rounded-2xl bg-primary/10 text-primary font-bold text-sm inline-flex items-center gap-2 hover:bg-primary/15"
+              >
+                <Plus className="h-4 w-4" /> Adicionar registo
+              </button>
+            </div>
           ) : (
             <div className="py-16 text-center text-muted-foreground text-sm">
               Sem dados para este dia.
@@ -792,6 +841,21 @@ export function CollaboratorCalendarView({
           )}
         </DialogContent>
       </Dialog>
+
+      {isAdmin && (
+        <EditDayModal
+          open={editModalOpen}
+          onClose={() => setEditModalOpen(false)}
+          collaboratorId={collaboratorId}
+          entry={selectedEntry}
+          date={selectedDateStr}
+          dateLabel={selectedDateLabel}
+          onSaved={() => {
+            onEntryUpdated?.()
+            setModalOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }

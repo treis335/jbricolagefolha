@@ -487,6 +487,7 @@ export function CalendarView(
               const isPast = dateStr < today
               const isMissingWorkday = isPast && !isToday && !hasEntry && !isWeekend
               const locked = !userUnlocked && isDayLocked(dateStr, diasBloqueio) && !isDayUnlocked(unlockedDays, dateStr)
+              const isAdminEdited = entryMap.get(dateStr)?.editadoPorAdmin === true
               const uniqueKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}-${dateStr}-${index}`
 
               return (
@@ -523,9 +524,20 @@ export function CalendarView(
                   )}
 
                   {/* Lock icon */}
-                  {locked && (
+                  {locked && !isAdminEdited && (
                     <span aria-hidden className="absolute top-1 right-1 z-20 text-[10px] leading-none select-none pointer-events-none opacity-50">
                       🔒
+                    </span>
+                  )}
+
+                  {/* Admin edited badge */}
+                  {isAdminEdited && (
+                    <span
+                      aria-hidden
+                      title="Editado pelo admin"
+                      className="absolute top-1 right-1 z-20 w-3.5 h-3.5 rounded-full bg-amber-400 flex items-center justify-center text-[8px] leading-none select-none pointer-events-none shadow-sm"
+                    >
+                      🛡️
                     </span>
                   )}
 
