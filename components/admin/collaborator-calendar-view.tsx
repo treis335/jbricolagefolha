@@ -449,7 +449,7 @@ export function CollaboratorCalendarView({
                 if (unlockMode && !isDayLocked(dateStr, diasBloqueio)) return
                 handleDayClick(date, e.shiftKey)
               }}
-              disabled={!rateMode && !hasEntry}
+              disabled={!rateMode && !hasEntry && !isAdmin}
               className={cn(
                 "flex flex-col items-center justify-center relative transition-all select-none border-r border-b",
                 isLastCol && "border-r-0",
@@ -465,7 +465,7 @@ export function CollaboratorCalendarView({
                 unlockMode && unlockDates.includes(dateStr) && "ring-inset ring-2 ring-amber-500/60 bg-amber-100/60 dark:bg-amber-950/20",
                 unlockMode && !isDayLocked(dateStr, diasBloqueio) && "opacity-25 cursor-default",
                 // Normal mode styles
-                !rateMode && !hasEntry && "cursor-default",
+                !rateMode && !hasEntry && (isAdmin ? "cursor-pointer hover:bg-primary/5 active:scale-95" : "cursor-default"),
                 !rateMode && isWeekend && !hasEntry && (compact ? "bg-muted/20" : "bg-muted/30"),
                 !rateMode && hasEntry && !isAbsence && "cursor-pointer hover:bg-primary/5 active:scale-95 bg-primary/[0.04]",
                 !rateMode && isAbsence && "cursor-pointer hover:bg-amber-50/60 bg-amber-50/30",
