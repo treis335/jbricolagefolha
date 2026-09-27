@@ -4,7 +4,7 @@
 import { useState, Suspense, Component, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { useCollaborators } from "@/hooks/useCollaborators"
-import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles } from "lucide-react"
+import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles, Table2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ── Lazy load every modal — if any fails, only that modal crashes ─────────────
@@ -13,6 +13,7 @@ const AnnualReportModal      = dynamic(() => import("./annual-report-modal").the
 const RateHistoryModal       = dynamic(() => import("./rate-history-modal").then(m => ({ default: m.RateHistoryModal })),        { ssr: false })
 const HoursReportModal       = dynamic(() => import("./hours-report-modal").then(m => ({ default: m.HoursReportModal })),       { ssr: false })
 const PerformanceReportModal = dynamic(() => import("./performance-report-modal").then(m => ({ default: m.PerformanceReportModal })), { ssr: false })
+const MapaHorasModal         = dynamic(() => import("./mapa-horas-modal").then(m => ({ default: m.MapaHorasModal })),           { ssr: false })
 
 // ── Error Boundary ─────────────────────────────────────────────────────────────
 class ReportsBoundary extends Component<{ children: ReactNode }, { err: string | null }> {
@@ -86,6 +87,15 @@ const REPORTS = [
     accent: "text-rose-600 dark:text-rose-400",
     bg: "bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/40",
     tags: ["Performance", "Ranking", "Evolução"],
+  },
+  {
+    id: "mapa",
+    icon: Table2,
+    title: "Mapa de Horas (grelha)",
+    description: "Vista em grelha, um colaborador por linha e um dia por coluna — como uma folha Excel. Exporta para .xlsx.",
+    accent: "text-teal-600 dark:text-teal-400",
+    bg: "bg-teal-50 dark:bg-teal-950/20 border-teal-100 dark:border-teal-900/40",
+    tags: ["Grelha", "Excel", "Mensal"],
   },
 ] as const
 
@@ -174,6 +184,7 @@ export function AdminReportsView() {
         {open === "rates"       && <RateHistoryModal       open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "hours"       && <HoursReportModal       open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "performance" && <PerformanceReportModal open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "mapa"        && <MapaHorasModal         open onClose={() => setOpen(null)} collaborators={collaborators} />}
       </Suspense>
     </ReportsBoundary>
   )
