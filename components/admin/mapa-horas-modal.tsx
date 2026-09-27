@@ -49,6 +49,7 @@ export function MapaHorasModal({ open, onClose, collaborators = [] }: Props) {
         })
         return { id: c.id, nome: c.name, taxa: c.currentRate, horasPorDia, totalHoras, totalReceber }
       })
+      .filter(c => c.totalHoras > 0)
       .sort((a, b) => a.nome.localeCompare(b.nome))
   }, [collaborators, year, month])
 
@@ -141,7 +142,7 @@ export function MapaHorasModal({ open, onClose, collaborators = [] }: Props) {
                   </th>
                   <th className="px-2 py-2.5 font-bold whitespace-nowrap">€/H</th>
                   {dias.map(d => (
-                    <th key={d} className={cn("px-1.5 py-2.5 font-semibold w-8 text-center", isWeekend(year, month, d) && "bg-slate-700 dark:bg-slate-800")}>
+                    <th key={d} className={cn("px-1.5 py-2.5 font-semibold w-8 text-center", isWeekend(year, month, d) && "bg-emerald-700")}>
                       {d}
                     </th>
                   ))}
@@ -163,7 +164,7 @@ export function MapaHorasModal({ open, onClose, collaborators = [] }: Props) {
                           key={d}
                           className={cn(
                             "px-1 py-1.5 text-center tabular-nums",
-                            isWeekend(year, month, d) && "bg-muted/40",
+                            isWeekend(year, month, d) && "bg-emerald-100 dark:bg-emerald-950/30",
                             !h && "text-muted-foreground/25"
                           )}
                         >
