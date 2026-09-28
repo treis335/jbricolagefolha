@@ -1,10 +1,10 @@
 // components/admin/admin-bottom-nav.tsx
 "use client"
 
-import { LayoutDashboard, Users, FileText, Settings, Euro, HardHat, CalendarDays } from "lucide-react"
+import { LayoutDashboard, Users, FileText, Settings, Euro, HardHat, CalendarDays, Wrench } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type AdminTabType = "dashboard" | "collaborators" | "finance" | "obras" | "escalas" | "reports" | "settings"
+export type AdminTabType = "dashboard" | "collaborators" | "finance" | "obras" | "escalas" | "ferramentas" | "reports" | "settings"
 
 interface AdminBottomNavProps {
   activeTab: AdminTabType
@@ -16,6 +16,7 @@ const tabs = [
   { id: "collaborators" as AdminTabType, label: "Equipa",     icon: Users           },
   { id: "obras"         as AdminTabType, label: "Obras",      icon: HardHat         },
   { id: "escalas"       as AdminTabType, label: "Escala",     icon: CalendarDays    },
+  { id: "ferramentas"   as AdminTabType, label: "Ferram.",    icon: Wrench          },
   { id: "finance"       as AdminTabType, label: "Finanças",   icon: Euro            },
   { id: "reports"       as AdminTabType, label: "Relat.", icon: FileText },
   { id: "settings"      as AdminTabType, label: "Config.", icon: Settings },
@@ -30,7 +31,7 @@ export function AdminBottomNav({ activeTab, onTabChange }: AdminBottomNavProps) 
         style={{ WebkitBackdropFilter: "blur(20px)" }}
       />
 
-      <div className="relative grid grid-cols-7 max-w-2xl mx-auto px-0.5 pb-safe"
+      <div className="relative grid grid-cols-8 max-w-2xl mx-auto px-0.5 pb-safe"
            style={{ height: "64px" }}>
         {tabs.map((tab) => {
           const Icon = tab.icon
