@@ -4,11 +4,12 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Wrench, Plus, Search, QrCode, Pencil, Loader2, Camera, Printer, Download,
-  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen,
+  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, MapPin, HardHat,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { ArmazemModal } from "@/components/admin/armazem-modal"
+import { LocalizarFerramentaModal } from "@/components/admin/localizar-ferramenta-modal"
 import {
   getFerramentas, createFerramenta, updateFerramenta, deleteFerramenta,
   uploadFotoFerramenta, gerarQrDataUrl, type Ferramenta,
@@ -246,6 +247,7 @@ export function AdminFerramentasView() {
   const [qrDe, setQrDe] = useState<Ferramenta | null>(null)
   const [gerandoPdf, setGerandoPdf] = useState(false)
   const [armazemAberto, setArmazemAberto] = useState(false)
+  const [localizarAberto, setLocalizarAberto] = useState(false)
 
   const carregar = () => {
     setLoading(true)
@@ -320,6 +322,12 @@ export function AdminFerramentasView() {
             {ferramentas.filter(f => f.ativa).length} no catálogo
           </p>
         </div>
+        <button
+          onClick={() => setLocalizarAberto(true)}
+          className="h-10 px-3.5 rounded-2xl bg-muted/60 hover:bg-muted text-sm font-bold flex items-center gap-1.5 shrink-0"
+        >
+          <MapPin className="h-4 w-4" /> <span className="hidden sm:inline">Localizar</span>
+        </button>
         <button
           onClick={() => setArmazemAberto(true)}
           className="h-10 px-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold flex items-center gap-1.5 shrink-0"
@@ -398,9 +406,14 @@ export function AdminFerramentasView() {
                 {!f.ativa ? (
                   <span className="text-[10px] font-bold text-muted-foreground bg-muted rounded-full px-2 py-0.5 self-start">Arquivada</span>
                 ) : f.comQuem ? (
-                  <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/40 rounded-full px-2 py-0.5 self-start flex items-center gap-1 max-w-full">
-                    <User className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{f.comQuem.colaboradorNome}</span>
-                  </span>
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-950/40 rounded-full px-2 py-0.5 self-start flex items-center gap-1 max-w-full w-fit">
+                      <User className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{f.comQuem.colaboradorNome}</span>
+                    </span>
+                    <p className="text-[10px] text-muted-foreground/70 truncate flex items-center gap-1">
+                      <HardHat className="h-2.5 w-2.5 shrink-0" /> {f.comQuem.obraNome}
+                    </p>
+                  </div>
                 ) : (
                   <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 rounded-full px-2 py-0.5 self-start">Disponível</span>
                 )}
@@ -431,6 +444,7 @@ export function AdminFerramentasView() {
       )}
       <QrDialog ferramenta={qrDe} onClose={() => setQrDe(null)} />
       <ArmazemModal open={armazemAberto} onClose={() => setArmazemAberto(false)} onChanged={carregar} />
+      <LocalizarFerramentaModal open={localizarAberto} onClose={() => setLocalizarAberto(false)} />
     </div>
   )
 }
