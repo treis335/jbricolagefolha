@@ -30,6 +30,7 @@ export interface Collaborator {
   createdAt: string | null
   migrated?: boolean
   ativo: boolean
+  fotoUrl?: string
   pendingAmount: number
   unlockedDays: import("@/lib/useGlobalSettings").UnlockedDay[]
   entries: DayEntry[]
@@ -112,6 +113,7 @@ export function useCollaborators(): UseCollaboratorsReturn {
           createdAt:         d.createdAt || null,
           migrated:          d.migrated  || false,
           ativo,
+          fotoUrl: d.fotoUrl || undefined,
           pendingAmount: 0,
           unlockedDays: Array.isArray(d.unlockedDays) ? d.unlockedDays : [],
           entries,

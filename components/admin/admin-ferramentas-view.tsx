@@ -4,10 +4,11 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Wrench, Plus, Search, QrCode, Pencil, Loader2, Camera, Printer, Download,
-  Archive, ArchiveRestore, Trash2, ImageIcon, User,
+  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { ArmazemModal } from "@/components/admin/armazem-modal"
 import {
   getFerramentas, createFerramenta, updateFerramenta, deleteFerramenta,
   uploadFotoFerramenta, gerarQrDataUrl, type Ferramenta,
@@ -244,6 +245,7 @@ export function AdminFerramentasView() {
   const [emEdicao, setEmEdicao] = useState<Ferramenta | null>(null)
   const [qrDe, setQrDe] = useState<Ferramenta | null>(null)
   const [gerandoPdf, setGerandoPdf] = useState(false)
+  const [armazemAberto, setArmazemAberto] = useState(false)
 
   const carregar = () => {
     setLoading(true)
@@ -318,6 +320,12 @@ export function AdminFerramentasView() {
             {ferramentas.filter(f => f.ativa).length} no catálogo
           </p>
         </div>
+        <button
+          onClick={() => setArmazemAberto(true)}
+          className="h-10 px-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold flex items-center gap-1.5 shrink-0"
+        >
+          <PackageOpen className="h-4 w-4" /> <span className="hidden sm:inline">Armazém</span>
+        </button>
         <button
           onClick={abrirNova}
           className="h-10 px-4 rounded-2xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-1.5 shrink-0"
@@ -422,6 +430,7 @@ export function AdminFerramentasView() {
         />
       )}
       <QrDialog ferramenta={qrDe} onClose={() => setQrDe(null)} />
+      <ArmazemModal open={armazemAberto} onClose={() => setArmazemAberto(false)} onChanged={carregar} />
     </div>
   )
 }
