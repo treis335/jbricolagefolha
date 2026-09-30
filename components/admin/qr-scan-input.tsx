@@ -26,7 +26,11 @@ export function QrScanInput({ onScan, placeholder = "Pica ou escreve o código�
     if (!autoFocusPistola || cameraOpen) return
     inputRef.current?.focus()
     const interval = setInterval(() => {
-      if (document.activeElement !== inputRef.current) inputRef.current?.focus()
+      const ativo = document.activeElement as HTMLElement | null
+      const éOutroCampo = ativo && ativo !== inputRef.current && (
+        ativo.tagName === "INPUT" || ativo.tagName === "TEXTAREA" || ativo.isContentEditable
+      )
+      if (ativo !== inputRef.current && !éOutroCampo) inputRef.current?.focus()
     }, 800)
     return () => clearInterval(interval)
   }, [autoFocusPistola, cameraOpen])
