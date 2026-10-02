@@ -7,6 +7,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { QrScanInput } from "@/components/admin/qr-scan-input"
+import { feedbackScan } from "@/lib/scan-feedback"
 import {
   getFerramentas, getHistoricoFerramenta,
   type Ferramenta, type HistoricoEntrega,
@@ -63,8 +64,8 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
 
   const handleScan = (code: string) => {
     const f = ferramentas.find(ff => ff.id === code)
-    if (f) { abrirDetalhe(f); setPesquisa("") }
-    else setAvisoScan("Nenhuma ferramenta encontrada com esse código.")
+    if (f) { feedbackScan("sucesso"); abrirDetalhe(f); setPesquisa("") }
+    else { feedbackScan("erro"); setAvisoScan("Nenhuma ferramenta encontrada com esse código.") }
   }
 
   const fecharDetalhe = () => { setSelecionada(null); setHistorico([]) }
