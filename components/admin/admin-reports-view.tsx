@@ -4,7 +4,7 @@
 import { useState, Suspense, Component, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { useCollaborators } from "@/hooks/useCollaborators"
-import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles, Table2 } from "lucide-react"
+import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles, Table2, Camera } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ── Lazy load every modal — if any fails, only that modal crashes ─────────────
@@ -14,6 +14,7 @@ const RateHistoryModal       = dynamic(() => import("./rate-history-modal").then
 const HoursReportModal       = dynamic(() => import("./hours-report-modal").then(m => ({ default: m.HoursReportModal })),       { ssr: false })
 const PerformanceReportModal = dynamic(() => import("./performance-report-modal").then(m => ({ default: m.PerformanceReportModal })), { ssr: false })
 const MapaHorasModal         = dynamic(() => import("./mapa-horas-modal").then(m => ({ default: m.MapaHorasModal })),           { ssr: false })
+const FotosModal              = dynamic(() => import("./fotos-modal").then(m => ({ default: m.FotosModal })),                    { ssr: false })
 
 // ── Error Boundary ─────────────────────────────────────────────────────────────
 class ReportsBoundary extends Component<{ children: ReactNode }, { err: string | null }> {
@@ -96,6 +97,15 @@ const REPORTS = [
     accent: "text-teal-600 dark:text-teal-400",
     bg: "bg-teal-50 dark:bg-teal-950/20 border-teal-100 dark:border-teal-900/40",
     tags: ["Grelha", "Excel", "Mensal"],
+  },
+  {
+    id: "fotos",
+    icon: Camera,
+    title: "Fotos (antes/depois)",
+    description: "Todas as fotos carregadas pelos colaboradores, num só sítio — filtra por colaborador, obra ou antes/depois.",
+    accent: "text-pink-600 dark:text-pink-400",
+    bg: "bg-pink-50 dark:bg-pink-950/20 border-pink-100 dark:border-pink-900/40",
+    tags: ["Fotos", "Obras", "Antes/Depois"],
   },
 ] as const
 
@@ -185,6 +195,7 @@ export function AdminReportsView() {
         {open === "hours"       && <HoursReportModal       open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "performance" && <PerformanceReportModal open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "mapa"        && <MapaHorasModal         open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "fotos"       && <FotosModal              open onClose={() => setOpen(null)} collaborators={collaborators} />}
       </Suspense>
     </ReportsBoundary>
   )
