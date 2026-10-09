@@ -6,6 +6,7 @@ import { createPortal } from "react-dom"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { resolveEntryTaxa } from "@/lib/utils"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import type { Collaborator } from "@/hooks/useCollaborators"
 import type { ServiceFoto } from "@/lib/types"
 import {
@@ -356,17 +357,59 @@ function CollabCard({ collab, dateKey }: { collab: Collaborator; dateKey: string
 }
 
 // ── Absent pill ───────────────────────────────────────────────────────────────
-function AbsentPill({ collab }: { collab: Collaborator }) {
+// ── Resumo de quem falta + popup com nomes ────────────────────────────────────
+function AbsentSummary({ absent, isTodayDay, dateLabel }: {
+  absent: Collaborator[]
+  isTodayDay: boolean
+  dateLabel: string
+}) {
+  const [open, setOpen] = useState(false)
+  if (absent.length === 0) return null
+
+  const titulo = isTodayDay
+    ? (absent.length === 1 ? "Falta 1 colaborador" : `Faltam ${absent.length} colaboradores`)
+    : `${absent.length} sem registo`
+  const sorted = [...absent].sort((a, b) => a.name.localeCompare(b.name, "pt-PT"))
+
   return (
-    <div className="flex items-center gap-2 px-2.5 py-2 rounded-xl border border-border/40 bg-muted/20 min-w-0 overflow-hidden">
-      <div className="relative shrink-0">
-        <Avatar name={collab.name} size="sm" />
-        <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-muted-foreground/25 border-2 border-card" />
-      </div>
-      <span className="text-[11px] font-semibold text-muted-foreground/60 truncate">
-        {collab.name.split(" ")[0]}
-      </span>
-    </div>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-amber-200/70 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 hover:bg-amber-100/60 dark:hover:bg-amber-950/40 transition-all active:scale-[0.99] text-left"
+      >
+        <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black tracking-tight text-amber-700 dark:text-amber-300 leading-tight">{titulo}</p>
+          <p className="text-[11px] text-muted-foreground/60">
+            {isTodayDay ? "Ainda sem registo hoje" : "Sem registo neste dia"} · toca para ver quem
+          </p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-sm rounded-3xl p-0 overflow-hidden gap-0 max-h-[80dvh] flex flex-col">
+          <DialogTitle className="sr-only">Colaboradores sem registo</DialogTitle>
+          <DialogDescription className="sr-only">Lista de colaboradores que ainda não preencheram o dia</DialogDescription>
+
+          <div className="px-5 pt-5 pb-3 border-b border-border/30 shrink-0">
+            <p className="text-base font-black tracking-tight">{titulo}</p>
+            <p className="text-[11px] text-muted-foreground/60 capitalize">{dateLabel}</p>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 space-y-1.5">
+            {sorted.map(c => (
+              <div key={c.id} className="flex items-center gap-3 px-3 py-2 rounded-xl border border-border/40 bg-muted/20">
+                <Avatar name={c.name} size="sm" />
+                <span className="text-sm font-semibold truncate">{c.name}</span>
+              </div>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -519,27 +562,8 @@ export function TodayPanel({ collaborators }: { collaborators: Collaborator[] })
             <CollabCard key={c.id} collab={c} dateKey={dateKey} />
           ))}
 
-          {/* Absent grid */}
-          {absent.length > 0 && worked.length > 0 && (
-            <div className="pt-1 space-y-2">
-              <div className="flex items-center gap-1.5 px-0.5">
-                <AlertCircle className="h-3 w-3 text-muted-foreground/30" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/40">
-                  {isTodayDay ? "Ainda sem registo" : "Sem registo"} · {absent.length}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                {absent.map(c => <AbsentPill key={c.id} collab={c} />)}
-              </div>
-            </div>
-          )}
-
-          {/* All absent */}
-          {absent.length > 0 && worked.length === 0 && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {absent.map(c => <AbsentPill key={c.id} collab={c} />)}
-            </div>
-          )}
+          {/* Quem falta: resumo compacto + popup com nomes */}
+          <AbsentSummary absent={absent} isTodayDay={isTodayDay} dateLabel={fmtDay(selectedDate)} />
         </div>
       )}
     </div>
