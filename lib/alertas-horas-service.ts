@@ -117,7 +117,7 @@ export function detectarDivergencias(collaborators: Collaborator[]): Divergencia
 
     const horasVals = membros.map(m => m.horas)
     const diff = Math.max(...horasVals) - Math.min(...horasVals)
-    if (diff > LIMIAR_HORAS) {
+    if (diff >= LIMIAR_HORAS - 1e-9) {
       const sortedUids = membros.map(m => m.uid).sort()
       resultado.push({
         groupId: `${date}__${sortedUids.join("_")}`,
