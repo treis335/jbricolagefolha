@@ -11,6 +11,7 @@ import {
 import { useCollaborators } from "@/hooks/useCollaborators"
 import { Spinner } from "@/components/ui/spinner"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn, fmt, resolveEntryTaxa } from "@/lib/utils"
 import type { AdminTabType } from "@/components/admin/admin-bottom-nav"
 import { TodayPanel } from "@/components/admin/today-panel"
@@ -23,6 +24,77 @@ interface CollabWithMonth {
 }
 
 
+
+// ─── Acesso rápido: botão compacto + popup com a grelha de colaboradores ─────
+function AcessoRapidoColaboradores({ colaboradores, onVerLista, onAbrir }: {
+  colaboradores: CollabWithMonth[]
+  onVerLista: () => void
+  onAbrir: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border bg-card hover:bg-muted/40 transition-all active:scale-[0.99] text-left"
+      >
+        <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Users className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold leading-tight">Acesso rápido — Colaboradores</p>
+          <p className="text-[11px] text-muted-foreground">{colaboradores.length} colaboradores · toca para abrir</p>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden gap-0 max-h-[85dvh] flex flex-col">
+          <DialogTitle className="sr-only">Acesso rápido — Colaboradores</DialogTitle>
+          <DialogDescription className="sr-only">Abrir a ficha de um colaborador</DialogDescription>
+
+          <div className="flex items-center justify-between gap-2 pl-5 pr-12 py-4 border-b shrink-0">
+            <p className="font-bold text-sm flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              Colaboradores
+            </p>
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-8 gap-1"
+              onClick={() => { setOpen(false); onVerLista() }}
+            >
+              Ver lista completa <ArrowUpRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2">
+            {colaboradores.map((c) => {
+              const initials = c.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()
+              const isActive = c._monthHours > 0
+              return (
+                <button key={c.id} onClick={() => { setOpen(false); onAbrir(c.id) }}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-muted/60 transition-all active:scale-95 group"
+                >
+                  <div className={cn(
+                    "w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold border-2 transition-all",
+                    isActive ? "bg-primary/10 text-primary border-primary/20 group-hover:bg-primary/15" : "bg-muted text-muted-foreground border-transparent"
+                  )}>
+                    {initials}
+                  </div>
+                  <div className="text-center min-w-0 w-full">
+                    <p className="text-xs font-semibold truncate w-full">{c.name.split(" ")[0]}</p>
+                    <p className={cn("text-[10px] tabular-nums", isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
+                      {isActive ? `${c._monthHours.toFixed(0)}h` : "inativo"}
+                    </p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 function Sparkline({ values, color = "#3b82f6" }: { values: number[]; color?: string }) {
@@ -604,43 +676,11 @@ export function AdminDashboardView({ onTabChange }: { onTabChange?: (tab: AdminT
 
         {/* ── Acesso Rápido ── */}
         {collaborators.length > 0 && (
-          <div className="rounded-2xl border bg-card overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <p className="font-bold text-sm flex items-center gap-2">
-                <Users className="h-4 w-4 text-primary" />
-                Acesso Rápido — Colaboradores
-              </p>
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground h-8 gap-1"
-                onClick={() => go("collaborators")}
-              >
-                Ver lista completa <ArrowUpRight className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            <div className="p-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2">
-              {stats.withMonthData.map((c) => {
-                const initials = c.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()
-                const isActive = c._monthHours > 0
-                return (
-                  <button key={c.id} onClick={() => router.push(`/admin/collaborator/${c.id}`)}
-                    className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-muted/60 transition-all active:scale-95 group"
-                  >
-                    <div className={cn(
-                      "w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-bold border-2 transition-all",
-                      isActive ? "bg-primary/10 text-primary border-primary/20 group-hover:bg-primary/15" : "bg-muted text-muted-foreground border-transparent"
-                    )}>
-                      {initials}
-                    </div>
-                    <div className="text-center">
-                      <p className="text-xs font-semibold truncate w-full">{c.name.split(" ")[0]}</p>
-                      <p className={cn("text-[10px] tabular-nums", isActive ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground")}>
-                        {isActive ? `${c._monthHours.toFixed(0)}h` : "inativo"}
-                      </p>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <AcessoRapidoColaboradores
+            colaboradores={stats.withMonthData}
+            onVerLista={() => go("collaborators")}
+            onAbrir={(id) => router.push(`/admin/collaborator/${id}`)}
+          />
         )}
 
         {/* ── Footer ── */}
