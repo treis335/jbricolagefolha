@@ -1,7 +1,7 @@
 // components/admin/alerta-horas-button.tsx
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Loader2, Check, MessageSquare, Users, Calendar } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
@@ -9,7 +9,7 @@ import { useCollaborators } from "@/hooks/useCollaborators"
 import { useAuth } from "@/lib/AuthProvider"
 import { cn } from "@/lib/utils"
 import {
-  detectarDivergencias, getEstadosAlertas, grupoAtivo, marcarVerificado, salvarComentario,
+  detectarDivergencias, subscreverEstadosAlertas, grupoAtivo, marcarVerificado, salvarComentario,
   type DivergenciaGrupo, type EstadoAlerta,
 } from "@/lib/alertas-horas-service"
 
@@ -27,12 +27,14 @@ export function AlertaHorasButton() {
   const [comentarios, setComentarios] = useState<Record<string, string>>({})
   const [verificando, setVerificando] = useState<string | null>(null)
 
-  const carregarEstados = () => {
-    setLoadingEstados(true)
-    getEstadosAlertas().then(setEstados).finally(() => setLoadingEstados(false))
-  }
-
-  useEffect(() => { carregarEstados() }, [])
+  // Tempo real: qualquer admin que verifique/comente atualiza todos os outros
+  useEffect(() => {
+    const unsub = subscreverEstadosAlertas(
+      novos => { setEstados(novos); setLoadingEstados(false) },
+      err => { console.error(err); setLoadingEstados(false) },
+    )
+    return unsub
+  }, [])
 
   const todosGrupos = useMemo(() => detectarDivergencias(collaborators), [collaborators])
   const ativos = useMemo(
@@ -40,10 +42,22 @@ export function AlertaHorasButton() {
     [todosGrupos, estados]
   )
 
+  // Sincroniza os comentários com o Firestore, sem pisar o que este admin está a escrever:
+  // só atualiza o campo se o texto local ainda for igual ao último valor remoto conhecido.
+  const comentariosRemotos = useRef<Record<string, string>>({})
   useEffect(() => {
-    const initial: Record<string, string> = {}
-    ativos.forEach(g => { initial[g.groupId] = estados.get(g.groupId)?.comentario ?? "" })
-    setComentarios(prev => ({ ...initial, ...prev }))
+    const remotos: Record<string, string> = {}
+    ativos.forEach(g => { remotos[g.groupId] = estados.get(g.groupId)?.comentario ?? "" })
+    const anteriores = comentariosRemotos.current
+    setComentarios(prev => {
+      const next = { ...prev }
+      for (const [id, remoto] of Object.entries(remotos)) {
+        const anterior = anteriores[id]
+        if (!(id in prev) || prev[id] === (anterior ?? "")) next[id] = remoto
+      }
+      return next
+    })
+    comentariosRemotos.current = remotos
   }, [ativos, estados])
 
   const loading = loadingCol || loadingEstados
@@ -54,11 +68,6 @@ export function AlertaHorasButton() {
     setVerificando(grupo.groupId)
     try {
       await marcarVerificado(grupo, user.uid)
-      setEstados(prev => {
-        const next = new Map(prev)
-        next.set(grupo.groupId, { ...next.get(grupo.groupId), verificado: true, horasVerificadas: Object.fromEntries(grupo.membros.map(m => [m.uid, m.horas])) })
-        return next
-      })
     } catch (err) {
       console.error(err)
     } finally {
@@ -72,11 +81,6 @@ export function AlertaHorasButton() {
     if (texto === (estados.get(groupId)?.comentario ?? "")) return
     try {
       await salvarComentario(groupId, texto, user.uid)
-      setEstados(prev => {
-        const next = new Map(prev)
-        next.set(groupId, { ...next.get(groupId), comentario: texto })
-        return next
-      })
     } catch (err) {
       console.error(err)
     }

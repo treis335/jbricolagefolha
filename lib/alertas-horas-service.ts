@@ -11,7 +11,7 @@
 // porque compara sempre as horas atuais com a fotografia guardada no momento
 // da verificação.
 
-import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from "firebase/firestore"
+import { collection, doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp, type Unsubscribe } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { Collaborator } from "@/hooks/useCollaborators"
 
@@ -137,6 +137,24 @@ export async function getEstadosAlertas(): Promise<Map<string, EstadoAlerta>> {
   const map = new Map<string, EstadoAlerta>()
   snap.docs.forEach(d => map.set(d.id, d.data() as EstadoAlerta))
   return map
+}
+
+/** Subscreve em tempo real o estado (verificado/comentário) de todos os alertas.
+ *  Assim, quando um admin verifica ou comenta, os outros veem logo a alteração.
+ *  Devolve a função para cancelar a subscrição. */
+export function subscreverEstadosAlertas(
+  onChange: (estados: Map<string, EstadoAlerta>) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    collection(db, "alertasHoras"),
+    snap => {
+      const map = new Map<string, EstadoAlerta>()
+      snap.docs.forEach(d => map.set(d.id, d.data() as EstadoAlerta))
+      onChange(map)
+    },
+    err => onError?.(err),
+  )
 }
 
 /** Um grupo está ativo (deve aparecer na lista) se nunca foi verificado, ou
