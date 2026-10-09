@@ -1,9 +1,9 @@
 "use client"
 
-import { CalendarDays, Wallet, Settings } from "lucide-react"
+import { CalendarDays, Wallet, Wrench, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type TabType = "calendar" | "financeiro" | "settings"
+export type TabType = "calendar" | "financeiro" | "ferramentas" | "settings"
 
 interface BottomNavProps {
   activeTab: TabType
@@ -13,6 +13,7 @@ interface BottomNavProps {
 const tabs = [
   { id: "calendar"   as TabType, label: "Calendário", icon: CalendarDays },
   { id: "financeiro" as TabType, label: "Financeiro",  icon: Wallet       },
+  { id: "ferramentas" as TabType, label: "Ferramentas", icon: Wrench       },
   { id: "settings"   as TabType, label: "Definições",  icon: Settings     },
 ]
 

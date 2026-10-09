@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthProvider"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { cn } from "@/lib/utils"
 import {
-  CalendarDays, Wallet, Settings,
+  CalendarDays, Wallet, Wrench, Settings,
   Plus, LogOut, ChevronRight, Clock, Euro, Zap,
 } from "lucide-react"
 import type { TabType } from "./bottom-nav"
@@ -23,6 +23,7 @@ interface SideNavProps {
 const navItems: { id: TabType; label: string; icon: React.ElementType; desc: string }[] = [
   { id: "calendar",   label: "Calendário",  icon: CalendarDays, desc: "Registar & consultar" },
   { id: "financeiro", label: "Financeiro",  icon: Wallet,       desc: "Pagamentos & saldo"  },
+  { id: "ferramentas", label: "Ferramentas", icon: Wrench,      desc: "O que tens atribuído" },
   { id: "settings",   label: "Definições",  icon: Settings,     desc: "Perfil & taxa horária" },
 ]
 

@@ -61,6 +61,25 @@ export function subscreverFerramentas(
   )
 }
 
+/**
+ * Lado do colaborador (só leitura): as ferramentas que estão com ele neste momento.
+ * Filtra no servidor por comQuem.colaboradorUid — as regras do Firestore devem
+ * permitir ler uma ferramenta apenas ao admin ou ao colaborador a quem está atribuída.
+ */
+export function subscreverFerramentasDoColaborador(
+  uid: string,
+  onChange: (lista: Ferramenta[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    query(collection(db, "ferramentas"), where("comQuem.colaboradorUid", "==", uid)),
+    snap => onChange(
+      snap.docs.map(docParaFerramenta).sort((a, b) => (a.comQuem!.desde < b.comQuem!.desde ? -1 : 1)) // mais antigas primeiro
+    ),
+    err => onError?.(err),
+  )
+}
+
 // ── Numeração sequencial ────────────────────────────────────────────────────
 // O contador só sobe: apagar ou arquivar uma ferramenta nunca liberta o número.
 // Fica em config/ferramentasContador ({ ultimo }) e é incrementado em transação,

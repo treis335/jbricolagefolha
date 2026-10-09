@@ -9,6 +9,7 @@ import { SideNav } from "@/components/side-nav"
 import dynamic from "next/dynamic"
 
 const DayEntryForm   = dynamic(() => import("@/components/day-entry-form").then(m => ({ default: m.DayEntryForm })))
+const MinhasFerramentasView = dynamic(() => import("@/components/minhas-ferramentas-view").then(m => ({ default: m.MinhasFerramentasView })))
 const SettingsView   = dynamic(() => import("@/components/settings-view").then(m => ({ default: m.SettingsView })))
 const FinanceiroView = dynamic(() => import("@/components/financeiro-view").then(m => ({ default: m.FinanceiroView })))
 
@@ -84,6 +85,9 @@ function AppContent() {
           </TabPane>
           <TabPane active={activeTab === "financeiro"}>
             <FinanceiroView />
+          </TabPane>
+          <TabPane active={activeTab === "ferramentas"}>
+            <MinhasFerramentasView />
           </TabPane>
           <TabPane active={activeTab === "settings"}>
             <SettingsView />
