@@ -12,9 +12,11 @@ interface ObraPickerProps {
   open: boolean
   onClose: () => void
   onSelect: (obra: Obra) => void
+  /** Classe de z-index (ex.: "z-[110]") para abrir por cima de modais com z-index alto */
+  zClass?: string
 }
 
-export function ObraPicker({ open, onClose, onSelect }: ObraPickerProps) {
+export function ObraPicker({ open, onClose, onSelect, zClass }: ObraPickerProps) {
   const [obras, setObras] = useState<Obra[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -48,7 +50,8 @@ export function ObraPicker({ open, onClose, onSelect }: ObraPickerProps) {
       <Sheet open={open} onOpenChange={v => !v && onClose()}>
         <SheetContent
           side="bottom"
-          className="rounded-t-3xl border-0 bg-background max-h-[92dvh] flex flex-col p-0 shadow-2xl [&>button]:hidden sm:max-w-xl sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl"
+          overlayClassName={zClass}
+          className={`${zClass ?? ""} rounded-t-3xl border-0 bg-background max-h-[92dvh] flex flex-col p-0 shadow-2xl [&>button]:hidden sm:max-w-xl sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl`}
         >
           <div className="flex justify-center pt-3 shrink-0">
             <div className="w-10 h-1 rounded-full bg-border/50" />

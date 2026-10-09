@@ -360,11 +360,16 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
       </div>
 
       {pickerAberto && (
-        <ObraPicker
-          open
-          onClose={() => setPickerAberto(false)}
-          onSelect={(obra: Obra) => { setObraNome(obra.nome); setPickerAberto(false) }}
-        />
+        // O picker vive num portal mas, na árvore do React, está dentro do fundo do Armazém:
+        // sem isto, o clique "sobe" até ao fundo e fecha/reinicia o Armazém.
+        <div onClick={e => e.stopPropagation()}>
+          <ObraPicker
+            open
+            zClass="z-[110]"
+            onClose={() => setPickerAberto(false)}
+            onSelect={(obra: Obra) => { setObraNome(obra.nome); setPickerAberto(false); setPasso(2) }}
+          />
+        </div>
       )}
     </div>
   )
