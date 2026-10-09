@@ -4,15 +4,15 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Wrench, Plus, Search, QrCode, Pencil, Loader2, Camera, Printer, Download,
-  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, MapPin, HardHat,
+  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, HardHat, Clock, History, PackageCheck,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { ArmazemModal } from "@/components/admin/armazem-modal"
-import { LocalizarFerramentaModal } from "@/components/admin/localizar-ferramenta-modal"
 import {
   subscreverFerramentas, numerarFerramentasEmFalta, createFerramenta, updateFerramenta, deleteFerramenta,
-  uploadFotoFerramenta, gerarQrDataUrl, miniaturaUrl, type Ferramenta,
+  uploadFotoFerramenta, gerarQrDataUrl, miniaturaUrl, getHistoricoFerramenta,
+  type Ferramenta, type HistoricoEntrega,
 } from "@/lib/ferramentas-service"
 
 // ─── Formulário (criar / editar) ─────────────────────────────────────────────
@@ -249,6 +249,121 @@ function QrDialog({ ferramenta, onClose }: { ferramenta: Ferramenta | null; onCl
   )
 }
 
+// ─── Helpers de datas ────────────────────────────────────────────────────────
+function diasDesde(iso: string): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86400000))
+}
+function haQuanto(iso: string): string {
+  const d = diasDesde(iso)
+  return d === 0 ? "hoje" : d === 1 ? "há 1 dia" : `há ${d} dias`
+}
+function fmtData(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-PT", { day: "numeric", month: "short" })
+}
+
+// ─── Detalhe: onde está agora + histórico + ações ────────────────────────────
+function FerramentaDetalhe({ ferramenta, onClose, onQr, onEditar }: {
+  ferramenta: Ferramenta | null
+  onClose: () => void
+  onQr: (f: Ferramenta) => void
+  onEditar: (f: Ferramenta) => void
+}) {
+  const [historico, setHistorico] = useState<HistoricoEntrega[]>([])
+  const [loadingHist, setLoadingHist] = useState(false)
+  const id = ferramenta?.id
+  const desde = ferramenta?.comQuem?.desde
+
+  // carrega ao abrir e volta a carregar quando a ferramenta é entregue/devolvida
+  useEffect(() => {
+    if (!id) { setHistorico([]); return }
+    setLoadingHist(true)
+    getHistoricoFerramenta(id).then(setHistorico).catch(console.error).finally(() => setLoadingHist(false))
+  }, [id, desde])
+
+  return (
+    <Dialog open={!!ferramenta} onOpenChange={o => { if (!o) onClose() }}>
+      <DialogContent className="max-w-md rounded-3xl p-0 overflow-hidden gap-0 max-h-[90dvh] flex flex-col">
+        {ferramenta && (
+          <>
+            <DialogTitle className="sr-only">{ferramenta.nome}</DialogTitle>
+            <DialogDescription className="sr-only">Estado atual e histórico da ferramenta</DialogDescription>
+
+            <div className="flex-1 overflow-y-auto">
+              <div className="relative aspect-video bg-muted/30 flex items-center justify-center overflow-hidden">
+                {ferramenta.fotoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={miniaturaUrl(ferramenta.fotoUrl, 800)} alt={ferramenta.nome} className="w-full h-full object-cover" />
+                ) : (
+                  <ImageIcon className="h-10 w-10 text-muted-foreground/20" />
+                )}
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div>
+                  {ferramenta.numero != null && (
+                    <p className="text-xs font-black tracking-widest text-muted-foreground tabular-nums">Nº {ferramenta.numero}</p>
+                  )}
+                  <p className="text-xl font-black tracking-tight leading-tight">{ferramenta.nome}</p>
+                </div>
+
+                {!ferramenta.ativa ? (
+                  <div className="rounded-2xl bg-muted/50 p-4 text-sm font-semibold text-muted-foreground">Arquivada</div>
+                ) : ferramenta.comQuem ? (
+                  <div className="rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 p-4 space-y-1.5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700/70 dark:text-amber-400/60">Está com</p>
+                    <p className="flex items-center gap-2 text-sm font-bold"><User className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" /> {ferramenta.comQuem.colaboradorNome}</p>
+                    <p className="flex items-center gap-2 text-sm"><HardHat className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" /> {ferramenta.comQuem.obraNome}</p>
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5 shrink-0" /> {haQuanto(ferramenta.comQuem.desde)} ({fmtData(ferramenta.comQuem.desde)})</p>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 p-4 flex items-center gap-2">
+                    <PackageCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Disponível no armazém</span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 flex items-center gap-1">
+                    <History className="h-3 w-3" /> Histórico
+                  </p>
+                  {loadingHist ? (
+                    <div className="py-6 flex justify-center"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+                  ) : historico.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-2">Ainda sem entregas.</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {historico.map(h => (
+                        <div key={h.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-muted/40 text-xs">
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{h.colaboradorNome} · {h.obraNome}</p>
+                            <p className="text-muted-foreground">
+                              {fmtData(h.entregueEm)} → {h.devolvidoEm ? fmtData(h.devolvidoEm) : "ainda com ele"}
+                            </p>
+                          </div>
+                          {!h.devolvidoEm && <span className="text-[9px] font-bold text-amber-600 bg-amber-100 dark:bg-amber-950/40 rounded-full px-2 py-0.5 shrink-0">Em curso</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-border/40 shrink-0 flex gap-2">
+              <button onClick={() => onQr(ferramenta)} className="flex-1 h-11 rounded-xl bg-muted/60 hover:bg-muted text-sm font-semibold flex items-center justify-center gap-1.5">
+                <QrCode className="h-4 w-4" /> QR / Etiqueta
+              </button>
+              <button onClick={() => onEditar(ferramenta)} className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center gap-1.5">
+                <Pencil className="h-4 w-4" /> Editar
+              </button>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 // ─── Ecrã principal ──────────────────────────────────────────────────────────
 export function AdminFerramentasView() {
   const [ferramentas, setFerramentas] = useState<Ferramenta[]>([])
@@ -260,7 +375,8 @@ export function AdminFerramentasView() {
   const [qrDe, setQrDe] = useState<Ferramenta | null>(null)
   const [gerandoPdf, setGerandoPdf] = useState(false)
   const [armazemAberto, setArmazemAberto] = useState(false)
-  const [localizarAberto, setLocalizarAberto] = useState(false)
+  const [detalheId, setDetalheId] = useState<string | null>(null)
+  const [filtro, setFiltro] = useState<"todas" | "obra" | "livres">("todas")
 
   // Tempo real: entregas/devoluções e edições de qualquer admin aparecem logo
   useEffect(() => {
@@ -284,13 +400,28 @@ export function AdminFerramentasView() {
   const visiveis = useMemo(() => {
     const q = pesquisa.trim().toLowerCase().replace(/^#/, "")
     const n = /^\d+$/.test(q) ? Number(q) : null
-    return ferramentas.filter(f =>
-      (mostrarArquivadas ? true : f.ativa) &&
-      (!q || f.nome.toLowerCase().includes(q) || (n !== null && f.numero === n))
-    )
-  }, [ferramentas, pesquisa, mostrarArquivadas])
+    const lista = ferramentas.filter(f => {
+      if (filtro === "todas" ? !(mostrarArquivadas || f.ativa) : !f.ativa || (filtro === "obra") !== !!f.comQuem) return false
+      return !q || f.nome.toLowerCase().includes(q) || (n !== null && f.numero === n)
+    })
+    // "Em obra": as que estão fora há mais tempo primeiro
+    if (filtro === "obra") lista.sort((a, b) => (a.comQuem!.desde < b.comQuem!.desde ? -1 : 1))
+    return lista
+  }, [ferramentas, pesquisa, mostrarArquivadas, filtro])
 
-  const nArquivadas = ferramentas.filter(f => !f.ativa).length
+  const ativas = ferramentas.filter(f => f.ativa)
+  const nObra = ativas.filter(f => f.comQuem).length
+  const nLivres = ativas.length - nObra
+  const detalhe = ferramentas.find(f => f.id === detalheId) ?? null
+  const nArquivadas = ferramentas.length - ativas.length
+
+  // Enter com um número exato abre logo essa ferramenta (ex.: "12")
+  const abrirPorNumero = () => {
+    const q = pesquisa.trim().replace(/^#/, "")
+    if (!/^\d+$/.test(q)) return
+    const f = ferramentas.find(ff => ff.numero === Number(q))
+    if (f) { setDetalheId(f.id); setPesquisa("") }
+  }
 
   const abrirNova = () => { setEmEdicao(null); setFormAberto(true) }
   const abrirEditar = (f: Ferramenta) => { setEmEdicao(f); setFormAberto(true) }
@@ -355,15 +486,9 @@ export function AdminFerramentasView() {
         <div className="min-w-0 flex-1">
           <h1 className="text-xl font-black tracking-tight">Ferramentas</h1>
           <p className="text-xs text-muted-foreground/70 mt-0.5">
-            {ferramentas.filter(f => f.ativa).length} no catálogo
+            {nObra} em obra · {nLivres} disponíveis
           </p>
         </div>
-        <button
-          onClick={() => setLocalizarAberto(true)}
-          className="h-10 px-3.5 rounded-2xl bg-muted/60 hover:bg-muted text-sm font-bold flex items-center gap-1.5 shrink-0"
-        >
-          <MapPin className="h-4 w-4" /> <span className="hidden sm:inline">Localizar</span>
-        </button>
         <button
           onClick={() => setArmazemAberto(true)}
           className="h-10 px-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold flex items-center gap-1.5 shrink-0"
@@ -386,6 +511,7 @@ export function AdminFerramentasView() {
             type="text"
             value={pesquisa}
             onChange={e => setPesquisa(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") abrirPorNumero() }}
             placeholder="Pesquisar por nome ou número…"
             className="w-full h-11 pl-9 pr-3 rounded-xl border border-border/50 bg-card text-sm"
           />
@@ -401,7 +527,22 @@ export function AdminFerramentasView() {
         </button>
       </div>
 
-      {nArquivadas > 0 && (
+      <div className="flex gap-2 overflow-x-auto -mx-1 px-1">
+        {([["todas", "Todas", ativas.length], ["obra", "Em obra", nObra], ["livres", "Disponíveis", nLivres]] as const).map(([k, label, n]) => (
+          <button
+            key={k}
+            onClick={() => setFiltro(k)}
+            className={cn(
+              "h-9 px-3.5 rounded-full text-xs font-bold whitespace-nowrap border transition-colors",
+              filtro === k ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border/60 hover:text-foreground"
+            )}
+          >
+            {label} <span className="opacity-70 tabular-nums ml-0.5">{n}</span>
+          </button>
+        ))}
+      </div>
+
+      {filtro === "todas" && nArquivadas > 0 && (
         <button
           onClick={() => setMostrarArquivadas(v => !v)}
           className="text-xs font-semibold text-muted-foreground hover:text-foreground"
@@ -427,7 +568,7 @@ export function AdminFerramentasView() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {visiveis.map(f => (
-            <div key={f.id} className={cn("rounded-2xl border border-border/60 bg-card overflow-hidden flex flex-col", !f.ativa && "opacity-60")}>
+            <button key={f.id} onClick={() => setDetalheId(f.id)} className={cn("rounded-2xl border border-border/60 bg-card overflow-hidden flex flex-col text-left transition-all hover:border-primary/40 active:scale-[0.98]", !f.ativa && "opacity-60")}>
               <div className="relative aspect-[4/3] bg-muted/30 flex items-center justify-center overflow-hidden">
                 {f.fotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -452,23 +593,15 @@ export function AdminFerramentasView() {
                       <User className="h-2.5 w-2.5 shrink-0" /> <span className="truncate">{f.comQuem.colaboradorNome}</span>
                     </span>
                     <p className="text-[10px] text-muted-foreground/70 truncate flex items-center gap-1">
-                      <HardHat className="h-2.5 w-2.5 shrink-0" /> {f.comQuem.obraNome}
+                      <HardHat className="h-2.5 w-2.5 shrink-0" /> {f.comQuem.obraNome} · {haQuanto(f.comQuem.desde)}
                     </p>
                   </div>
                 ) : (
                   <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40 rounded-full px-2 py-0.5 self-start">Disponível</span>
                 )}
 
-                <div className="flex gap-1.5 mt-auto pt-1">
-                  <button onClick={() => setQrDe(f)} className="flex-1 h-8 rounded-lg bg-muted/60 hover:bg-muted text-[11px] font-semibold flex items-center justify-center gap-1">
-                    <QrCode className="h-3.5 w-3.5" /> QR
-                  </button>
-                  <button onClick={() => abrirEditar(f)} className="flex-1 h-8 rounded-lg bg-muted/60 hover:bg-muted text-[11px] font-semibold flex items-center justify-center gap-1">
-                    <Pencil className="h-3.5 w-3.5" /> Editar
-                  </button>
-                </div>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -483,9 +616,14 @@ export function AdminFerramentasView() {
           onSaved={() => {}}
         />
       )}
+      <FerramentaDetalhe
+        ferramenta={detalhe}
+        onClose={() => setDetalheId(null)}
+        onQr={f => { setDetalheId(null); setQrDe(f) }}
+        onEditar={f => { setDetalheId(null); abrirEditar(f) }}
+      />
       <QrDialog ferramenta={qrDe} onClose={() => setQrDe(null)} />
       <ArmazemModal open={armazemAberto} onClose={() => setArmazemAberto(false)} />
-      <LocalizarFerramentaModal open={localizarAberto} onClose={() => setLocalizarAberto(false)} />
     </div>
   )
 }
