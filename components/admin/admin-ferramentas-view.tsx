@@ -4,11 +4,13 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Wrench, Plus, Search, QrCode, Pencil, Loader2, Camera, Printer, Download,
-  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, HardHat, Clock, History, PackageCheck,
+  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, HardHat, Clock, History, PackageCheck, ScanLine, X,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { ArmazemModal } from "@/components/admin/armazem-modal"
+import { QrScanInput } from "@/components/admin/qr-scan-input"
+import { feedbackScan } from "@/lib/scan-feedback"
 import {
   subscreverFerramentas, numerarFerramentasEmFalta, createFerramenta, updateFerramenta, deleteFerramenta,
   uploadFotoFerramenta, gerarQrDataUrl, miniaturaUrl, getHistoricoFerramenta,
@@ -376,6 +378,8 @@ export function AdminFerramentasView() {
   const [gerandoPdf, setGerandoPdf] = useState(false)
   const [armazemAberto, setArmazemAberto] = useState(false)
   const [detalheId, setDetalheId] = useState<string | null>(null)
+  const [scanAberto, setScanAberto] = useState(false)
+  const [scanErro, setScanErro] = useState("")
   const [filtro, setFiltro] = useState<"todas" | "obra" | "livres">("todas")
 
   // Tempo real: entregas/devoluções e edições de qualquer admin aparecem logo
@@ -414,6 +418,14 @@ export function AdminFerramentasView() {
   const nLivres = ativas.length - nObra
   const detalhe = ferramentas.find(f => f.id === detalheId) ?? null
   const nArquivadas = ferramentas.length - ativas.length
+
+  // Picar QR (câmara ou pistola) ou escrever o número → abre logo a ferramenta
+  const handleScan = (code: string) => {
+    const c = code.trim().replace(/^#/, "")
+    const f = ferramentas.find(ff => ff.id === c || (/^\d+$/.test(c) && ff.numero === Number(c)))
+    if (f) { feedbackScan("sucesso"); setScanErro(""); setScanAberto(false); setDetalheId(f.id) }
+    else { feedbackScan("erro"); setScanErro("Nenhuma ferramenta encontrada com esse código.") }
+  }
 
   // Enter com um número exato abre logo essa ferramenta (ex.: "12")
   const abrirPorNumero = () => {
@@ -517,6 +529,15 @@ export function AdminFerramentasView() {
           />
         </div>
         <button
+          onClick={() => { setScanAberto(v => !v); setScanErro("") }}
+          className={cn(
+            "h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 shrink-0 transition-colors",
+            scanAberto ? "bg-red-500 text-white" : "bg-primary text-primary-foreground"
+          )}
+        >
+          {scanAberto ? <X className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />} {scanAberto ? "Fechar" : "Picar"}
+        </button>
+        <button
           onClick={handleImprimirTodas}
           disabled={gerandoPdf || ferramentas.filter(f => f.ativa).length === 0}
           title="Imprimir todas as etiquetas"
@@ -541,6 +562,13 @@ export function AdminFerramentasView() {
           </button>
         ))}
       </div>
+
+      {scanAberto && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-3 space-y-2">
+          <QrScanInput onScan={handleScan} placeholder="Pica o QR ou escreve o número…" />
+          {scanErro && <p className="text-xs text-red-500 font-medium px-1">{scanErro}</p>}
+        </div>
+      )}
 
       {filtro === "todas" && nArquivadas > 0 && (
         <button
