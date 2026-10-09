@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils"
 import { QrScanInput } from "@/components/admin/qr-scan-input"
 import { feedbackScan } from "@/lib/scan-feedback"
 import {
-  getFerramentas, getHistoricoFerramenta,
+  subscreverFerramentas, getHistoricoFerramenta, miniaturaUrl,
   type Ferramenta, type HistoricoEntrega,
 } from "@/lib/ferramentas-service"
 
@@ -39,7 +39,11 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    getFerramentas().then(setFerramentas).catch(console.error).finally(() => setLoading(false))
+    const unsub = subscreverFerramentas(
+      lista => { setFerramentas(lista); setLoading(false) },
+      err => { console.error(err); setLoading(false) },
+    )
+    return unsub
   }, [open])
 
   const emObra = useMemo(
@@ -50,9 +54,10 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
   )
 
   const resultadosPesquisa = useMemo(() => {
-    const q = pesquisa.trim().toLowerCase()
+    const q = pesquisa.trim().toLowerCase().replace(/^#/, "")
     if (!q) return []
-    return ferramentas.filter(f => f.nome.toLowerCase().includes(q)).slice(0, 8)
+    const n = /^\d+$/.test(q) ? Number(q) : null
+    return ferramentas.filter(f => f.nome.toLowerCase().includes(q) || (n !== null && f.numero === n)).slice(0, 8)
   }, [ferramentas, pesquisa])
 
   const abrirDetalhe = (f: Ferramenta) => {
@@ -63,7 +68,8 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
   }
 
   const handleScan = (code: string) => {
-    const f = ferramentas.find(ff => ff.id === code)
+    const c = code.trim().replace(/^#/, "")
+    const f = ferramentas.find(ff => ff.id === c || (/^\d+$/.test(c) && ff.numero === Number(c)))
     if (f) { feedbackScan("sucesso"); abrirDetalhe(f); setPesquisa("") }
     else { feedbackScan("erro"); setAvisoScan("Nenhuma ferramenta encontrada com esse código.") }
   }
@@ -86,14 +92,14 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
               <button onClick={fecharDetalhe} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center shrink-0">
                 <X className="h-4 w-4" />
               </button>
-              <p className="text-sm font-black tracking-tight truncate flex-1">{selecionada.nome}</p>
+              <p className="text-sm font-black tracking-tight truncate flex-1">{selecionada.numero != null && <span className="text-muted-foreground mr-1.5">Nº {selecionada.numero}</span>}{selecionada.nome}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               <div className="aspect-video rounded-2xl bg-muted/30 overflow-hidden flex items-center justify-center">
                 {selecionada.fotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={selecionada.fotoUrl} alt={selecionada.nome} className="w-full h-full object-cover" />
+                  <img src={miniaturaUrl(selecionada.fotoUrl, 800)} alt={selecionada.nome} className="w-full h-full object-cover" />
                 ) : (
                   <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
                 )}
@@ -166,12 +172,12 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
                   type="text"
                   value={pesquisa}
                   onChange={e => setPesquisa(e.target.value)}
-                  placeholder="Pesquisar pelo nome…"
+                  placeholder="Pesquisar por nome ou número…"
                   className="w-full h-11 pl-9 pr-3 rounded-xl border border-border/50 bg-background text-sm"
                 />
               </div>
 
-              <QrScanInput onScan={handleScan} autoFocusPistola={open && !pesquisa} placeholder="Ou pica o QR da ferramenta…" />
+              <QrScanInput onScan={handleScan} autoFocusPistola={open && !pesquisa} placeholder="Ou pica o QR / escreve o número…" />
               {avisoScan && <p className="text-xs text-red-500 font-medium">{avisoScan}</p>}
             </div>
 
@@ -183,7 +189,7 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
                     onClick={() => abrirDetalhe(f)}
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl bg-muted/40 hover:bg-muted text-left"
                   >
-                    <span className="text-sm font-semibold truncate">{f.nome}</span>
+                    <span className="text-sm font-semibold truncate">{f.numero != null && <span className="text-muted-foreground mr-1.5">Nº {f.numero}</span>}{f.nome}</span>
                     <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
                       !f.ativa ? "bg-muted text-muted-foreground" : f.comQuem ? "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400" : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400"
                     )}>
@@ -210,11 +216,11 @@ export function LocalizarFerramentaModal({ open, onClose }: Props) {
                         <div className="w-9 h-9 rounded-lg bg-muted overflow-hidden shrink-0 flex items-center justify-center">
                           {f.fotoUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img src={f.fotoUrl} alt={f.nome} className="w-full h-full object-cover" />
+                            <img src={miniaturaUrl(f.fotoUrl, 120)} alt={f.nome} loading="lazy" className="w-full h-full object-cover" />
                           ) : <ImageIcon className="h-4 w-4 text-muted-foreground/30" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold truncate">{f.nome}</p>
+                          <p className="text-sm font-semibold truncate">{f.numero != null && <span className="text-muted-foreground mr-1.5">Nº {f.numero}</span>}{f.nome}</p>
                           <p className="text-[11px] text-muted-foreground truncate">
                             {f.comQuem!.colaboradorNome} · {f.comQuem!.obraNome}
                           </p>

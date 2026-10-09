@@ -1,7 +1,7 @@
 // components/admin/armazem-modal.tsx
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import {
   X, PackageCheck, PackageOpen, HardHat, Check, AlertTriangle, Loader2,
   ChevronLeft, Pencil,
@@ -12,13 +12,13 @@ import { useCollaborators, type Collaborator } from "@/hooks/useCollaborators"
 import { ObraPicker } from "@/components/forms/obra-picker"
 import type { Obra } from "@/lib/obras-service"
 import { QrScanInput } from "@/components/admin/qr-scan-input"
-import { entregarFerramentas, devolverFerramentas } from "@/lib/ferramentas-service"
+import { entregarFerramentas, devolverFerramentas, buscarFerramentaPorCodigo } from "@/lib/ferramentas-service"
 import { feedbackScan } from "@/lib/scan-feedback"
 
 interface Props {
   open: boolean
   onClose: () => void
-  onChanged: () => void
+  onChanged?: () => void
 }
 
 function iniciais(nome: string): string {
@@ -55,7 +55,7 @@ function Avatar({ c, size = "w-12 h-12" }: { c: Collaborator; size?: string }) {
 
 type Modo = "entregar" | "devolver"
 type Passo = 0 | 1 | 2   // só para o modo "entregar": colaborador → obra → scan
-type ItemFila = { code: string; nome?: string; estado: "ok" | "aviso" | "erro"; mensagem?: string }
+type ItemFila = { code: string; nome?: string; numero?: number; estado: "ok" | "aviso" | "erro"; mensagem?: string; feito?: boolean }
 
 export function ArmazemModal({ open, onClose, onChanged }: Props) {
   const { user } = useAuth()
@@ -71,21 +71,23 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
   const [processando, setProcessando] = useState(false)
   const [houveMudanca, setHouveMudanca] = useState(false)
 
+  // ids (resolvidos) já na lista — evita duplicados mesmo que o mesmo item seja lido por QR e por número
+  const idsRef = useRef(new Set<string>())
+  const limparFila = () => { idsRef.current.clear(); setFila([]) }
+
   const resetTudo = () => {
-    setColaborador(null); setObraNome(""); setFila([]); setModo("entregar"); setPasso(0)
+    setColaborador(null); setObraNome(""); limparFila(); setModo("entregar"); setPasso(0)
   }
 
   const handleClose = () => {
-    if (houveMudanca) onChanged()
+    if (houveMudanca) onChanged?.()
     resetTudo(); setHouveMudanca(false)
     onClose()
   }
 
   const mudarModo = (m: Modo) => {
-    setModo(m); setFila([]); setColaborador(null); setObraNome(""); setPasso(0)
+    setModo(m); limparFila(); setColaborador(null); setObraNome(""); setPasso(0)
   }
-
-  const jaNaFila = (code: string) => fila.some(i => i.code === code)
 
   // ── Entregar ────────────────────────────────────────────────────────────
   const escolherColaborador = (c: Collaborator) => {
@@ -98,35 +100,60 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
     setPasso(2)
   }
 
-  const handleScanEntregar = (code: string) => {
-    if (jaNaFila(code)) { feedbackScan("aviso"); return }
+  const adicionarErro = (raw: string, mensagem: string) =>
+    setFila(prev => [{ code: `x:${raw}`, nome: raw, estado: "erro", mensagem }, ...prev.filter(i => i.code !== `x:${raw}`)])
+
+  // Aceita o QR (id) ou o número escrito ("12" / "#12") e valida logo no momento de ler
+  const handleScanEntregar = async (raw: string) => {
+    let f
+    try { f = await buscarFerramentaPorCodigo(raw) } catch (err) {
+      console.error(err); feedbackScan("erro"); adicionarErro(raw, "Erro ao procurar a ferramenta"); return
+    }
+    if (!f) { feedbackScan("erro"); adicionarErro(raw, "Código não encontrado"); return }
+    if (idsRef.current.has(f.id)) { feedbackScan("aviso"); return }
+    idsRef.current.add(f.id)
+    const base = { code: f.id, nome: f.nome, numero: f.numero }
+    if (!f.ativa) {
+      feedbackScan("erro")
+      setFila(prev => [{ ...base, estado: "erro", mensagem: "Ferramenta arquivada" }, ...prev]); return
+    }
+    if (f.comQuem) {
+      feedbackScan("aviso")
+      setFila(prev => [{ ...base, estado: "aviso", mensagem: `Já está com ${f.comQuem!.colaboradorNome}` }, ...prev]); return
+    }
     feedbackScan("sucesso")
-    setFila(prev => [{ code, estado: "ok", mensagem: "Pronta a entregar" }, ...prev])
+    setFila(prev => [{ ...base, estado: "ok", mensagem: "Pronta a entregar" }, ...prev])
   }
 
-  const removerDaFila = (code: string) => setFila(prev => prev.filter(i => i.code !== code))
+  const removerDaFila = (code: string) => {
+    idsRef.current.delete(code)
+    setFila(prev => prev.filter(i => i.code !== code))
+  }
 
   const confirmarEntrega = async () => {
-    if (!colaborador || !obraNome.trim() || fila.length === 0 || !user) return
+    const porEntregar = fila.filter(i => i.estado === "ok" && !i.feito)
+    if (!colaborador || !obraNome.trim() || porEntregar.length === 0 || !user) return
     setProcessando(true)
     try {
-      const codes = fila.filter(i => i.estado === "ok").map(i => i.code)
+      const codes = porEntregar.map(i => i.code)
       const res = await entregarFerramentas(codes, colaborador.id, colaborador.name, obraNome.trim(), user.uid)
       setHouveMudanca(true)
 
       setFila(prev => prev.map(item => {
+        if (!codes.includes(item.code)) return item
         const entregue = res.entregues.find(e => e.id === item.code)
-        if (entregue) return { ...item, nome: entregue.nome, estado: "ok", mensagem: "Entregue ✓" }
+        if (entregue) return { ...item, nome: entregue.nome, estado: "ok", mensagem: "Entregue ✓", feito: true }
         const emUso = res.jaEmUso.find(e => e.id === item.code)
         if (emUso) return { ...item, nome: emUso.nome, estado: "aviso", mensagem: `Já está com ${emUso.comQuem.colaboradorNome}` }
         if (res.inexistentes.includes(item.code)) return { ...item, estado: "erro", mensagem: "Código desconhecido" }
         return item
       }))
 
-      if (res.entregues.length > 0 && res.jaEmUso.length === 0 && res.inexistentes.length === 0) {
+      const tudoOk = res.jaEmUso.length === 0 && res.inexistentes.length === 0 && fila.every(i => i.estado === "ok")
+      if (tudoOk) {
         feedbackScan("sucesso")
-        setTimeout(() => { setFila([]); setColaborador(null); setObraNome(""); setPasso(0) }, 1300)
-      } else if (res.jaEmUso.length > 0 || res.inexistentes.length > 0) {
+        setTimeout(() => { limparFila(); setColaborador(null); setObraNome(""); setPasso(0) }, 1300)
+      } else {
         feedbackScan("aviso")
       }
     } catch (err) {
@@ -138,34 +165,42 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
   }
 
   // ── Devolver ────────────────────────────────────────────────────────────
-  const handleScanDevolver = async (code: string) => {
-    if (jaNaFila(code)) return
-    setFila(prev => [{ code, estado: "ok", mensagem: "A processar…" }, ...prev])
+  const handleScanDevolver = async (raw: string) => {
+    let f
+    try { f = await buscarFerramentaPorCodigo(raw) } catch (err) {
+      console.error(err); feedbackScan("erro"); adicionarErro(raw, "Erro ao procurar a ferramenta"); return
+    }
+    if (!f) { feedbackScan("erro"); adicionarErro(raw, "Código não encontrado"); return }
+    if (idsRef.current.has(f.id)) return
+    idsRef.current.add(f.id)
+    const id = f.id
+    const atualizar = (patch: Partial<ItemFila>) => setFila(prev => prev.map(i => i.code === id ? { ...i, ...patch } : i))
+    setFila(prev => [{ code: id, nome: f.nome, numero: f.numero, estado: "ok", mensagem: "A processar…" }, ...prev])
     try {
-      const res = await devolverFerramentas([code], user?.uid ?? "")
+      const res = await devolverFerramentas([id], user?.uid ?? "")
       if (res.devolvidas.length > 0) {
-        const d = res.devolvidas[0]
         feedbackScan("sucesso")
+        atualizar({ estado: "ok", mensagem: `Devolvida — estava com ${res.devolvidas[0].colaboradorNome}` })
         setHouveMudanca(true)
-        setFila(prev => prev.map(i => i.code === code ? { ...i, nome: d.nome, estado: "ok", mensagem: `Devolvida — estava com ${d.colaboradorNome}` } : i))
       } else if (res.naoEstavamEntregues.length > 0) {
         feedbackScan("aviso")
-        setFila(prev => prev.map(i => i.code === code ? { ...i, estado: "aviso", mensagem: "Já estava em stock" } : i))
+        atualizar({ estado: "aviso", mensagem: "Já estava em stock" })
       } else {
         feedbackScan("erro")
-        setFila(prev => prev.map(i => i.code === code ? { ...i, estado: "erro", mensagem: "Código não corresponde a nenhuma ferramenta" } : i))
+        atualizar({ estado: "erro", mensagem: "Código não corresponde a nenhuma ferramenta" })
       }
     } catch (err) {
       console.error(err)
       feedbackScan("erro")
-      setFila(prev => prev.map(i => i.code === code ? { ...i, estado: "erro", mensagem: "Erro ao processar" } : i))
+      atualizar({ estado: "erro", mensagem: "Erro ao processar" })
+      idsRef.current.delete(id)
     }
   }
 
   if (!open) return null
 
   const totalPassosEntrega = 3
-  const filaOk = fila.filter(i => i.estado === "ok")
+  const filaOk = fila.filter(i => i.estado === "ok" && !i.feito)
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" onClick={handleClose}>
@@ -284,7 +319,7 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
                     </button>
                   </div>
 
-                  <QrScanInput onScan={handleScanEntregar} autoFocusPistola={open} placeholder="Pica as ferramentas…" />
+                  <QrScanInput onScan={handleScanEntregar} autoFocusPistola={open} placeholder="Pica o QR ou escreve o número…" />
 
                   {fila.length > 0 && (
                     <div className="space-y-1.5">
@@ -300,7 +335,7 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
           ) : (
             <div className="space-y-4">
               <p className="text-sm font-bold text-center text-muted-foreground">Pica as ferramentas que chegaram</p>
-              <QrScanInput onScan={handleScanDevolver} autoFocusPistola={open} placeholder="Pica as ferramentas devolvidas…" />
+              <QrScanInput onScan={handleScanDevolver} autoFocusPistola={open} placeholder="Pica o QR ou escreve o número…" />
               {fila.length > 0 && (
                 <div className="space-y-1.5">
                   {fila.map(item => <FilaRow key={item.code} item={item} />)}
@@ -351,7 +386,10 @@ function FilaRow({ item, onRemover }: { item: ItemFila; onRemover?: () => void }
         <AlertTriangle className={cn("h-4 w-4 shrink-0", item.estado === "aviso" ? "text-amber-600 dark:text-amber-400" : "text-red-500")} />
       )}
       <div className="min-w-0 flex-1">
-        <p className="font-semibold truncate">{item.nome ?? item.code}</p>
+        <p className="font-semibold truncate">
+          {item.numero != null && <span className="font-mono text-xs text-muted-foreground mr-1.5">Nº {item.numero}</span>}
+          {item.nome ?? item.code}
+        </p>
         {item.mensagem && <p className="text-[11px] text-muted-foreground truncate">{item.mensagem}</p>}
       </div>
       {onRemover && (

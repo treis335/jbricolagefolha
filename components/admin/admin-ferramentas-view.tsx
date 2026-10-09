@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils"
 import { ArmazemModal } from "@/components/admin/armazem-modal"
 import { LocalizarFerramentaModal } from "@/components/admin/localizar-ferramenta-modal"
 import {
-  getFerramentas, createFerramenta, updateFerramenta, deleteFerramenta,
-  uploadFotoFerramenta, gerarQrDataUrl, type Ferramenta,
+  subscreverFerramentas, numerarFerramentasEmFalta, createFerramenta, updateFerramenta, deleteFerramenta,
+  uploadFotoFerramenta, gerarQrDataUrl, miniaturaUrl, type Ferramenta,
 } from "@/lib/ferramentas-service"
 
 // ─── Formulário (criar / editar) ─────────────────────────────────────────────
@@ -89,7 +89,9 @@ function FerramentaFormDialog({
         <div className="px-6 pt-6 pb-4 border-b border-border/40 shrink-0">
           <p className="text-base font-black tracking-tight">{ferramenta ? "Editar ferramenta" : "Nova ferramenta"}</p>
           <p className="text-[11px] text-muted-foreground/70 mt-0.5">
-            {ferramenta ? "O QR code mantém-se sempre o mesmo" : "O QR code é gerado automaticamente ao guardar"}
+            {ferramenta
+              ? `${ferramenta.numero != null ? `Nº ${ferramenta.numero} · ` : ""}O QR code e o número mantêm-se sempre os mesmos`
+              : "O QR code e o número (sequencial) são atribuídos automaticamente ao guardar"}
           </p>
         </div>
 
@@ -194,7 +196,7 @@ function QrDialog({ ferramenta, onClose }: { ferramenta: Ferramenta | null; onCl
     if (!qr || !ferramenta) return
     const a = document.createElement("a")
     a.href = qr
-    a.download = `qr-${ferramenta.nome.replace(/\s+/g, "-").toLowerCase()}.png`
+    a.download = `qr-${ferramenta.numero != null ? `${ferramenta.numero}-` : ""}${ferramenta.nome.replace(/\s+/g, "-").toLowerCase()}.png`
     a.click()
   }
 
@@ -202,18 +204,29 @@ function QrDialog({ ferramenta, onClose }: { ferramenta: Ferramenta | null; onCl
     if (!qr || !ferramenta) return
     const { default: jsPDF } = await import("jspdf")
     const docPdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [62, 62] })
-    docPdf.addImage(qr, "PNG", 6, 4, 50, 50)
+    docPdf.addImage(qr, "PNG", 9, 3, 44, 44)
     docPdf.setFont("helvetica", "bold")
-    docPdf.setFontSize(9)
-    const linhas = docPdf.splitTextToSize(ferramenta.nome, 54) as string[]
-    docPdf.text(linhas.slice(0, 2), 31, 57, { align: "center" })
-    docPdf.save(`etiqueta-${ferramenta.nome.replace(/\s+/g, "-").toLowerCase()}.pdf`)
+    if (ferramenta.numero != null) {
+      docPdf.setFontSize(20)
+      docPdf.text(`Nº ${ferramenta.numero}`, 31, 54, { align: "center" })
+      docPdf.setFontSize(8)
+      const linhas = docPdf.splitTextToSize(ferramenta.nome, 56) as string[]
+      docPdf.text(linhas[0] ?? "", 31, 59.5, { align: "center" })
+    } else {
+      docPdf.setFontSize(9)
+      const linhas = docPdf.splitTextToSize(ferramenta.nome, 54) as string[]
+      docPdf.text(linhas.slice(0, 2), 31, 53, { align: "center" })
+    }
+    docPdf.save(`etiqueta-${ferramenta.numero != null ? `${ferramenta.numero}-` : ""}${ferramenta.nome.replace(/\s+/g, "-").toLowerCase()}.pdf`)
   }
 
   return (
     <Dialog open={!!ferramenta} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-xs rounded-3xl p-6 gap-4">
-        <DialogTitle className="text-center text-base font-black">{ferramenta?.nome}</DialogTitle>
+        <DialogTitle className="text-center text-base font-black">
+          {ferramenta?.numero != null && <span className="block text-3xl tabular-nums">Nº {ferramenta.numero}</span>}
+          {ferramenta?.nome}
+        </DialogTitle>
         <DialogDescription className="sr-only">QR code da ferramenta</DialogDescription>
         <div className="aspect-square w-full rounded-2xl bg-white border border-border/40 flex items-center justify-center p-3">
           {qr ? (
@@ -249,16 +262,31 @@ export function AdminFerramentasView() {
   const [armazemAberto, setArmazemAberto] = useState(false)
   const [localizarAberto, setLocalizarAberto] = useState(false)
 
-  const carregar = () => {
-    setLoading(true)
-    getFerramentas().then(setFerramentas).catch(console.error).finally(() => setLoading(false))
-  }
-  useEffect(carregar, [])
+  // Tempo real: entregas/devoluções e edições de qualquer admin aparecem logo
+  useEffect(() => {
+    const unsub = subscreverFerramentas(
+      lista => { setFerramentas(lista); setLoading(false) },
+      err => { console.error(err); setLoading(false) },
+    )
+    return unsub
+  }, [])
+
+  // Ferramentas criadas antes da numeração recebem número (uma vez, por ordem de criação)
+  const numeracaoFeita = useRef(false)
+  useEffect(() => {
+    if (loading || numeracaoFeita.current) return
+    if (ferramentas.some(f => f.numero == null)) {
+      numeracaoFeita.current = true
+      numerarFerramentasEmFalta().catch(err => { numeracaoFeita.current = false; console.error(err) })
+    }
+  }, [loading, ferramentas])
 
   const visiveis = useMemo(() => {
-    const q = pesquisa.trim().toLowerCase()
+    const q = pesquisa.trim().toLowerCase().replace(/^#/, "")
+    const n = /^\d+$/.test(q) ? Number(q) : null
     return ferramentas.filter(f =>
-      (mostrarArquivadas ? true : f.ativa) && (!q || f.nome.toLowerCase().includes(q))
+      (mostrarArquivadas ? true : f.ativa) &&
+      (!q || f.nome.toLowerCase().includes(q) || (n !== null && f.numero === n))
     )
   }, [ferramentas, pesquisa, mostrarArquivadas])
 
@@ -292,12 +320,20 @@ export function AdminFerramentasView() {
         docPdf.rect(x, y, cellW, cellH)
         docPdf.setLineDashPattern([], 0)
 
-        docPdf.addImage(qrs[i], "PNG", x + 11.5, y + 3, 40, 40)
+        docPdf.addImage(qrs[i], "PNG", x + 14.5, y + 2, 34, 34)
         docPdf.setFont("helvetica", "bold")
-        docPdf.setFontSize(9)
         docPdf.setTextColor(20)
-        const linhas = docPdf.splitTextToSize(f.nome, cellW - 6) as string[]
-        docPdf.text(linhas.slice(0, 2), x + cellW / 2, y + 47, { align: "center" })
+        if (f.numero != null) {
+          docPdf.setFontSize(14)
+          docPdf.text(`Nº ${f.numero}`, x + cellW / 2, y + 42, { align: "center" })
+          docPdf.setFontSize(8)
+          const linhas = docPdf.splitTextToSize(f.nome, cellW - 6) as string[]
+          docPdf.text(linhas.slice(0, 2), x + cellW / 2, y + 47, { align: "center" })
+        } else {
+          docPdf.setFontSize(9)
+          const linhas = docPdf.splitTextToSize(f.nome, cellW - 6) as string[]
+          docPdf.text(linhas.slice(0, 2), x + cellW / 2, y + 42, { align: "center" })
+        }
       })
 
       docPdf.save("etiquetas-ferramentas.pdf")
@@ -350,7 +386,7 @@ export function AdminFerramentasView() {
             type="text"
             value={pesquisa}
             onChange={e => setPesquisa(e.target.value)}
-            placeholder="Pesquisar ferramenta…"
+            placeholder="Pesquisar por nome ou número…"
             className="w-full h-11 pl-9 pr-3 rounded-xl border border-border/50 bg-card text-sm"
           />
         </div>
@@ -392,12 +428,17 @@ export function AdminFerramentasView() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {visiveis.map(f => (
             <div key={f.id} className={cn("rounded-2xl border border-border/60 bg-card overflow-hidden flex flex-col", !f.ativa && "opacity-60")}>
-              <div className="aspect-[4/3] bg-muted/30 flex items-center justify-center overflow-hidden">
+              <div className="relative aspect-[4/3] bg-muted/30 flex items-center justify-center overflow-hidden">
                 {f.fotoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={f.fotoUrl} alt={f.nome} className="w-full h-full object-cover" />
+                  <img src={miniaturaUrl(f.fotoUrl)} alt={f.nome} loading="lazy" className="w-full h-full object-cover" />
                 ) : (
                   <ImageIcon className="h-8 w-8 text-muted-foreground/20" />
+                )}
+                {f.numero != null && (
+                  <span className="absolute top-2 left-2 min-w-7 h-7 px-2 rounded-lg bg-black/70 text-white text-xs font-black tabular-nums flex items-center justify-center backdrop-blur-sm">
+                    {f.numero}
+                  </span>
                 )}
               </div>
               <div className="p-3 space-y-2 flex-1 flex flex-col">
@@ -439,11 +480,11 @@ export function AdminFerramentasView() {
           open
           onClose={() => setFormAberto(false)}
           ferramenta={emEdicao}
-          onSaved={carregar}
+          onSaved={() => {}}
         />
       )}
       <QrDialog ferramenta={qrDe} onClose={() => setQrDe(null)} />
-      <ArmazemModal open={armazemAberto} onClose={() => setArmazemAberto(false)} onChanged={carregar} />
+      <ArmazemModal open={armazemAberto} onClose={() => setArmazemAberto(false)} />
       <LocalizarFerramentaModal open={localizarAberto} onClose={() => setLocalizarAberto(false)} />
     </div>
   )
