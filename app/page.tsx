@@ -65,6 +65,19 @@ function AppContent() {
   const [formOpen, setFormOpen] = useState(false)
   const { isLoading } = useWorkTracker()
 
+  // O botão Ferramentas do cabeçalho (mobile) muda o separador; o cabeçalho é informado do separador ativo
+  useEffect(() => {
+    const h = (e: Event) => {
+      const t = (e as CustomEvent<TabType>).detail
+      if (t) setActiveTab(t)
+    }
+    window.addEventListener("jb:set-tab", h)
+    return () => window.removeEventListener("jb:set-tab", h)
+  }, [])
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("jb:tab-changed", { detail: activeTab }))
+  }, [activeTab])
+
   const handleSelectDate = (date: Date) => { setSelectedDate(date); setFormOpen(true) }
   const handleAddToday   = () => { setSelectedDate(new Date()); setFormOpen(true) }
   const handleCloseForm  = () => { setFormOpen(false); setSelectedDate(null) }

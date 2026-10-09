@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useAuth } from "@/lib/AuthProvider"
 import { isAuthorizedAdmin } from "@/lib/admin-config"
 import { Button } from "@/components/ui/button"
-import { ShieldCheck, LayoutDashboard } from "lucide-react"
+import { ShieldCheck, LayoutDashboard, Wrench } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
@@ -19,6 +19,8 @@ export function Header() {
   const pathname = usePathname()
   const [isOnline, setIsOnline] = useState(true)
   const [scrolled, setScrolled] = useState(false)
+
+  const [tabAtiva, setTabAtiva] = useState("calendar")
 
   const isAdmin = user ? isAuthorizedAdmin(user.uid) : false
   const isOnAdminPage = pathname?.startsWith("/admin")
@@ -33,6 +35,16 @@ export function Header() {
       window.removeEventListener("offline", update)
     }
   }, [])
+
+  // A página principal avisa qual é o separador ativo (para destacar o botão Ferramentas)
+  useEffect(() => {
+    const h = (e: Event) => setTabAtiva(String((e as CustomEvent).detail ?? "calendar"))
+    window.addEventListener("jb:tab-changed", h)
+    return () => window.removeEventListener("jb:tab-changed", h)
+  }, [])
+
+  const irParaFerramentas = () =>
+    window.dispatchEvent(new CustomEvent("jb:set-tab", { detail: tabAtiva === "ferramentas" ? "calendar" : "ferramentas" }))
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 4)
@@ -85,6 +97,23 @@ export function Header() {
 
           {/* Escala do dia — só do lado colaborador */}
           {!isOnAdminPage && <EscalaDoDia />}
+
+          {/* Ferramentas — só em mobile (no desktop está no menu lateral), à esquerda dos avisos */}
+          {!isOnAdminPage && user && (
+            <button
+              onClick={irParaFerramentas}
+              title="As minhas ferramentas"
+              aria-label="As minhas ferramentas"
+              className={cn(
+                "lg:hidden relative flex items-center justify-center w-8 h-8 rounded-xl shrink-0 transition-all press-effect border",
+                tabAtiva === "ferramentas"
+                  ? "bg-indigo-600 border-indigo-600 text-white"
+                  : "bg-indigo-100 dark:bg-indigo-950/40 border-indigo-300/60 dark:border-indigo-800/50 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-200/60 dark:hover:bg-indigo-900/50"
+              )}
+            >
+              <Wrench className="h-4 w-4" />
+            </button>
+          )}
 
           {/* Aviso de dias corrigidos pelo admin — só do lado colaborador */}
           {!isOnAdminPage && <AvisoEdicaoAdmin />}
