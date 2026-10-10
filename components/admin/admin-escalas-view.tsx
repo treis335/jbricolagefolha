@@ -26,9 +26,11 @@ function formatDataChip(dateStr: string): string {
 }
 
 export function AdminEscalasView() {
-  const { collaborators } = useCollaborators()
-  const ativos = useMemo(() => collaborators.filter(c => c.ativo), [collaborators])
-  const nomeById = useMemo(() => new Map(collaborators.map(c => [c.id, c.name])), [collaborators])
+  // O Patrão pode ser posto numa equipa como qualquer colaborador (fica fora das outras listas)
+  const { collaborators, patroes } = useCollaborators()
+  const equipaPossiveis = useMemo(() => [...collaborators, ...patroes], [collaborators, patroes])
+  const ativos = useMemo(() => equipaPossiveis.filter(c => c.ativo), [equipaPossiveis])
+  const nomeById = useMemo(() => new Map(equipaPossiveis.map(c => [c.id, c.name])), [equipaPossiveis])
 
   const [date, setDate] = useState(hojeStr)
   const [equipas, setEquipas] = useState<EscalaEquipa[]>([])
