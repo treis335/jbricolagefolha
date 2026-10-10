@@ -27,6 +27,8 @@ export interface ActiveCollaborator {
   nome: string
   email?: string
   currentRate?: number
+  /** Patrão: pode ser marcado na equipa, mas não recebe sugestões (não tem lado de colaborador) */
+  patrao?: boolean
 }
 
 interface UseActiveCollaboratorsReturn {
@@ -121,10 +123,11 @@ export async function syncCollaboratorName(
 // useActiveCollaborators
 // ─────────────────────────────────────────────────────────────────────────────
 export function useActiveCollaborators(): UseActiveCollaboratorsReturn {
-  const { collaborators, loading, error, refetch } = useCollaborators()
+  const { collaborators, patroes, loading, error, refetch } = useCollaborators()
 
   const activeCollaborators = useMemo((): ActiveCollaborator[] => {
-    return collaborators
+    // O Patrão também aparece: os colaboradores marcam quando estiveram com ele
+    return [...collaborators, ...patroes]
       .filter(c => c.ativo === true)
       .map(c => ({
         uid: c.id,
@@ -132,9 +135,10 @@ export function useActiveCollaborators(): UseActiveCollaboratorsReturn {
         nome: c.name,
         email: c.email,
         currentRate: c.currentRate,
+        patrao: c.tipoContrato === "patrao",
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, "pt"))
-  }, [collaborators])
+  }, [collaborators, patroes])
 
   return {
     activeCollaborators,

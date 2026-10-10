@@ -188,6 +188,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     .sort((a, b) => a.nome.localeCompare(b.nome))
   }, [activeCollaborators])
 
+  // O Patrão pode ser marcado na equipa, mas não lhe enviamos sugestões (não tem lado de colaborador)
+  const patraoUids = useMemo(
+    () => new Set(activeCollaborators.filter(c => c.patrao).map(c => c.uid)),
+    [activeCollaborators],
+  )
+
   const [totalHoras, setTotalHoras] = useState(8)
   const [services, setServices] = useState<Service[]>([])
   const [activeServiceId, setActiveServiceId] = useState<string | null>(null)
@@ -452,7 +458,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
           descricao: s.descricao,
           materiais: s.materiais,
           equipa:    s.equipa,
-          equipaUids: s.equipaUids || [],
+          equipaUids: (s.equipaUids || []).filter(uid => !patraoUids.has(uid)),
         })),
         dateStr,
         user.displayName || user.email || "Colega",
