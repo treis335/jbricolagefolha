@@ -4,7 +4,6 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useAuth } from "@/lib/AuthProvider"
-import { isAuthorizedAdmin } from "@/lib/admin-config"
 import { Button } from "@/components/ui/button"
 import { ShieldCheck, LayoutDashboard, Wrench } from "lucide-react"
 import { usePathname } from "next/navigation"
@@ -15,14 +14,13 @@ import { AlertaHorasButton } from "@/components/admin/alerta-horas-button"
 import { AvisoEdicaoAdmin } from "@/components/aviso-edicao-admin"
 
 export function Header() {
-  const { user } = useAuth()
+  const { user, isAdmin, isPatrao } = useAuth()
   const pathname = usePathname()
   const [isOnline, setIsOnline] = useState(true)
   const [scrolled, setScrolled] = useState(false)
 
   const [tabAtiva, setTabAtiva] = useState("calendar")
 
-  const isAdmin = user ? isAuthorizedAdmin(user.uid) : false
   const isOnAdminPage = pathname?.startsWith("/admin")
 
   useEffect(() => {
@@ -142,8 +140,8 @@ export function Header() {
             <span className="hidden sm:inline">{isOnline ? "Online" : "Offline"}</span>
           </div>
 
-          {/* Admin button */}
-          {isAdmin && (
+          {/* Admin button (o Patrão não tem lado de colaborador, por isso não alterna) */}
+          {isAdmin && !isPatrao && (
             <Link href={isOnAdminPage ? "/" : "/admin"}>
               <Button
                 variant={isOnAdminPage ? "default" : "outline"}

@@ -11,7 +11,6 @@ import {
 import type { TabType } from "./bottom-nav"
 import Image from "next/image"
 import Link from "next/link"
-import { isAuthorizedAdmin } from "@/lib/admin-config"
 import { useMemo } from "react"
 
 interface SideNavProps {
@@ -28,10 +27,9 @@ const navItems: { id: TabType; label: string; icon: React.ElementType; desc: str
 ]
 
 export function SideNav({ activeTab, onTabChange, onAddToday }: SideNavProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, isAdmin } = useAuth()
   const { data, getFaltaReceber } = useWorkTracker()
 
-  const isAdmin = user ? isAuthorizedAdmin(user.uid) : false
 
   const stats = useMemo(() => {
     const entries = data?.entries ?? []

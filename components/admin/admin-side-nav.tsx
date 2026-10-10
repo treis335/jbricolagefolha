@@ -39,7 +39,7 @@ const accentBg: Record<string, string> = {
 }
 
 export function AdminSideNav({ activeTab, onTabChange }: AdminSideNavProps) {
-  const { user, logout } = useAuth()
+  const { user, logout, isPatrao } = useAuth()
 
   const userInitials = (user?.displayName ?? user?.email ?? "A")
     .split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()
@@ -102,18 +102,20 @@ export function AdminSideNav({ activeTab, onTabChange }: AdminSideNavProps) {
         })}
       </nav>
 
-      {/* Back to App */}
-      <div className="px-3 pb-2 shrink-0">
-        <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-150 group">
-          <div className="w-8 h-8 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-semibold leading-none">Voltar à App</p>
-            <p className="text-[10px] text-muted-foreground/60 mt-0.5">Vista colaborador</p>
-          </div>
-        </Link>
-      </div>
+      {/* Back to App — o Patrão não tem lado de colaborador */}
+      {!isPatrao && (
+        <div className="px-3 pb-2 shrink-0">
+          <Link href="/" className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-150 group">
+            <div className="w-8 h-8 rounded-xl bg-muted/60 flex items-center justify-center shrink-0">
+              <ArrowLeft className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-none">Voltar à App</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-0.5">Vista colaborador</p>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* User */}
       <div className="border-t border-border/60 px-3 py-3 shrink-0">

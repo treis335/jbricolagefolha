@@ -31,7 +31,7 @@ export interface Collaborator {
   migrated?: boolean
   ativo: boolean
   fotoUrl?: string
-  tipoContrato?: "funcionario" | "independente"
+  tipoContrato?: "funcionario" | "independente" | "patrao"
   pendingAmount: number
   unlockedDays: import("@/lib/useGlobalSettings").UnlockedDay[]
   entries: DayEntry[]
@@ -40,6 +40,8 @@ export interface Collaborator {
 
 interface UseCollaboratorsReturn {
   collaborators: Collaborator[]
+  /** Utilizadores com tipo "Patrão" — ficam fora de `collaborators` (horas, escalas, armazém…) */
+  patroes: Collaborator[]
   loading: boolean
   error: string | null
   refetch: () => Promise<void>
@@ -74,6 +76,7 @@ function lerColaboradores(forcar: boolean): Promise<QuerySnapshot<DocumentData>>
 
 export function useCollaborators(): UseCollaboratorsReturn {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
+  const [patroes, setPatroes]             = useState<Collaborator[]>([])
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)
 
@@ -129,7 +132,7 @@ export function useCollaborators(): UseCollaboratorsReturn {
           migrated:          d.migrated  || false,
           ativo,
           fotoUrl: d.fotoUrl || undefined,
-          tipoContrato: d.tipoContrato === "independente" ? "independente" : "funcionario",
+          tipoContrato: d.tipoContrato === "independente" ? "independente" : d.tipoContrato === "patrao" ? "patrao" : "funcionario",
           pendingAmount: 0,
           unlockedDays: Array.isArray(d.unlockedDays) ? d.unlockedDays : [],
           entries,
@@ -142,7 +145,8 @@ export function useCollaborators(): UseCollaboratorsReturn {
         return a.name.localeCompare(b.name, "pt")
       })
 
-      setCollaborators(data)
+      setCollaborators(data.filter(c => c.tipoContrato !== "patrao"))
+      setPatroes(data.filter(c => c.tipoContrato === "patrao"))
     } catch (err) {
       setError("Erro ao carregar colaboradores.")
     } finally {
@@ -152,5 +156,5 @@ export function useCollaborators(): UseCollaboratorsReturn {
 
   useEffect(() => { fetchCollaborators() }, [])
 
-  return { collaborators, loading, error, refetch: () => fetchCollaborators(true) }
+  return { collaborators, patroes, loading, error, refetch: () => fetchCollaborators(true) }
 }

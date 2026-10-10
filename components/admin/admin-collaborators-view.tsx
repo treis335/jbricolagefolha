@@ -12,7 +12,7 @@ import {
   Eye, X, Loader2, Mail, Phone,
   UserX, UserCheck, ShieldOff, Lock, Unlock,
   CreditCard, ChevronDown, ChevronUp, Zap, ZapOff,
-  Building2, Hash, Info, Copy, CheckCircle2, Trash2, AlertTriangle,
+  Building2, Hash, Info, Copy, CheckCircle2, Trash2, AlertTriangle, Briefcase, ChevronRight,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Spinner } from "@/components/ui/spinner"
@@ -572,7 +572,7 @@ export function AdminCollaboratorsView() {
   const [localAtivo, setLocalAtivo] = useState<Record<string, boolean>>({})
 
   const router = useRouter()
-  const { collaborators, loading, error, refetch } = useCollaborators()
+  const { collaborators, patroes, loading, error, refetch } = useCollaborators()
 
   const mergedCollabs = collaborators.map(c => ({
     ...c,
@@ -820,6 +820,26 @@ export function AdminCollaboratorsView() {
                 modoGestao={modoGestao}
                 onViewDetail={() => router.push(`/admin/collaborator/${collab.id}`)}
               />
+            ))}
+          </div>
+        )}
+
+        {/* Patrões — só veem a administração; ficam fora das horas, escalas e armazém */}
+        {patroes.length > 0 && (
+          <div className="space-y-2 pt-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 px-1">Patrões</p>
+            {patroes.map(p => (
+              <button
+                key={p.id}
+                onClick={() => router.push(`/admin/collaborator/${p.id}`)}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border/50 bg-card text-left active:scale-[0.99] transition-all"
+              >
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center shrink-0">
+                  <Briefcase className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                </div>
+                <span className="text-sm font-semibold truncate flex-1">{p.name}</span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+              </button>
             ))}
           </div>
         )}

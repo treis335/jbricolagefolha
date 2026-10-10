@@ -13,7 +13,6 @@ import { Spinner } from "@/components/ui/spinner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ShieldAlert, ArrowLeft } from "lucide-react"
-import { isAuthorizedAdmin } from "@/lib/admin-config"
 import { cn } from "@/lib/utils"
 
 const SkeletonView = () => (
@@ -59,16 +58,16 @@ function AdminContent() {
   const [activeTab, setActiveTab] = useState<AdminTabType>("dashboard")
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const { isLoading } = useWorkTracker()
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
     if (!user && !isLoading) { router.push("/"); return }
     if (user) {
-      if (!isAuthorizedAdmin(user.uid)) { router.push("/"); return }
+      if (!isAdmin) { router.push("/"); return }
       setIsCheckingAuth(false)
     }
-  }, [user, isLoading, router])
+  }, [user, isAdmin, isLoading, router])
 
   if (isLoading || isCheckingAuth) {
     return (
@@ -81,7 +80,7 @@ function AdminContent() {
     )
   }
 
-  if (!user || !isAuthorizedAdmin(user.uid)) {
+  if (!user || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="max-w-md w-full border-destructive/50 rounded-3xl">

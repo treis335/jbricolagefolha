@@ -153,7 +153,7 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged, onT
   collaborator: any
   onClose: () => void
   onNameSaved: (name: string) => void
-  onTipoSaved?: (tipo: "funcionario" | "independente") => void
+  onTipoSaved?: (tipo: "funcionario" | "independente" | "patrao") => void
   onLockChanged: (locks: { fotoLocked: boolean; nomeLocked: boolean }) => void
 }) {
   // ── Nome ──
@@ -162,11 +162,11 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged, onT
   const [nameSaved, setNameSaved] = useState(false)
 
   // ── Tipo de contrato (funcionário / independente) ──
-  const [tipoContrato, setTipoContrato] = useState<"funcionario" | "independente">(
-    collaborator.tipoContrato === "independente" ? "independente" : "funcionario"
+  const [tipoContrato, setTipoContrato] = useState<"funcionario" | "independente" | "patrao">(
+    collaborator.tipoContrato === "independente" ? "independente" : collaborator.tipoContrato === "patrao" ? "patrao" : "funcionario"
   )
   const [savingTipo, setSavingTipo] = useState(false)
-  const saveTipo = async (novo: "funcionario" | "independente") => {
+  const saveTipo = async (novo: "funcionario" | "independente" | "patrao") => {
     if (novo === tipoContrato || savingTipo) return
     setSavingTipo(true)
     try {
@@ -397,14 +397,15 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged, onT
             {/* ── Tipo de contrato ── */}
             <div className="space-y-2">
               <SectionTitle icon={<Briefcase className="h-3 w-3 opacity-60" />} label="Tipo de contrato" />
-              <div className="grid grid-cols-2 gap-2">
-                {([["funcionario", "Funcionário"], ["independente", "Independente"]] as const).map(([valor, label]) => (
+              <div className="grid grid-cols-3 gap-2">
+                {([["funcionario", "Funcionário"], ["independente", "Independente"], ["patrao", "Patrão"]] as const).map(([valor, label]) => (
+
                   <button
                     key={valor}
                     onClick={() => saveTipo(valor)}
                     disabled={savingTipo}
                     className={cn(
-                      "h-11 rounded-xl border text-sm font-semibold transition-all active:scale-95 disabled:opacity-60",
+                      "h-11 rounded-xl border text-xs font-semibold transition-all active:scale-95 disabled:opacity-60",
                       tipoContrato === valor
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-muted/40 border-border/40 text-muted-foreground hover:text-foreground"
@@ -415,7 +416,9 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged, onT
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Os independentes anexam o recibo em PDF a cada mês e aparecem na lista de recibos em falta.
+                {tipoContrato === "patrao"
+                  ? "Patrão: passa a ver apenas a administração (sem o lado de colaborador) e deixa de aparecer nas horas, escalas e armazém. Aplica-se na próxima vez que abrir a app."
+                  : "Os independentes podem anexar o recibo em PDF a cada mês (opcional)."}
               </p>
             </div>
 
@@ -642,7 +645,7 @@ export default function CollaboratorDetailPage() {
         fotoUrl: userData.fotoUrl || "",
         fotoLocked: userData.fotoLocked ?? false,
         nomeLocked: userData.nomeLocked ?? false,
-        tipoContrato: userData.tipoContrato === "independente" ? "independente" : "funcionario",
+        tipoContrato: userData.tipoContrato === "independente" ? "independente" : userData.tipoContrato === "patrao" ? "patrao" : "funcionario",
         currentRate,
         totalHoursAllTime,
         entries,
@@ -876,10 +879,10 @@ export default function CollaboratorDetailPage() {
                         <span>{collaborator.username}</span>
                       </span>
                     )}
-                    {collaborator.tipoContrato === "independente" && (
+                    {(collaborator.tipoContrato === "independente" || collaborator.tipoContrato === "patrao") && (
                       <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 w-fit">
                         <Briefcase className="h-3 w-3 shrink-0" />
-                        <span>Independente</span>
+                        <span>{collaborator.tipoContrato === "patrao" ? "Patrão" : "Independente"}</span>
                       </span>
                     )}
                   </div>

@@ -19,10 +19,15 @@ import {
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { usePathname, useRouter } from "next/navigation"
 import { isEmailAllowed, type GlobalSettings } from "@/lib/useGlobalSettings"
+import { isAuthorizedAdmin } from "@/lib/admin-config"
 
 interface AuthContextType {
   user: User | null
   isAuthLoading: boolean
+  /** Tipo de contrato "Patrão": só vê a administração (sem o lado de colaborador) */
+  isPatrao: boolean
+  /** Admin (UIDs fixos) ou Patrão */
+  isAdmin: boolean
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -130,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true)
   const [isSuspended, setIsSuspended] = useState(false)
   const [isUnauthorized, setIsUnauthorized] = useState(false)
+  const [isPatrao, setIsPatrao] = useState(false)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -147,6 +153,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
     setIsSuspended(false)
     setIsUnauthorized(false)
+    setIsPatrao(false)
     // Redireciona para o logout do Google para limpar a sessão em cache
     // Ao voltar, o login page vai pedir para selecionar conta novamente
     router.push("/login")
@@ -187,11 +194,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           })
 
           console.log(`[Auth] Nova conta criada → username: ${suggestedUsername}`)
+          setIsPatrao(false)
           setIsSuspended(false)
           setIsUnauthorized(false)
         } else {
           const data = snap.data()
 
+          setIsPatrao(data?.tipoContrato === "patrao")
           setIsUnauthorized(false)
 
           // ✅ Verifica se a conta foi suspensa pelo admin
@@ -218,6 +227,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } else {
         setIsSuspended(false)
+        setIsPatrao(false)
       }
 
       setUser(firebaseUser)
@@ -231,8 +241,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isAuthLoading) return
     if (!user && pathname !== "/login") router.push("/login")
-    if (user && pathname === "/login") router.push("/")
-  }, [user, isAuthLoading, pathname, router])
+    if (user && pathname === "/login") router.push(isPatrao ? "/admin" : "/")
+    // Patrão: só a administração — qualquer outra página leva ao /admin
+    if (user && isPatrao && pathname !== "/login" && !pathname?.startsWith("/admin")) router.replace("/admin")
+  }, [user, isAuthLoading, isPatrao, pathname, router])
 
   const loginWithGoogle = async () => {
     const provider = new GoogleAuthProvider()
@@ -265,11 +277,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return <AcessoNaoAutorizadoScreen onLogout={performLogout} />
   }
 
+  // Patrão fora do /admin: mostra um ecrã de transição em vez do lado de colaborador
+  const aRedirecionarPatrao = !!user && isPatrao && pathname !== "/login" && !pathname?.startsWith("/admin")
+
   return (
     <AuthContext.Provider
-      value={{ user, isAuthLoading, loginWithGoogle, logout: performLogout }}
+      value={{
+        user, isAuthLoading, isPatrao,
+        isAdmin: isPatrao || isAuthorizedAdmin(user?.uid),
+        loginWithGoogle, logout: performLogout,
+      }}
     >
-      {children}
+      {aRedirecionarPatrao ? (
+        <div className="min-h-screen flex items-center justify-center text-sm text-muted-foreground">
+          A abrir a administração…
+        </div>
+      ) : children}
     </AuthContext.Provider>
   )
 }
