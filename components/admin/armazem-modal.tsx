@@ -59,8 +59,12 @@ type ItemFila = { code: string; nome?: string; numero?: number; estado: "ok" | "
 
 export function ArmazemModal({ open, onClose, onChanged }: Props) {
   const { user } = useAuth()
-  const { collaborators } = useCollaborators()
-  const ativos = useMemo(() => collaborators.filter(c => c.ativo).sort((a, b) => a.name.localeCompare(b.name)), [collaborators])
+  // O Patrão também pode levar ferramentas
+  const { collaborators, patroes } = useCollaborators()
+  const ativos = useMemo(
+    () => [...collaborators, ...patroes].filter(c => c.ativo).sort((a, b) => a.name.localeCompare(b.name)),
+    [collaborators, patroes],
+  )
 
   const [modo, setModo] = useState<Modo>("entregar")
   const [passo, setPasso] = useState<Passo>(0)
