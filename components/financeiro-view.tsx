@@ -32,6 +32,7 @@ import {
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import type { PaymentMethod } from "@/lib/types"
 import { cn, fmt} from "@/lib/utils"
+import { ReciboMensalCard } from "@/components/recibo-mensal-card"
 
 const mesesPorExtenso = [
   "", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -206,6 +207,9 @@ export function FinanceiroView() {
             <p className="text-xs text-muted-foreground mt-0.5">Controlo de pagamentos e saldos</p>
           </div>
         </div>
+
+        {/* ── Recibo do mês (só para colaboradores independentes) ── */}
+        <ReciboMensalCard />
 
         {/* ── Period Filter ── */}
         <div className="flex items-end gap-3">

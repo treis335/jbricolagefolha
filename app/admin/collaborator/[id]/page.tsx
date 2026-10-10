@@ -13,7 +13,7 @@ import {
   Euro, Clock, TrendingUp, Mail, AtSign, Layers,
   ChevronRight, ChevronLeft, Camera, ImageIcon, Loader2,
   Check, X, Lock, LockOpen, ShieldAlert, CreditCard,
-  Building2, Hash, Phone, Zap, ZapOff,
+  Building2, Hash, Phone, Zap, ZapOff, Briefcase,
 } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
@@ -149,16 +149,33 @@ function SectionTitle({ icon, label }: { icon: React.ReactNode; label: string })
 }
 
 // ── Admin Edit Modal ──────────────────────────────────────────────────────────
-function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
+function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged, onTipoSaved }: {
   collaborator: any
   onClose: () => void
   onNameSaved: (name: string) => void
+  onTipoSaved?: (tipo: "funcionario" | "independente") => void
   onLockChanged: (locks: { fotoLocked: boolean; nomeLocked: boolean }) => void
 }) {
   // ── Nome ──
   const [draftName, setDraftName] = useState(collaborator.name)
   const [savingName, setSavingName] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
+
+  // ── Tipo de contrato (funcionário / independente) ──
+  const [tipoContrato, setTipoContrato] = useState<"funcionario" | "independente">(
+    collaborator.tipoContrato === "independente" ? "independente" : "funcionario"
+  )
+  const [savingTipo, setSavingTipo] = useState(false)
+  const saveTipo = async (novo: "funcionario" | "independente") => {
+    if (novo === tipoContrato || savingTipo) return
+    setSavingTipo(true)
+    try {
+      await setDoc(doc(db, "users", collaborator.id), { tipoContrato: novo }, { merge: true })
+      setTipoContrato(novo)
+      onTipoSaved?.(novo)
+    } catch { alert("Erro ao guardar o tipo de contrato.") }
+    finally { setSavingTipo(false) }
+  }
 
   // ── Permissões perfil ──
   const [fotoLocked, setFotoLocked] = useState(collaborator.fotoLocked ?? false)
@@ -375,6 +392,31 @@ function AdminEditModal({ collaborator, onClose, onNameSaved, onLockChanged }: {
                   {savingName ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                 </button>
               </div>
+            </div>
+
+            {/* ── Tipo de contrato ── */}
+            <div className="space-y-2">
+              <SectionTitle icon={<Briefcase className="h-3 w-3 opacity-60" />} label="Tipo de contrato" />
+              <div className="grid grid-cols-2 gap-2">
+                {([["funcionario", "Funcionário"], ["independente", "Independente"]] as const).map(([valor, label]) => (
+                  <button
+                    key={valor}
+                    onClick={() => saveTipo(valor)}
+                    disabled={savingTipo}
+                    className={cn(
+                      "h-11 rounded-xl border text-sm font-semibold transition-all active:scale-95 disabled:opacity-60",
+                      tipoContrato === valor
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-muted/40 border-border/40 text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Os independentes anexam o recibo em PDF a cada mês e aparecem na lista de recibos em falta.
+              </p>
             </div>
 
             {/* ── 2. Permissões de perfil ── */}
@@ -600,6 +642,7 @@ export default function CollaboratorDetailPage() {
         fotoUrl: userData.fotoUrl || "",
         fotoLocked: userData.fotoLocked ?? false,
         nomeLocked: userData.nomeLocked ?? false,
+        tipoContrato: userData.tipoContrato === "independente" ? "independente" : "funcionario",
         currentRate,
         totalHoursAllTime,
         entries,
@@ -833,6 +876,12 @@ export default function CollaboratorDetailPage() {
                         <span>{collaborator.username}</span>
                       </span>
                     )}
+                    {collaborator.tipoContrato === "independente" && (
+                      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 w-fit">
+                        <Briefcase className="h-3 w-3 shrink-0" />
+                        <span>Independente</span>
+                      </span>
+                    )}
                   </div>
                   <button
                     onClick={() => setShowEditModal(true)}
@@ -944,6 +993,7 @@ export default function CollaboratorDetailPage() {
           onClose={() => setShowEditModal(false)}
           onNameSaved={(name) => setCollaborator((prev: any) => ({ ...prev, name, username: name }))}
           onLockChanged={(locks) => setCollaborator((prev: any) => ({ ...prev, ...locks }))}
+          onTipoSaved={(tipoContrato) => setCollaborator((prev: any) => ({ ...prev, tipoContrato }))}
         />
       )}
 

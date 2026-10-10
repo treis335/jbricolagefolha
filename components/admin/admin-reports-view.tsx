@@ -4,7 +4,7 @@
 import { useState, Suspense, Component, type ReactNode } from "react"
 import dynamic from "next/dynamic"
 import { useCollaborators } from "@/hooks/useCollaborators"
-import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles, Table2, Camera } from "lucide-react"
+import { Calendar, BarChart3, History, Clock, FileBarChart, ChevronRight, Sparkles, Table2, Camera, Receipt } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // ── Lazy load every modal — if any fails, only that modal crashes ─────────────
@@ -14,6 +14,7 @@ const RateHistoryModal       = dynamic(() => import("./rate-history-modal").then
 const HoursReportModal       = dynamic(() => import("./hours-report-modal").then(m => ({ default: m.HoursReportModal })),       { ssr: false })
 const PerformanceReportModal = dynamic(() => import("./performance-report-modal").then(m => ({ default: m.PerformanceReportModal })), { ssr: false })
 const MapaHorasModal         = dynamic(() => import("./mapa-horas-modal").then(m => ({ default: m.MapaHorasModal })),           { ssr: false })
+const RecibosModal            = dynamic(() => import("./recibos-modal").then(m => ({ default: m.RecibosModal })),                  { ssr: false })
 const FotosModal              = dynamic(() => import("./fotos-modal").then(m => ({ default: m.FotosModal })),                    { ssr: false })
 
 // ── Error Boundary ─────────────────────────────────────────────────────────────
@@ -107,6 +108,15 @@ const REPORTS = [
     bg: "bg-pink-50 dark:bg-pink-950/20 border-pink-100 dark:border-pink-900/40",
     tags: ["Fotos", "Obras", "Antes/Depois"],
   },
+  {
+    id: "recibos",
+    icon: Receipt,
+    title: "Recibos dos independentes",
+    description: "Recibos em PDF enviados pelos colaboradores independentes, por mês — vê quem falta e descarrega tudo num ZIP.",
+    accent: "text-indigo-600 dark:text-indigo-400",
+    bg: "bg-indigo-50 dark:bg-indigo-950/20 border-indigo-100 dark:border-indigo-900/40",
+    tags: ["Recibos", "PDF", "ZIP"],
+  },
 ] as const
 
 // ── Main ───────────────────────────────────────────────────────────────────────
@@ -195,6 +205,7 @@ export function AdminReportsView() {
         {open === "hours"       && <HoursReportModal       open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "performance" && <PerformanceReportModal open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "mapa"        && <MapaHorasModal         open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "recibos"     && <RecibosModal           open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "fotos"       && <FotosModal              open onClose={() => setOpen(null)} collaborators={collaborators} />}
       </Suspense>
     </ReportsBoundary>
