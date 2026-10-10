@@ -66,14 +66,14 @@ export function ReciboMensalCard() {
   const dataEnvio = recibo?.enviadoEm?.toDate?.()
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card p-3 space-y-2.5">
+    <div className="rounded-2xl border border-indigo-200/60 dark:border-indigo-900/40 bg-indigo-50/60 dark:bg-indigo-950/20 p-3 space-y-2.5">
       {/* Cabeçalho compacto: título + mês navegável */}
       <div className="flex items-center gap-2">
         <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center shrink-0">
           <Receipt className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
         </div>
         <p className="text-sm font-bold flex-1 min-w-0">Recibo</p>
-        <div className="flex items-center rounded-lg bg-muted/40">
+        <div className="flex items-center rounded-lg bg-white/70 dark:bg-white/5">
           <button onClick={() => setMes(m => somarMeses(m, -1))} aria-label="Mês anterior"
             className="w-8 h-8 rounded-lg hover:bg-background flex items-center justify-center active:scale-95 transition-all">
             <ChevronLeft className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function ReciboMensalCard() {
         )
       ) : (
         <button onClick={() => inputRef.current?.click()}
-          className={cn("w-full h-10 rounded-lg border border-dashed border-border/70 hover:border-indigo-400/60 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/10",
+          className={cn("w-full h-10 rounded-lg border border-dashed border-indigo-300/70 dark:border-indigo-800/60 bg-white/50 dark:bg-white/5 hover:border-indigo-400/70 hover:bg-white/80 dark:hover:bg-white/10",
             "flex items-center justify-center gap-2 text-xs font-semibold transition-all active:scale-[0.99]")}>
           <Upload className="h-4 w-4 text-muted-foreground" />
           Anexar recibo (PDF, máx. 5 MB)
