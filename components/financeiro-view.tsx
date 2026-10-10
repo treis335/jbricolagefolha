@@ -208,9 +208,6 @@ export function FinanceiroView() {
           </div>
         </div>
 
-        {/* ── Recibo do mês (só para colaboradores independentes) ── */}
-        <ReciboMensalCard />
-
         {/* ── Period Filter ── */}
         <div className="flex items-end gap-3">
           <div className="flex-1 space-y-1">
@@ -364,6 +361,9 @@ export function FinanceiroView() {
             </div>
           )}
         </div>
+
+        {/* ── Recibo do mês (só independentes) — logo acima de Registar Pagamento ── */}
+        <ReciboMensalCard />
 
         {/* ── Register Payment — Collapsible ── */}
         <div className="rounded-2xl border border-border/60 overflow-hidden shadow-sm">

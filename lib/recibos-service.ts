@@ -8,6 +8,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { criarZip } from "@/lib/zip-simples"
+import { resolveDisplayName } from "@/hooks/useCollaborators"
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME ?? ""
 const CLOUDINARY_UPLOAD_PRESET = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET ?? ""
@@ -46,17 +47,28 @@ export function mesPorExtenso(mes: string): string {
   const [a, m] = mes.split("-").map(Number)
   return `${MESES[m - 1]} ${a}`
 }
+/** "João Silva", "2026-10" → "recibo-joao-silva-10-2026.pdf" */
+export function nomeFicheiroRecibo(nomeColaborador: string, mes: string): string {
+  const [ano, m] = mes.split("-")
+  const slug = nomeColaborador.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "colaborador"
+  return `recibo-${slug}-${m}-${ano}.pdf`
+}
+
 export function formatarTamanho(bytes: number): string {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
 // ── Leitura em tempo real ────────────────────────────────────────────────────
 /** Tipo de contrato do próprio colaborador (por defeito: funcionário). */
-export function subscreverTipoContrato(uid: string, onChange: (t: TipoContrato) => void): Unsubscribe {
+export function subscreverTipoContrato(uid: string, onChange: (t: TipoContrato, nome: string) => void): Unsubscribe {
   return onSnapshot(
     doc(db, "users", uid),
-    snap => onChange(snap.data()?.tipoContrato === "independente" ? "independente" : "funcionario"),
-    () => onChange("funcionario"),
+    snap => {
+      const d = snap.data()
+      onChange(d?.tipoContrato === "independente" ? "independente" : "funcionario", d ? resolveDisplayName(d) : "")
+    },
+    () => onChange("funcionario", ""),
   )
 }
 
@@ -116,19 +128,26 @@ function uploadPdf(file: File, onProgress?: (pct: number) => void): Promise<{ ur
   })
 }
 
-/** Envia o PDF e associa-o ao mês. Se já existir um recibo desse mês, é substituído. */
+/**
+ * Envia o PDF e associa-o ao mês. Se já existir um recibo desse mês, é substituído.
+ * O ficheiro é renomeado automaticamente para recibo-nome-mes-ano.pdf.
+ */
 export async function enviarRecibo(
-  file: File, colaboradorUid: string, mes: string, enviadoPor: string, onProgress?: (pct: number) => void,
+  fileOriginal: File, colaboradorUid: string, nomeColaborador: string, mes: string, enviadoPor: string,
+  onProgress?: (pct: number) => void,
 ): Promise<void> {
+  const file = fileOriginal
   const ePdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")
   if (!ePdf) throw new Error("O ficheiro tem de ser um PDF.")
   if (file.size > TAMANHO_MAX_RECIBO) throw new Error("O PDF é demasiado grande (máximo 5 MB).")
   if (!/^\d{4}-\d{2}$/.test(mes)) throw new Error("Mês inválido.")
 
-  const { url, publicId } = await uploadPdf(file, onProgress)
+  const nomeFinal = nomeFicheiroRecibo(nomeColaborador, mes)
+  const renomeado = new File([file], nomeFinal, { type: "application/pdf" })
+  const { url, publicId } = await uploadPdf(renomeado, onProgress)
   await setDoc(doc(db, "recibos", reciboId(colaboradorUid, mes)), {
     colaboradorUid, mes, url, publicId,
-    nomeOriginal: file.name, tamanho: file.size,
+    nomeOriginal: nomeFinal, tamanho: file.size,
     enviadoEm: serverTimestamp(), enviadoPor,
   })
 }
@@ -139,10 +158,6 @@ export async function removerRecibo(colaboradorUid: string, mes: string): Promis
 }
 
 // ── Download ─────────────────────────────────────────────────────────────────
-function nomeSeguro(s: string): string {
-  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "colaborador"
-}
-
 /** Descarrega todos os recibos indicados num único ZIP. Devolve os nomes dos que não foi possível obter. */
 export async function descarregarRecibosZip(
   itens: { colaborador: string; recibo: Recibo }[], mes: string,
@@ -155,8 +170,9 @@ export async function descarregarRecibosZip(
     try {
       const res = await fetch(recibo.url)
       if (!res.ok) throw new Error(String(res.status))
-      let nome = `${nomeSeguro(colaborador)}_${mes}.pdf`
-      for (let i = 2; usados.has(nome); i++) nome = `${nomeSeguro(colaborador)}_${mes}_${i}.pdf`
+      const base = nomeFicheiroRecibo(colaborador, mes)
+      let nome = base
+      for (let i = 2; usados.has(nome); i++) nome = base.replace(/\.pdf$/, `-${i}.pdf`)
       usados.add(nome)
       ficheiros.push({ nome, dados: new Uint8Array(await res.arrayBuffer()) })
     } catch {
