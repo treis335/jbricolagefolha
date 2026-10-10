@@ -1,13 +1,15 @@
 // components/escala-do-dia.tsx
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
+import { doc, getDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase"
 import { ChevronLeft, ChevronRight, MapPin, Users, CalendarDays } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/AuthProvider"
 import { formatLocalDate } from "@/lib/date-utils"
 import { getMinhasEscalas, type EscalaEquipa } from "@/lib/escalas-service"
-import { useCollaborators } from "@/hooks/useCollaborators"
+import { resolveDisplayName } from "@/hooks/useCollaborators"
 import { cn } from "@/lib/utils"
 
 interface MinhaEscala {
@@ -45,7 +47,8 @@ function corAvatar(uid: string): string {
 
 export function EscalaDoDia() {
   const { user } = useAuth()
-  const { collaborators } = useCollaborators()
+  const [nomes, setNomes] = useState<Record<string, string>>({})
+  const nomesPedidos = useRef(new Set<string>())
   const [escalas, setEscalas] = useState<MinhaEscala[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -62,11 +65,30 @@ export function EscalaDoDia() {
     return () => { cancelled = true }
   }, [user])
 
+  // Só vai buscar nomes quando HÁ escala, e só dos colegas dessa equipa
+  // (antes descarregava os documentos completos de todos os colaboradores, sempre que a app abria)
+  useEffect(() => {
+    if (escalas.length === 0) return
+    const uids = Array.from(new Set(escalas.flatMap(e => e.equipa.colaboradorUids)))
+      .filter(uid => uid !== user?.uid && !nomesPedidos.current.has(uid))
+    if (uids.length === 0) return
+    uids.forEach(uid => nomesPedidos.current.add(uid))
+    Promise.all(uids.map(uid =>
+      getDoc(doc(db, "users", uid))
+        .then(s => (s.exists() ? ([uid, resolveDisplayName(s.data())] as const) : null))
+        .catch(() => null)
+    )).then(res => setNomes(prev => {
+      const novo = { ...prev }
+      res.forEach(r => { if (r) novo[r[0]] = r[1] })
+      return novo
+    }))
+  }, [escalas, user?.uid])
+
   if (loading || escalas.length === 0) return null
 
   const atual = escalas[index]
   const equipa = atual.equipa.colaboradorUids
-    .map(uid => ({ uid, nome: uid === user?.uid ? (user?.displayName ?? "Tu") : collaborators.find(c => c.id === uid)?.name }))
+    .map(uid => ({ uid, nome: uid === user?.uid ? (user?.displayName ?? "Tu") : nomes[uid] }))
     .filter((m): m is { uid: string; nome: string } => Boolean(m.nome))
     .sort((a, b) => (a.uid === user?.uid ? -1 : b.uid === user?.uid ? 1 : a.nome.localeCompare(b.nome)))
 

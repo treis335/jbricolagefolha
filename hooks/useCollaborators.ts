@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { collection, getDocs, query, where } from "firebase/firestore"
+import { collection, getDocs, query, where, type DocumentData, type QuerySnapshot } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { DayEntry } from "@/lib/types"
 
@@ -44,7 +44,7 @@ interface UseCollaboratorsReturn {
   refetch: () => Promise<void>
 }
 
-function resolveDisplayName(userData: any): string {
+export function resolveDisplayName(userData: any): string {
   return (userData.username || "").trim() || (userData.name || "").trim() || "Sem nome"
 }
 
@@ -57,16 +57,30 @@ function resolveEntryTaxa(entry: any, currentRate: number): number {
   return currentRate
 }
 
+// Vários componentes montam ao mesmo tempo e pediam, cada um, TODOS os documentos dos colaboradores.
+// Pedidos simultâneos partilham agora a mesma leitura. Não há cache: uma leitura nova
+// (e o refetch, sempre) vai ao servidor, por isso os dados nunca ficam desatualizados.
+let leituraEmCurso: Promise<QuerySnapshot<DocumentData>> | null = null
+function lerColaboradores(forcar: boolean): Promise<QuerySnapshot<DocumentData>> {
+  if (forcar || !leituraEmCurso) {
+    const leitura = getDocs(query(collection(db, "users"), where("role", "==", "worker")))
+    const limpar = () => { if (leituraEmCurso === leitura) leituraEmCurso = null }
+    leitura.then(limpar, limpar)
+    leituraEmCurso = leitura
+  }
+  return leituraEmCurso!
+}
+
 export function useCollaborators(): UseCollaboratorsReturn {
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [loading, setLoading]             = useState(true)
   const [error, setError]                 = useState<string | null>(null)
 
-  const fetchCollaborators = async () => {
+  const fetchCollaborators = async (forcar = false) => {
     setLoading(true)
     setError(null)
     try {
-      const snap = await getDocs(query(collection(db, "users"), where("role", "==", "worker")))
+      const snap = await lerColaboradores(forcar)
       const now  = new Date()
       const curM = now.getMonth(), curY = now.getFullYear()
 
@@ -136,5 +150,5 @@ export function useCollaborators(): UseCollaboratorsReturn {
 
   useEffect(() => { fetchCollaborators() }, [])
 
-  return { collaborators, loading, error, refetch: fetchCollaborators }
+  return { collaborators, loading, error, refetch: () => fetchCollaborators(true) }
 }

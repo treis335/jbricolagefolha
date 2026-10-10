@@ -291,15 +291,18 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
       markerRef.current = marker
     }
     const loadLeaflet = async () => {
+      // O CSS do Leaflet já não vem no <head> global: carrega-se aqui e o mapa só arranca quando estiver pronto
+      let cssPronto: Promise<void> = Promise.resolve()
       if (!document.getElementById("leaflet-css")) {
         const link = document.createElement("link")
         link.id = "leaflet-css"; link.rel = "stylesheet"
         link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        cssPronto = new Promise<void>(resolve => { link.onload = () => resolve(); link.onerror = () => resolve() })
         document.head.appendChild(link)
       }
-      if ((window as any).L) { initMap(); return }
+      if ((window as any).L) { await cssPronto; initMap(); return }
       if (document.getElementById("leaflet-js")) {
-        const wait = setInterval(() => { if ((window as any).L) { clearInterval(wait); initMap() } }, 50)
+        const wait = setInterval(() => { if ((window as any).L) { clearInterval(wait); cssPronto.then(initMap) } }, 50)
         return
       }
       await new Promise<void>((resolve, reject) => {
@@ -308,6 +311,7 @@ function MapaObra({ localizacao, nomeMorada, onLocationUpdate }: MapaObraProps) 
         script.onload = () => resolve(); script.onerror = () => reject()
         document.head.appendChild(script)
       })
+      await cssPronto
       initMap()
     }
     loadLeaflet().catch(console.error)

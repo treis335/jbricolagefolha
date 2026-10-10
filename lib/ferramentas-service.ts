@@ -10,7 +10,6 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import { compressImage } from "@/lib/service-fotos"
-import QRCode from "qrcode"
 
 export interface FerramentaComQuem {
   colaboradorUid: string
@@ -222,6 +221,7 @@ export async function uploadFotoFerramenta(
 // O conteúdo do QR é só o ID da ferramenta — simples, único, sem ambiguidade.
 
 export async function gerarQrDataUrl(ferramentaId: string): Promise<string> {
+  const { default: QRCode } = await import("qrcode")
   return QRCode.toDataURL(ferramentaId, { width: 320, margin: 1 })
 }
 
