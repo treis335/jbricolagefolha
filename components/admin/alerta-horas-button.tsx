@@ -23,6 +23,7 @@ export function AlertaHorasButton() {
   const { collaborators, loading: loadingCol } = useCollaborators()
   const [estados, setEstados] = useState<Map<string, EstadoAlerta>>(new Map())
   const [loadingEstados, setLoadingEstados] = useState(true)
+  const [erroEstados, setErroEstados] = useState(false)
   const [open, setOpen] = useState(false)
   const [comentarios, setComentarios] = useState<Record<string, string>>({})
   const [verificando, setVerificando] = useState<string | null>(null)
@@ -30,8 +31,8 @@ export function AlertaHorasButton() {
   // Tempo real: qualquer admin que verifique/comente atualiza todos os outros
   useEffect(() => {
     const unsub = subscreverEstadosAlertas(
-      novos => { setEstados(novos); setLoadingEstados(false) },
-      err => { console.error(err); setLoadingEstados(false) },
+      novos => { setEstados(novos); setErroEstados(false); setLoadingEstados(false) },
+      err => { console.error(err); setErroEstados(true); setLoadingEstados(false) },
     )
     return unsub
   }, [])
@@ -123,6 +124,11 @@ export function AlertaHorasButton() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {erroEstados && (
+              <div className="rounded-xl border border-amber-300/70 bg-amber-50 dark:bg-amber-950/20 px-3 py-2.5 text-xs text-amber-800 dark:text-amber-300">
+                Não foi possível ler as verificações já feitas (falta de permissão?). Estas divergências podem já ter sido verificadas por outro admin.
+              </div>
+            )}
             {ativos.length === 0 ? (
               <div className="py-10 text-center text-sm text-muted-foreground">Sem divergências por confirmar 🎉</div>
             ) : (
