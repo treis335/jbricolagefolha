@@ -2,8 +2,9 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar } from "lucide-react"
+import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ZoomableImage } from "@/components/zoomable-image"
 import type { Collaborator } from "@/hooks/useCollaborators"
 
 interface Props {
@@ -21,6 +22,38 @@ interface FotoFlat {
   date: string
   obraNome: string
   descricao: string
+}
+
+function slug(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+}
+
+/** Descarrega a foto com um nome útil: obra-colaborador-data-tipo */
+async function descarregarFoto(f: FotoFlat) {
+  const nome = [slug(f.obraNome), slug(f.colaboradorNome), f.date, f.tipo].filter(Boolean).join("-") || "foto"
+  const clicar = (href: string, ficheiro?: string) => {
+    const a = document.createElement("a")
+    a.href = href
+    if (ficheiro) a.download = ficheiro
+    a.rel = "noopener"
+    document.body.appendChild(a); a.click(); a.remove()
+  }
+  // Cloudinary: o próprio servidor força o download (funciona em qualquer telemóvel/browser)
+  if (f.url.includes("res.cloudinary.com") && f.url.includes("/upload/")) {
+    clicar(f.url.replace("/upload/", `/upload/fl_attachment:${nome}/`))
+    return
+  }
+  try {
+    const res = await fetch(f.url)
+    if (!res.ok) throw new Error(String(res.status))
+    const blob = await res.blob()
+    const ext = blob.type.split("/")[1]?.split("+")[0] || "jpg"
+    const url = URL.createObjectURL(blob)
+    clicar(url, `${nome}.${ext}`)
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+  } catch {
+    window.open(f.url, "_blank", "noopener")
+  }
 }
 
 function formatData(dateStr: string): string {
@@ -167,9 +200,18 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
             )}>
               {ampliada.tipo}
             </span>
-            <button onClick={() => setIndexAmpliada(null)} className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
-              <X className="h-5 w-5 text-white" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => descarregarFoto(ampliada)}
+                aria-label="Descarregar foto"
+                className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 flex items-center gap-1.5 text-white text-xs font-semibold"
+              >
+                <Download className="h-4 w-4" /> Descarregar
+              </button>
+              <button onClick={() => setIndexAmpliada(null)} aria-label="Fechar" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
+                <X className="h-5 w-5 text-white" />
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 flex items-center justify-center relative px-2 min-h-0">
@@ -181,8 +223,7 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
                 <ChevronLeft className="h-5 w-5 text-white" />
               </button>
             )}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={ampliada.url} alt={ampliada.obraNome} className="max-w-full max-h-full object-contain rounded-xl" />
+            <ZoomableImage key={ampliada.url} src={ampliada.url} alt={ampliada.obraNome} className="absolute inset-0" />
             {indexAmpliada < filtradas.length - 1 && (
               <button
                 onClick={() => setIndexAmpliada(i => (i ?? 0) + 1)}
