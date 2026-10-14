@@ -1,10 +1,10 @@
 // components/admin/fotos-modal.tsx
 "use client"
 
-import { useMemo, useState } from "react"
-import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar, Download } from "lucide-react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar, Download, Plus, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { ZoomableImage } from "@/components/zoomable-image"
+import { ZoomableImage, type ZoomHandle } from "@/components/zoomable-image"
 import type { Collaborator } from "@/hooks/useCollaborators"
 
 interface Props {
@@ -56,6 +56,14 @@ async function descarregarFoto(f: FotoFlat) {
   }
 }
 
+/** Miniatura leve (Cloudinary redimensiona); outros URLs ficam como estão */
+function miniatura(url: string, largura = 160): string {
+  if (!url.includes("res.cloudinary.com") || !url.includes("/upload/")) return url
+  return url.replace("/upload/", `/upload/f_auto,q_auto,c_fill,w_${largura},h_${largura}/`)
+}
+
+const clampIndex = (i: number, total: number) => Math.min(Math.max(i, 0), Math.max(total - 1, 0))
+
 function formatData(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number)
   return new Date(y, m - 1, d).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })
@@ -66,6 +74,9 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
   const [tipo, setTipo] = useState<"todas" | "antes" | "depois">("todas")
   const [busca, setBusca] = useState("")
   const [indexAmpliada, setIndexAmpliada] = useState<number | null>(null)
+  const zoomRef = useRef<ZoomHandle>(null)
+  const [escalaAtual, setEscalaAtual] = useState(1)
+  const miniaturasRef = useRef<(HTMLButtonElement | null)[]>([])
 
   const todasFotos = useMemo<FotoFlat[]>(() => {
     const lista: FotoFlat[] = []
@@ -105,6 +116,32 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
   )
 
   const ampliada = indexAmpliada !== null ? filtradas[indexAmpliada] : null
+
+  const mudarFoto = (delta: 1 | -1) =>
+    setIndexAmpliada(i => (i === null ? i : clampIndex(i + delta, filtradas.length)))
+
+  // Teclado (computador): ← → mudam de foto · + − zoom · 0 ajusta · Esc fecha
+  useEffect(() => {
+    if (indexAmpliada === null) return
+    const aoTecla = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") mudarFoto(1)
+      else if (e.key === "ArrowLeft") mudarFoto(-1)
+      else if (e.key === "+" || e.key === "=") zoomRef.current?.zoomIn()
+      else if (e.key === "-") zoomRef.current?.zoomOut()
+      else if (e.key === "0") zoomRef.current?.reset()
+      else if (e.key === "Escape") setIndexAmpliada(null)
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener("keydown", aoTecla)
+    return () => window.removeEventListener("keydown", aoTecla)
+  }, [indexAmpliada, filtradas.length])
+
+  // mantém a miniatura da foto atual visível na faixa
+  useEffect(() => {
+    if (indexAmpliada === null) return
+    miniaturasRef.current[indexAmpliada]?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" })
+  }, [indexAmpliada])
 
   if (!open) return null
 
@@ -187,62 +224,131 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
         </div>
       </div>
 
-      {/* Vista ampliada */}
+      {/* Vista ampliada — galeria completa: topo, foto, comandos, informação e miniaturas */}
       {ampliada && indexAmpliada !== null && (
         <div
-          className="fixed inset-0 z-[200] bg-black/95 flex flex-col"
+          className="fixed inset-0 z-[200] bg-black flex flex-col"
+          style={{ height: "100dvh" }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between p-4 shrink-0">
+          {/* Topo */}
+          <div className="shrink-0 flex items-center gap-2 px-3 py-2.5" style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}>
+            <span className="text-white text-sm font-bold tabular-nums">{indexAmpliada + 1} / {filtradas.length}</span>
             <span className={cn(
               "text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white",
               ampliada.tipo === "antes" ? "bg-amber-500/90" : "bg-emerald-500/90"
             )}>
               {ampliada.tipo}
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex-1" />
+            <button
+              onClick={() => descarregarFoto(ampliada)}
+              aria-label="Descarregar foto"
+              className="h-10 px-3.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center gap-1.5 text-white text-xs font-semibold"
+            >
+              <Download className="h-4 w-4" /> Descarregar
+            </button>
+            <button
+              onClick={() => setIndexAmpliada(null)}
+              aria-label="Fechar"
+              className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center"
+            >
+              <X className="h-5 w-5 text-white" />
+            </button>
+          </div>
+
+          {/* Foto */}
+          <div className="flex-1 min-h-0 relative">
+            <ZoomableImage
+              key={ampliada.url}
+              ref={zoomRef}
+              src={ampliada.url}
+              alt={ampliada.obraNome}
+              className="absolute inset-0"
+              onEscalaChange={setEscalaAtual}
+              onSwipe={mudarFoto}
+            />
+          </div>
+
+          {/* Comandos */}
+          <div className="shrink-0 flex items-center justify-center gap-2 px-3 py-2">
+            <button
+              onClick={() => mudarFoto(-1)}
+              disabled={indexAmpliada === 0}
+              aria-label="Foto anterior"
+              className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center disabled:opacity-30"
+            >
+              <ChevronLeft className="h-6 w-6 text-white" />
+            </button>
+            <div className="flex items-center rounded-full bg-white/15 mx-1">
               <button
-                onClick={() => descarregarFoto(ampliada)}
-                aria-label="Descarregar foto"
-                className="h-9 px-3 rounded-full bg-white/10 hover:bg-white/20 flex items-center gap-1.5 text-white text-xs font-semibold"
+                onClick={() => zoomRef.current?.zoomOut()}
+                disabled={escalaAtual <= 1}
+                aria-label="Diminuir zoom"
+                className="w-12 h-12 rounded-full hover:bg-white/15 active:scale-95 flex items-center justify-center disabled:opacity-30"
               >
-                <Download className="h-4 w-4" /> Descarregar
+                <Minus className="h-5 w-5 text-white" />
               </button>
-              <button onClick={() => setIndexAmpliada(null)} aria-label="Fechar" className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center">
-                <X className="h-5 w-5 text-white" />
+              <button
+                onClick={() => zoomRef.current?.reset()}
+                aria-label="Ajustar à largura do ecrã"
+                className="min-w-[56px] h-12 text-center text-xs font-semibold text-white tabular-nums"
+              >
+                {Math.round(escalaAtual * 100)}%
+              </button>
+              <button
+                onClick={() => zoomRef.current?.zoomIn()}
+                disabled={escalaAtual >= 5}
+                aria-label="Aumentar zoom"
+                className="w-12 h-12 rounded-full hover:bg-white/15 active:scale-95 flex items-center justify-center disabled:opacity-30"
+              >
+                <Plus className="h-5 w-5 text-white" />
               </button>
             </div>
+            <button
+              onClick={() => mudarFoto(1)}
+              disabled={indexAmpliada >= filtradas.length - 1}
+              aria-label="Foto seguinte"
+              className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center disabled:opacity-30"
+            >
+              <ChevronRight className="h-6 w-6 text-white" />
+            </button>
           </div>
 
-          <div className="flex-1 flex items-center justify-center relative px-2 min-h-0">
-            {indexAmpliada > 0 && (
-              <button
-                onClick={() => setIndexAmpliada(i => (i ?? 0) - 1)}
-                className="absolute left-2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center shrink-0 z-10"
-              >
-                <ChevronLeft className="h-5 w-5 text-white" />
-              </button>
-            )}
-            <ZoomableImage key={ampliada.url} src={ampliada.url} alt={ampliada.obraNome} className="absolute inset-0" />
-            {indexAmpliada < filtradas.length - 1 && (
-              <button
-                onClick={() => setIndexAmpliada(i => (i ?? 0) + 1)}
-                className="absolute right-2 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center shrink-0 z-10"
-              >
-                <ChevronRight className="h-5 w-5 text-white" />
-              </button>
-            )}
-          </div>
-
-          <div className="p-4 pb-6 shrink-0 space-y-1.5">
+          {/* Informação */}
+          <div className="shrink-0 px-4 pb-2 space-y-0.5">
             <p className="text-white font-bold text-sm flex items-center gap-1.5">
-              <HardHat className="h-3.5 w-3.5 text-white/60" /> {ampliada.obraNome}
+              <HardHat className="h-3.5 w-3.5 text-white/60 shrink-0" /> <span className="truncate">{ampliada.obraNome}</span>
             </p>
-            {ampliada.descricao && <p className="text-white/70 text-xs">{ampliada.descricao}</p>}
-            <div className="flex items-center gap-3 text-white/60 text-xs pt-1">
-              <span className="flex items-center gap-1"><User className="h-3 w-3" /> {ampliada.colaboradorNome}</span>
-              <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {formatData(ampliada.date)}</span>
+            {ampliada.descricao && <p className="text-white/70 text-xs line-clamp-2">{ampliada.descricao}</p>}
+            <div className="flex items-center gap-3 text-white/60 text-xs">
+              <span className="flex items-center gap-1 min-w-0"><User className="h-3 w-3 shrink-0" /> <span className="truncate">{ampliada.colaboradorNome}</span></span>
+              <span className="flex items-center gap-1 shrink-0"><Calendar className="h-3 w-3" /> {formatData(ampliada.date)}</span>
             </div>
+            <p className="text-white/35 text-[10px] pt-0.5">Toque duplo para ampliar · deslize para mudar de foto</p>
+          </div>
+
+          {/* Miniaturas — todas as fotos (com os filtros atuais) */}
+          <div
+            className="shrink-0 flex gap-1.5 overflow-x-auto px-3 pt-1"
+            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          >
+            {filtradas.map((f, i) => (
+              <button
+                key={`${f.url}-${i}`}
+                ref={el => { miniaturasRef.current[i] = el }}
+                onClick={() => setIndexAmpliada(i)}
+                aria-label={`Foto ${i + 1}`}
+                className={cn(
+                  "relative w-14 h-14 rounded-lg overflow-hidden shrink-0 transition-all",
+                  i === indexAmpliada ? "ring-2 ring-white opacity-100" : "opacity-50 hover:opacity-80"
+                )}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={miniatura(f.url)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                <span className={cn("absolute bottom-0 inset-x-0 h-1", f.tipo === "antes" ? "bg-amber-500" : "bg-emerald-500")} />
+              </button>
+            ))}
           </div>
         </div>
       )}

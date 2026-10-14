@@ -1,9 +1,10 @@
 // components/zoomable-image.tsx
-// Imagem com zoom: botões +/−, duplo toque/clique, roda do rato, pinça (2 dedos) e arrastar quando ampliada.
+// Imagem com zoom: duplo toque/clique, pinça (2 dedos), roda do rato, arrastar quando ampliada
+// e deslizar para os lados (com zoom a 1×) para mudar de foto.
+// Os botões ficam fora do componente — controla-se por ref (zoomIn/zoomOut/reset).
 "use client"
 
-import { useEffect, useRef, useState } from "react"
-import { Minus, Plus } from "lucide-react"
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 
 const ESCALA_MAX = 5
@@ -16,7 +17,24 @@ function limitar(p: { x: number; y: number }, escala: number, el: HTMLElement | 
   return { x: clamp(p.x, -maxX, maxX), y: clamp(p.y, -maxY, maxY) }
 }
 
-export function ZoomableImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
+export interface ZoomHandle {
+  zoomIn: () => void
+  zoomOut: () => void
+  reset: () => void
+}
+
+interface Props {
+  src: string
+  alt: string
+  className?: string
+  onEscalaChange?: (escala: number) => void
+  /** +1 = foto seguinte, −1 = foto anterior (só com zoom a 1×) */
+  onSwipe?: (direcao: 1 | -1) => void
+}
+
+export const ZoomableImage = forwardRef<ZoomHandle, Props>(function ZoomableImage(
+  { src, alt, className, onEscalaChange, onSwipe }, ref,
+) {
   const [escala, setEscala] = useState(1)
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [aGesto, setAGesto] = useState(false)
@@ -24,10 +42,13 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
   const caixa = useRef<HTMLDivElement>(null)
   const escalaRef = useRef(1)
   const ponteiros = useRef(new Map<number, { x: number; y: number }>())
+  const inicio = useRef<{ x: number; y: number } | null>(null)
   const pinca = useRef<{ dist: number; escala: number } | null>(null)
   const arrasto = useRef<{ x: number; y: number; px: number; py: number } | null>(null)
   const movido = useRef(false)
   const ultimoToque = useRef(0)
+  const onSwipeRef = useRef(onSwipe)
+  onSwipeRef.current = onSwipe
 
   const definirEscala = (nova: number) => {
     const e = clamp(nova, 1, ESCALA_MAX)
@@ -36,7 +57,15 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
     setPos(p => limitar(p, e, caixa.current))
   }
 
-  // Roda do rato (precisa de listener nativo para poder impedir o scroll da página)
+  useImperativeHandle(ref, () => ({
+    zoomIn: () => definirEscala(escalaRef.current * 1.5),
+    zoomOut: () => definirEscala(escalaRef.current / 1.5),
+    reset: () => definirEscala(1),
+  }), [])
+
+  useEffect(() => { onEscalaChange?.(escala) }, [escala, onEscalaChange])
+
+  // Roda do rato (listener nativo para poder impedir o scroll da página)
   useEffect(() => {
     const el = caixa.current
     if (!el) return
@@ -49,15 +78,17 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
   }, [])
 
   const aoPressionar = (e: React.PointerEvent) => {
-    caixa.current?.setPointerCapture(e.pointerId)
+    try { caixa.current?.setPointerCapture(e.pointerId) } catch { /* ponteiro já terminou: ignora */ }
     ponteiros.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     movido.current = false
     setAGesto(true)
+    if (ponteiros.current.size === 1) inicio.current = { x: e.clientX, y: e.clientY }
     if (ponteiros.current.size === 2) {
       const [a, b] = [...ponteiros.current.values()]
-      pinca.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, escala }
+      pinca.current = { dist: Math.hypot(a.x - b.x, a.y - b.y) || 1, escala: escalaRef.current }
       arrasto.current = null
-    } else if (escala > 1) {
+      movido.current = true
+    } else if (escalaRef.current > 1) {
       arrasto.current = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y }
     }
   }
@@ -73,7 +104,9 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
       const dx = e.clientX - arrasto.current.x
       const dy = e.clientY - arrasto.current.y
       if (Math.abs(dx) + Math.abs(dy) > 4) movido.current = true
-      setPos(limitar({ x: arrasto.current.px + dx, y: arrasto.current.py + dy }, escala, caixa.current))
+      setPos(limitar({ x: arrasto.current.px + dx, y: arrasto.current.py + dy }, escalaRef.current, caixa.current))
+    } else if (inicio.current) {
+      if (Math.abs(e.clientX - inicio.current.x) + Math.abs(e.clientY - inicio.current.y) > 8) movido.current = true
     }
   }
 
@@ -82,12 +115,23 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
     ponteiros.current.delete(e.pointerId)
     if (ponteiros.current.size < 2) pinca.current = null
     if (ponteiros.current.size === 0) { arrasto.current = null; setAGesto(false) }
+    if (!eraUnico) return
+
+    // deslizar para os lados (sem zoom) → muda de foto
+    if (escalaRef.current <= 1 && inicio.current) {
+      const dx = e.clientX - inicio.current.x
+      const dy = e.clientY - inicio.current.y
+      if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        onSwipeRef.current?.(dx < 0 ? 1 : -1)
+        return
+      }
+    }
 
     // duplo toque / duplo clique: alterna entre 1× e 2,5×
-    if (eraUnico && !movido.current) {
+    if (!movido.current) {
       const agora = Date.now()
       if (agora - ultimoToque.current < 300) {
-        definirEscala(escala > 1 ? 1 : 2.5)
+        definirEscala(escalaRef.current > 1 ? 1 : 2.5)
         ultimoToque.current = 0
       } else {
         ultimoToque.current = agora
@@ -114,39 +158,13 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
           src={src}
           alt={alt}
           draggable={false}
-          className="max-w-full max-h-full object-contain rounded-xl"
+          className="max-w-full max-h-full object-contain"
           style={{
             transform: `translate(${pos.x}px, ${pos.y}px) scale(${escala})`,
             transition: aGesto ? "none" : "transform 0.15s ease-out",
           }}
         />
       </div>
-
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 rounded-full bg-black/60 backdrop-blur-sm p-1">
-        <button
-          onClick={() => definirEscala(escala / 1.5)}
-          disabled={escala <= 1}
-          aria-label="Diminuir zoom"
-          className="w-9 h-9 rounded-full hover:bg-white/15 flex items-center justify-center disabled:opacity-30"
-        >
-          <Minus className="h-4 w-4 text-white" />
-        </button>
-        <button
-          onClick={() => definirEscala(1)}
-          aria-label="Repor zoom"
-          className="min-w-[44px] text-center text-xs font-semibold text-white tabular-nums"
-        >
-          {Math.round(escala * 100)}%
-        </button>
-        <button
-          onClick={() => definirEscala(escala * 1.5)}
-          disabled={escala >= ESCALA_MAX}
-          aria-label="Aumentar zoom"
-          className="w-9 h-9 rounded-full hover:bg-white/15 flex items-center justify-center disabled:opacity-30"
-        >
-          <Plus className="h-4 w-4 text-white" />
-        </button>
-      </div>
     </div>
   )
-}
+})
