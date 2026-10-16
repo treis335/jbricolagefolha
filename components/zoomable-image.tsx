@@ -158,7 +158,7 @@ export const ZoomableImage = forwardRef<ZoomHandle, Props>(function ZoomableImag
           src={src}
           alt={alt}
           draggable={false}
-          className="max-w-full max-h-full object-contain"
+          className="max-w-full max-h-full object-contain rounded-xl"
           style={{
             transform: `translate(${pos.x}px, ${pos.y}px) scale(${escala})`,
             transition: aGesto ? "none" : "transform 0.15s ease-out",

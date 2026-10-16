@@ -62,6 +62,14 @@ function miniatura(url: string, largura = 160): string {
   return url.replace("/upload/", `/upload/f_auto,q_auto,c_fill,w_${largura},h_${largura}/`)
 }
 
+// Telemóvel deitado (baixo e largo): foto à esquerda, painel à direita
+const V_RAIZ = "fixed inset-0 z-[200] bg-black flex flex-col [@media(orientation:landscape)_and_(max-height:520px)]:grid [@media(orientation:landscape)_and_(max-height:520px)]:grid-cols-[minmax(0,1fr)_320px] [@media(orientation:landscape)_and_(max-height:520px)]:grid-rows-[auto_minmax(0,1fr)]"
+const V_TOPO = "shrink-0 flex items-center justify-between gap-2 px-3 pb-2 [@media(orientation:landscape)_and_(max-height:520px)]:col-start-2 [@media(orientation:landscape)_and_(max-height:520px)]:row-start-1 [@media(orientation:landscape)_and_(max-height:520px)]:bg-neutral-900/95"
+const V_FOTO = "flex-1 min-h-0 relative [@media(orientation:landscape)_and_(max-height:520px)]:col-start-1 [@media(orientation:landscape)_and_(max-height:520px)]:row-start-1 [@media(orientation:landscape)_and_(max-height:520px)]:row-span-2"
+const V_PAINEL = "shrink-0 w-full max-w-2xl mx-auto bg-neutral-900/95 border-t border-white/10 rounded-t-3xl pt-3 [@media(orientation:landscape)_and_(max-height:520px)]:max-w-none [@media(orientation:landscape)_and_(max-height:520px)]:rounded-none [@media(orientation:landscape)_and_(max-height:520px)]:border-t-0 [@media(orientation:landscape)_and_(max-height:520px)]:border-l [@media(orientation:landscape)_and_(max-height:520px)]:col-start-2 [@media(orientation:landscape)_and_(max-height:520px)]:row-start-2 [@media(orientation:landscape)_and_(max-height:520px)]:overflow-y-auto [@media(orientation:landscape)_and_(max-height:520px)]:pt-1"
+const V_MINIATURAS = "flex gap-1.5 overflow-x-auto px-3 pt-1 [@media(orientation:landscape)_and_(max-height:520px)]:flex-wrap [@media(orientation:landscape)_and_(max-height:520px)]:overflow-x-visible"
+const BTN_ICONE = "w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 transition-all flex items-center justify-center disabled:opacity-30 disabled:active:scale-100"
+
 const clampIndex = (i: number, total: number) => Math.min(Math.max(i, 0), Math.max(total - 1, 0))
 
 function formatData(dateStr: string): string {
@@ -77,6 +85,7 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
   const zoomRef = useRef<ZoomHandle>(null)
   const [escalaAtual, setEscalaAtual] = useState(1)
   const miniaturasRef = useRef<(HTMLButtonElement | null)[]>([])
+  const [dica, setDica] = useState(false)
 
   const todasFotos = useMemo<FotoFlat[]>(() => {
     const lista: FotoFlat[] = []
@@ -136,6 +145,14 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
     window.addEventListener("keydown", aoTecla)
     return () => window.removeEventListener("keydown", aoTecla)
   }, [indexAmpliada, filtradas.length])
+
+  // dica de gestos: aparece ao abrir e desaparece sozinha
+  useEffect(() => {
+    if (indexAmpliada === null) return
+    setDica(true)
+    const t = setTimeout(() => setDica(false), 4000)
+    return () => clearTimeout(t)
+  }, [indexAmpliada === null])
 
   // mantém a miniatura da foto atual visível na faixa
   useEffect(() => {
@@ -224,131 +241,124 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
         </div>
       </div>
 
-      {/* Vista ampliada — galeria completa: topo, foto, comandos, informação e miniaturas */}
+      {/* Vista ampliada — galeria completa */}
       {ampliada && indexAmpliada !== null && (
-        <div
-          className="fixed inset-0 z-[200] bg-black flex flex-col"
-          style={{ height: "100dvh" }}
-          onClick={e => e.stopPropagation()}
-        >
+        <div className={V_RAIZ} style={{ height: "100dvh" }} onClick={e => e.stopPropagation()}>
           {/* Topo */}
-          <div className="shrink-0 flex items-center gap-2 px-3 py-2.5" style={{ paddingTop: "max(0.625rem, env(safe-area-inset-top))" }}>
-            <span className="text-white text-sm font-bold tabular-nums">{indexAmpliada + 1} / {filtradas.length}</span>
-            <span className={cn(
-              "text-[10px] font-bold uppercase px-2 py-1 rounded-full text-white",
-              ampliada.tipo === "antes" ? "bg-amber-500/90" : "bg-emerald-500/90"
-            )}>
-              {ampliada.tipo}
-            </span>
-            <div className="flex-1" />
-            <button
-              onClick={() => descarregarFoto(ampliada)}
-              aria-label="Descarregar foto"
-              className="h-10 px-3.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center gap-1.5 text-white text-xs font-semibold"
-            >
-              <Download className="h-4 w-4" /> Descarregar
-            </button>
-            <button
-              onClick={() => setIndexAmpliada(null)}
-              aria-label="Fechar"
-              className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center"
-            >
-              <X className="h-5 w-5 text-white" />
-            </button>
+          <div className={V_TOPO} style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="px-3 py-1.5 rounded-full bg-white/10 text-white text-xs font-bold tabular-nums">
+                {indexAmpliada + 1} / {filtradas.length}
+              </span>
+              <span className={cn(
+                "text-[10px] font-bold uppercase tracking-wide px-2.5 py-1.5 rounded-full text-white",
+                ampliada.tipo === "antes" ? "bg-amber-500/90" : "bg-emerald-500/90"
+              )}>
+                {ampliada.tipo}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => descarregarFoto(ampliada)} aria-label="Descarregar foto" title="Descarregar" className={BTN_ICONE}>
+                <Download className="h-5 w-5 text-white" />
+              </button>
+              <button onClick={() => setIndexAmpliada(null)} aria-label="Fechar" title="Fechar" className={BTN_ICONE}>
+                <X className="h-5 w-5 text-white" />
+              </button>
+            </div>
           </div>
 
           {/* Foto */}
-          <div className="flex-1 min-h-0 relative">
+          <div className={V_FOTO}>
             <ZoomableImage
               key={ampliada.url}
               ref={zoomRef}
               src={ampliada.url}
               alt={ampliada.obraNome}
-              className="absolute inset-0"
+              className="absolute inset-y-0 left-2 right-2 w-auto"
               onEscalaChange={setEscalaAtual}
               onSwipe={mudarFoto}
             />
+            <div
+              className={cn(
+                "absolute top-2 left-1/2 -translate-x-1/2 z-10 pointer-events-none px-3 py-1.5 rounded-full bg-black/70 text-white/80 text-[11px] whitespace-nowrap transition-opacity duration-500",
+                dica ? "opacity-100" : "opacity-0"
+              )}
+            >
+              Toque duplo para ampliar · deslize para mudar de foto
+            </div>
           </div>
 
-          {/* Comandos */}
-          <div className="shrink-0 flex items-center justify-center gap-2 px-3 py-2">
-            <button
-              onClick={() => mudarFoto(-1)}
-              disabled={indexAmpliada === 0}
-              aria-label="Foto anterior"
-              className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center disabled:opacity-30"
-            >
-              <ChevronLeft className="h-6 w-6 text-white" />
-            </button>
-            <div className="flex items-center rounded-full bg-white/15 mx-1">
-              <button
-                onClick={() => zoomRef.current?.zoomOut()}
-                disabled={escalaAtual <= 1}
-                aria-label="Diminuir zoom"
-                className="w-12 h-12 rounded-full hover:bg-white/15 active:scale-95 flex items-center justify-center disabled:opacity-30"
-              >
-                <Minus className="h-5 w-5 text-white" />
+          {/* Painel: comandos, informação e miniaturas */}
+          <div className={V_PAINEL}>
+            <div className="flex items-center justify-center gap-2 px-3 pb-2">
+              <button onClick={() => mudarFoto(-1)} disabled={indexAmpliada === 0} aria-label="Foto anterior" className={BTN_ICONE}>
+                <ChevronLeft className="h-6 w-6 text-white" />
               </button>
-              <button
-                onClick={() => zoomRef.current?.reset()}
-                aria-label="Ajustar à largura do ecrã"
-                className="min-w-[56px] h-12 text-center text-xs font-semibold text-white tabular-nums"
-              >
-                {Math.round(escalaAtual * 100)}%
-              </button>
-              <button
-                onClick={() => zoomRef.current?.zoomIn()}
-                disabled={escalaAtual >= 5}
-                aria-label="Aumentar zoom"
-                className="w-12 h-12 rounded-full hover:bg-white/15 active:scale-95 flex items-center justify-center disabled:opacity-30"
-              >
-                <Plus className="h-5 w-5 text-white" />
+              <div className="flex items-center rounded-full bg-white/10 mx-1">
+                <button
+                  onClick={() => zoomRef.current?.zoomOut()}
+                  disabled={escalaAtual <= 1}
+                  aria-label="Diminuir zoom"
+                  className="w-11 h-11 rounded-full hover:bg-white/10 active:scale-95 flex items-center justify-center disabled:opacity-30"
+                >
+                  <Minus className="h-5 w-5 text-white" />
+                </button>
+                <button
+                  onClick={() => zoomRef.current?.reset()}
+                  aria-label="Ajustar à largura do ecrã"
+                  className="min-w-[56px] h-11 text-center text-xs font-semibold text-white tabular-nums"
+                >
+                  {Math.round(escalaAtual * 100)}%
+                </button>
+                <button
+                  onClick={() => zoomRef.current?.zoomIn()}
+                  disabled={escalaAtual >= 5}
+                  aria-label="Aumentar zoom"
+                  className="w-11 h-11 rounded-full hover:bg-white/10 active:scale-95 flex items-center justify-center disabled:opacity-30"
+                >
+                  <Plus className="h-5 w-5 text-white" />
+                </button>
+              </div>
+              <button onClick={() => mudarFoto(1)} disabled={indexAmpliada >= filtradas.length - 1} aria-label="Foto seguinte" className={BTN_ICONE}>
+                <ChevronRight className="h-6 w-6 text-white" />
               </button>
             </div>
-            <button
-              onClick={() => mudarFoto(1)}
-              disabled={indexAmpliada >= filtradas.length - 1}
-              aria-label="Foto seguinte"
-              className="w-12 h-12 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center disabled:opacity-30"
-            >
-              <ChevronRight className="h-6 w-6 text-white" />
-            </button>
-          </div>
 
-          {/* Informação */}
-          <div className="shrink-0 px-4 pb-2 space-y-0.5">
-            <p className="text-white font-bold text-sm flex items-center gap-1.5">
-              <HardHat className="h-3.5 w-3.5 text-white/60 shrink-0" /> <span className="truncate">{ampliada.obraNome}</span>
-            </p>
-            {ampliada.descricao && <p className="text-white/70 text-xs line-clamp-2">{ampliada.descricao}</p>}
-            <div className="flex items-center gap-3 text-white/60 text-xs">
-              <span className="flex items-center gap-1 min-w-0"><User className="h-3 w-3 shrink-0" /> <span className="truncate">{ampliada.colaboradorNome}</span></span>
-              <span className="flex items-center gap-1 shrink-0"><Calendar className="h-3 w-3" /> {formatData(ampliada.date)}</span>
+            <div className="px-4 pb-2.5 space-y-0.5">
+              <p className="text-white font-bold text-[15px] leading-snug flex items-center gap-1.5 min-w-0">
+                <HardHat className="h-4 w-4 text-white/50 shrink-0" />
+                <span className="truncate">{ampliada.obraNome}</span>
+              </p>
+              {ampliada.descricao && (
+                <p className="text-white/65 text-xs leading-snug line-clamp-2 [@media(max-height:700px)]:line-clamp-1">{ampliada.descricao}</p>
+              )}
+              <p className="flex items-center gap-1.5 text-white/55 text-xs min-w-0">
+                <User className="h-3 w-3 shrink-0" />
+                <span className="truncate">{ampliada.colaboradorNome}</span>
+                <span className="text-white/25">·</span>
+                <Calendar className="h-3 w-3 shrink-0" />
+                <span className="shrink-0">{formatData(ampliada.date)}</span>
+              </p>
             </div>
-            <p className="text-white/35 text-[10px] pt-0.5">Toque duplo para ampliar · deslize para mudar de foto</p>
-          </div>
 
-          {/* Miniaturas — todas as fotos (com os filtros atuais) */}
-          <div
-            className="shrink-0 flex gap-1.5 overflow-x-auto px-3 pt-1"
-            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-          >
-            {filtradas.map((f, i) => (
-              <button
-                key={`${f.url}-${i}`}
-                ref={el => { miniaturasRef.current[i] = el }}
-                onClick={() => setIndexAmpliada(i)}
-                aria-label={`Foto ${i + 1}`}
-                className={cn(
-                  "relative w-14 h-14 rounded-lg overflow-hidden shrink-0 transition-all",
-                  i === indexAmpliada ? "ring-2 ring-white opacity-100" : "opacity-50 hover:opacity-80"
-                )}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={miniatura(f.url)} alt="" loading="lazy" className="w-full h-full object-cover" />
-                <span className={cn("absolute bottom-0 inset-x-0 h-1", f.tipo === "antes" ? "bg-amber-500" : "bg-emerald-500")} />
-              </button>
-            ))}
+            <div className={V_MINIATURAS} style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+              {filtradas.map((f, i) => (
+                <button
+                  key={`${f.url}-${i}`}
+                  ref={el => { miniaturasRef.current[i] = el }}
+                  onClick={() => setIndexAmpliada(i)}
+                  aria-label={`Foto ${i + 1}`}
+                  className={cn(
+                    "relative w-12 h-12 [@media(max-height:700px)]:w-11 [@media(max-height:700px)]:h-11 rounded-lg overflow-hidden shrink-0 transition-all",
+                    i === indexAmpliada ? "ring-2 ring-white opacity-100" : "opacity-50 hover:opacity-80"
+                  )}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={miniatura(f.url)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                  <span className={cn("absolute bottom-0 inset-x-0 h-1", f.tipo === "antes" ? "bg-amber-500" : "bg-emerald-500")} />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       )}
