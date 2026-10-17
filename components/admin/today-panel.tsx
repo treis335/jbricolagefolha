@@ -154,7 +154,7 @@ function CollabCard({ collab, dateKey }: { collab: Collaborator; dateKey: string
   const obras     = [...new Set(services.map(s => s.obraNome).filter(Boolean))]
   const equipa    = [...new Set(services.flatMap(s => s.equipa    ?? []))]
   const materiais = [...new Set(services.flatMap(s => s.materiais ?? []))]
-  const allFotos  = services.flatMap(s => (s.fotos ?? []).map(f => ({ ...f, svc: s.obraNome })))
+  const allFotos  = services.flatMap(s => (s.fotos ?? []).map(f => ({ ...f, svc: f.obraNome || s.obraNome })))
   const fotosA    = allFotos.filter(f => f.tipo === "antes")
   const fotosD    = allFotos.filter(f => f.tipo === "depois")
   const isAbs     = horas === 0 && entry !== null

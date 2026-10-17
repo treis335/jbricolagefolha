@@ -3,15 +3,19 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { createPortal } from "react-dom"
-import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar, Download, Plus, Minus } from "lucide-react"
+import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar, Download, Plus, Minus, Check, CheckSquare, Undo2, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ZoomableImage, type ZoomHandle } from "@/components/zoomable-image"
 import type { Collaborator } from "@/hooks/useCollaborators"
+import { ObraPicker } from "@/components/forms/obra-picker"
+import { associarFotosAObra } from "@/lib/fotos-obra-service"
 
 interface Props {
   open: boolean
   onClose: () => void
   collaborators?: Collaborator[]
+  /** Chamado depois de associar fotos a uma obra (para atualizar os dados) */
+  onChanged?: () => void
 }
 
 interface FotoFlat {
@@ -78,7 +82,7 @@ function formatData(dateStr: string): string {
   return new Date(y, m - 1, d).toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })
 }
 
-export function FotosModal({ open, onClose, collaborators = [] }: Props) {
+export function FotosModal({ open, onClose, collaborators = [], onChanged }: Props) {
   const [colaboradorId, setColaboradorId] = useState<string>("todos")
   const [tipo, setTipo] = useState<"todas" | "antes" | "depois">("todas")
   const [busca, setBusca] = useState("")
@@ -87,6 +91,15 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
   const [escalaAtual, setEscalaAtual] = useState(1)
   const miniaturasRef = useRef<(HTMLButtonElement | null)[]>([])
   const [dica, setDica] = useState(false)
+
+  // Associar fotos a uma obra
+  const [modoSel, setModoSel] = useState(false)
+  const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
+  const [pickerAberto, setPickerAberto] = useState(false)
+  const [aGuardar, setAGuardar] = useState(false)
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null)
+  // correções feitas nesta sessão (aparecem logo, sem esperar pela atualização dos dados); null = obra original
+  const [correcoes, setCorrecoes] = useState<Map<string, { obraId: string; obraNome: string } | null>>(new Map())
 
   const todasFotos = useMemo<FotoFlat[]>(() => {
     const lista: FotoFlat[] = []
@@ -101,7 +114,10 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
               colaboradorId: c.id,
               colaboradorNome: c.name,
               date: entry.date,
-              obraNome: s.obraNome || "Sem obra",
+              // obra corrigida pelo admin (se houver) tem prioridade sobre a que o colaborador escreveu
+              obraNome: (correcoes.has(f.url)
+                ? correcoes.get(f.url)?.obraNome
+                : f.obraNome) || s.obraNome || "Sem obra",
               descricao: s.descricao || "",
             })
           })
@@ -109,7 +125,7 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
       })
     })
     return lista.sort((a, b) => (b.uploadedAt || b.date).localeCompare(a.uploadedAt || a.date))
-  }, [collaborators])
+  }, [collaborators, correcoes])
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -129,6 +145,49 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
 
   const mudarFoto = (delta: 1 | -1) =>
     setIndexAmpliada(i => (i === null ? i : clampIndex(i + delta, filtradas.length)))
+
+  const alternarSelecao = (url: string) =>
+    setSelecionadas(prev => { const n = new Set(prev); n.has(url) ? n.delete(url) : n.add(url); return n })
+
+  const sairDaSelecao = () => { setModoSel(false); setSelecionadas(new Set()) }
+
+  // Aplica a obra (ou repõe a original, com null) a todas as fotos selecionadas
+  const aplicarObra = async (obra: { id: string; nome: string } | null) => {
+    const escolhidas = todasFotos.filter(f => selecionadas.has(f.url))
+    if (escolhidas.length === 0) return
+    setAGuardar(true); setAviso(null)
+    try {
+      const alteradas = await associarFotosAObra(escolhidas.map(f => ({ colaboradorId: f.colaboradorId, url: f.url })), obra)
+      setCorrecoes(prev => {
+        const m = new Map(prev)
+        escolhidas.forEach(f => m.set(f.url, obra ? { obraId: obra.id, obraNome: obra.nome } : null))
+        return m
+      })
+      const n = escolhidas.length
+      setAviso({
+        ok: true,
+        texto: alteradas === 0
+          ? "Nada a alterar: as fotos já estavam assim."
+          : obra
+            ? `${n} ${n === 1 ? "foto associada" : "fotos associadas"} a ${obra.nome}.`
+            : `${n} ${n === 1 ? "foto reposta" : "fotos repostas"} para a obra original.`,
+      })
+      sairDaSelecao()
+      onChanged?.()
+    } catch (e) {
+      console.error(e)
+      setAviso({ ok: false, texto: "Não foi possível guardar. Tenta novamente." })
+    } finally {
+      setAGuardar(false)
+    }
+  }
+
+  // o aviso desaparece sozinho
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(null), 5000)
+    return () => clearTimeout(t)
+  }, [aviso])
 
   // Teclado (computador): ← → mudam de foto · + − zoom · 0 ajusta · Esc fecha
   useEffect(() => {
@@ -188,13 +247,45 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
       >
         {/* Header */}
         <div className="p-4 border-b border-border/40 shrink-0 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-base font-black tracking-tight flex items-center gap-2">
-              <Camera className="h-4 w-4 text-primary" /> Fotos ({filtradas.length})
-            </p>
-            <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center">
-              <X className="h-4 w-4" />
-            </button>
+          <div className="flex items-center justify-between gap-2">
+            {modoSel ? (
+              <p className="text-base font-black tracking-tight tabular-nums">
+                {selecionadas.size} {selecionadas.size === 1 ? "selecionada" : "selecionadas"}
+              </p>
+            ) : (
+              <p className="text-base font-black tracking-tight flex items-center gap-2">
+                <Camera className="h-4 w-4 text-primary" /> Fotos ({filtradas.length})
+              </p>
+            )}
+            <div className="flex items-center gap-1.5">
+              {modoSel ? (
+                <>
+                  <button
+                    onClick={() => setSelecionadas(new Set(filtradas.map(f => f.url)))}
+                    className="h-8 px-3 rounded-lg bg-muted/60 hover:bg-muted text-xs font-semibold"
+                  >
+                    Todas
+                  </button>
+                  <button onClick={sairDaSelecao} className="h-8 px-3 rounded-lg bg-muted/60 hover:bg-muted text-xs font-semibold">
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  {filtradas.length > 0 && (
+                    <button
+                      onClick={() => setModoSel(true)}
+                      className="h-8 px-3 rounded-lg bg-primary/10 text-primary hover:bg-primary/15 text-xs font-bold flex items-center gap-1.5"
+                    >
+                      <CheckSquare className="h-3.5 w-3.5" /> Selecionar
+                    </button>
+                  )}
+                  <button onClick={onClose} aria-label="Fechar" className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center">
+                    <X className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -229,6 +320,15 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
           </div>
         </div>
 
+        {aviso && (
+          <div className={cn(
+            "mx-3 mt-2 rounded-xl px-3 py-2 text-xs font-medium shrink-0",
+            aviso.ok ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300"
+          )}>
+            {aviso.texto}
+          </div>
+        )}
+
         {/* Grelha */}
         <div className="flex-1 overflow-y-auto p-3">
           {filtradas.length === 0 ? (
@@ -240,23 +340,75 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
               {filtradas.map((f, i) => (
                 <button
                   key={`${f.url}-${i}`}
-                  onClick={() => setIndexAmpliada(i)}
-                  className="relative aspect-square rounded-xl overflow-hidden bg-muted/40 group"
+                  onClick={() => (modoSel ? alternarSelecao(f.url) : setIndexAmpliada(i))}
+                  aria-pressed={modoSel ? selecionadas.has(f.url) : undefined}
+                  className={cn(
+                    "relative aspect-square rounded-xl overflow-hidden bg-muted/40 group transition-all",
+                    modoSel && selecionadas.has(f.url) && "ring-[3px] ring-primary ring-offset-1 ring-offset-card"
+                  )}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={f.url} alt={f.obraNome} className="w-full h-full object-cover group-active:scale-95 transition-transform" loading="lazy" />
+                  <img src={f.url} alt={f.obraNome} className={cn("w-full h-full object-cover group-active:scale-95 transition-transform", modoSel && selecionadas.has(f.url) && "opacity-80")} loading="lazy" />
                   <span className={cn(
                     "absolute top-1 left-1 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full text-white",
                     f.tipo === "antes" ? "bg-amber-500/90" : "bg-emerald-500/90"
                   )}>
                     {f.tipo}
                   </span>
+                  {modoSel && (
+                    <span className={cn(
+                      "absolute top-1.5 right-1.5 w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                      selecionadas.has(f.url) ? "bg-primary border-primary" : "bg-black/30 border-white/80"
+                    )}>
+                      {selecionadas.has(f.url) && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
+                    </span>
+                  )}
+                  <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/75 to-transparent px-1.5 pb-1 pt-5 text-[9px] font-semibold text-white text-left truncate">
+                    {f.obraNome}
+                  </span>
                 </button>
               ))}
             </div>
           )}
         </div>
+
+        {/* Barra de ação do modo "Selecionar" */}
+        {modoSel && (
+          <div
+            className="shrink-0 border-t border-border/40 bg-card px-3 pt-3 flex items-center gap-2"
+            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          >
+            <button
+              onClick={() => aplicarObra(null)}
+              disabled={selecionadas.size === 0 || aGuardar}
+              title="Repor a obra que o colaborador escreveu"
+              className="h-11 px-3.5 rounded-xl bg-muted/60 hover:bg-muted text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <Undo2 className="h-4 w-4" /> Repor
+            </button>
+            <button
+              onClick={() => setPickerAberto(true)}
+              disabled={selecionadas.size === 0 || aGuardar}
+              className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-40"
+            >
+              {aGuardar ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardHat className="h-4 w-4" />}
+              Associar a obra
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Escolha da obra — o clique não pode "subir" até ao fundo do modal (senão fecha tudo) */}
+      {pickerAberto && (
+        <div onClick={e => e.stopPropagation()}>
+          <ObraPicker
+            open
+            zClass="z-[110]"
+            onClose={() => setPickerAberto(false)}
+            onSelect={obra => { setPickerAberto(false); aplicarObra({ id: obra.id, nome: obra.nome }) }}
+          />
+        </div>
+      )}
 
       {/* Vista ampliada — galeria completa */}
       {ampliada && indexAmpliada !== null && (

@@ -122,7 +122,7 @@ const REPORTS = [
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function AdminReportsView() {
   const [open, setOpen] = useState<string | null>(null)
-  const { collaborators } = useCollaborators()
+  const { collaborators, refetch } = useCollaborators()
 
   return (
     <ReportsBoundary>
@@ -206,7 +206,7 @@ export function AdminReportsView() {
         {open === "performance" && <PerformanceReportModal open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "mapa"        && <MapaHorasModal         open onClose={() => setOpen(null)} collaborators={collaborators} />}
         {open === "recibos"     && <RecibosModal           open onClose={() => setOpen(null)} collaborators={collaborators} />}
-        {open === "fotos"       && <FotosModal              open onClose={() => setOpen(null)} collaborators={collaborators} />}
+        {open === "fotos"       && <FotosModal              open onClose={() => setOpen(null)} collaborators={collaborators} onChanged={refetch} />}
       </Suspense>
     </ReportsBoundary>
   )

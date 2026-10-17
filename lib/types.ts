@@ -9,6 +9,10 @@ export interface ServiceFoto {
   publicId: string
   tipo: "antes" | "depois"
   uploadedAt: string // ISO string
+  // Correção do admin (Relatórios → Fotos): obra a que a foto realmente pertence.
+  // Se existir, tem prioridade sobre a obra escrita pelo colaborador no serviço.
+  obraId?: string
+  obraNome?: string
 }
 
 export interface Service {
