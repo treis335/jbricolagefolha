@@ -2,6 +2,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { X, Camera, ChevronLeft, ChevronRight, User, HardHat, Calendar, Download, Plus, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { ZoomableImage, type ZoomHandle } from "@/components/zoomable-image"
@@ -63,7 +64,7 @@ function miniatura(url: string, largura = 160): string {
 }
 
 // Telemóvel deitado (baixo e largo): foto à esquerda, painel à direita
-const V_RAIZ = "fixed inset-0 z-[200] bg-black flex flex-col [@media(orientation:landscape)_and_(max-height:520px)]:grid [@media(orientation:landscape)_and_(max-height:520px)]:grid-cols-[minmax(0,1fr)_320px] [@media(orientation:landscape)_and_(max-height:520px)]:grid-rows-[auto_minmax(0,1fr)]"
+const V_RAIZ = "fixed inset-0 z-[200] bg-black flex flex-col overscroll-contain [@media(orientation:landscape)_and_(max-height:520px)]:grid [@media(orientation:landscape)_and_(max-height:520px)]:grid-cols-[minmax(0,1fr)_320px] [@media(orientation:landscape)_and_(max-height:520px)]:grid-rows-[auto_minmax(0,1fr)]"
 const V_TOPO = "shrink-0 flex items-center justify-between gap-2 px-3 pb-2 [@media(orientation:landscape)_and_(max-height:520px)]:col-start-2 [@media(orientation:landscape)_and_(max-height:520px)]:row-start-1 [@media(orientation:landscape)_and_(max-height:520px)]:bg-neutral-900/95"
 const V_FOTO = "flex-1 min-h-0 relative [@media(orientation:landscape)_and_(max-height:520px)]:col-start-1 [@media(orientation:landscape)_and_(max-height:520px)]:row-start-1 [@media(orientation:landscape)_and_(max-height:520px)]:row-span-2"
 const V_PAINEL = "shrink-0 w-full max-w-2xl mx-auto bg-neutral-900/95 border-t border-white/10 rounded-t-3xl pt-3 [@media(orientation:landscape)_and_(max-height:520px)]:max-w-none [@media(orientation:landscape)_and_(max-height:520px)]:rounded-none [@media(orientation:landscape)_and_(max-height:520px)]:border-t-0 [@media(orientation:landscape)_and_(max-height:520px)]:border-l [@media(orientation:landscape)_and_(max-height:520px)]:col-start-2 [@media(orientation:landscape)_and_(max-height:520px)]:row-start-2 [@media(orientation:landscape)_and_(max-height:520px)]:overflow-y-auto [@media(orientation:landscape)_and_(max-height:520px)]:pt-1"
@@ -146,6 +147,22 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
     return () => window.removeEventListener("keydown", aoTecla)
   }, [indexAmpliada, filtradas.length])
 
+  // Enquanto o modal está aberto, o fundo não rola (o visualizador ocupa o ecrã todo)
+  useEffect(() => {
+    if (!open) return
+    const html = document.documentElement
+    const body = document.body
+    const antes = { html: html.style.overflow, body: body.style.overflow }
+    const scrollY = window.scrollY   // em alguns telemóveis o fundo volta ao topo: repomos ao fechar
+    html.style.overflow = "hidden"
+    body.style.overflow = "hidden"
+    return () => {
+      html.style.overflow = antes.html
+      body.style.overflow = antes.body
+      window.scrollTo({ top: scrollY, behavior: "instant" })
+    }
+  }, [open])
+
   // dica de gestos: aparece ao abrir e desaparece sozinha
   useEffect(() => {
     if (indexAmpliada === null) return
@@ -162,8 +179,8 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
 
   if (!open) return null
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center overscroll-contain" onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
       <div
         className="relative w-full sm:max-w-3xl max-h-[92dvh] flex flex-col bg-card rounded-t-3xl sm:rounded-3xl border border-border/50 shadow-2xl overflow-hidden animate-slide-up sm:animate-scale-in"
@@ -362,6 +379,7 @@ export function FotosModal({ open, onClose, collaborators = [] }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   )
 }
