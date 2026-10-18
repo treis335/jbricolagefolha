@@ -27,6 +27,8 @@ interface FotoFlat {
   date: string
   obraNome: string
   descricao: string
+  /** Identifica o serviço a que a foto pertence (fotos do mesmo serviço partilham a obra) */
+  servicoKey: string
 }
 
 function slug(s: string): string {
@@ -99,7 +101,7 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
   const [aGuardar, setAGuardar] = useState(false)
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null)
   // correções feitas nesta sessão (aparecem logo, sem esperar pela atualização dos dados); null = obra original
-  const [correcoes, setCorrecoes] = useState<Map<string, { obraId: string; obraNome: string } | null>>(new Map())
+  const [correcoes, setCorrecoes] = useState<Map<string, { obraId: string; obraNome: string } | null>>(new Map())  // chave = serviço
 
   const todasFotos = useMemo<FotoFlat[]>(() => {
     const lista: FotoFlat[] = []
@@ -107,6 +109,7 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
       ;(c.entries || []).forEach((entry: any) => {
         ;(entry.services || []).forEach((s: any) => {
           ;(s.fotos || []).forEach((f: any) => {
+            const servicoKey = `${c.id}|${entry.date}|${s.id}`
             lista.push({
               url: f.url,
               tipo: f.tipo,
@@ -114,11 +117,12 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
               colaboradorId: c.id,
               colaboradorNome: c.name,
               date: entry.date,
-              // obra corrigida pelo admin (se houver) tem prioridade sobre a que o colaborador escreveu
-              obraNome: (correcoes.has(f.url)
-                ? correcoes.get(f.url)?.obraNome
+              // correção feita agora (aparece logo) > dados guardados; "repor" mostra já o título original
+              obraNome: (correcoes.has(servicoKey)
+                ? (correcoes.get(servicoKey)?.obraNome ?? s.obraOriginal?.obraNome)
                 : f.obraNome) || s.obraNome || "Sem obra",
               descricao: s.descricao || "",
+              servicoKey,
             })
           })
         })
@@ -157,20 +161,22 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
     if (escolhidas.length === 0) return
     setAGuardar(true); setAviso(null)
     try {
-      const alteradas = await associarFotosAObra(escolhidas.map(f => ({ colaboradorId: f.colaboradorId, url: f.url })), obra)
+      const servicosAlterados = await associarFotosAObra(escolhidas.map(f => ({ colaboradorId: f.colaboradorId, url: f.url })), obra)
+      const chaves = new Set(escolhidas.map(f => f.servicoKey))
       setCorrecoes(prev => {
         const m = new Map(prev)
-        escolhidas.forEach(f => m.set(f.url, obra ? { obraId: obra.id, obraNome: obra.nome } : null))
+        chaves.forEach(k => m.set(k, obra ? { obraId: obra.id, obraNome: obra.nome } : null))
         return m
       })
       const n = escolhidas.length
+      const extra = todasFotos.filter(f => chaves.has(f.servicoKey)).length - n   // outras fotos do mesmo serviço
       setAviso({
         ok: true,
-        texto: alteradas === 0
-          ? "Nada a alterar: as fotos já estavam assim."
+        texto: servicosAlterados === 0
+          ? "Nada a alterar: já estava assim."
           : obra
-            ? `${n} ${n === 1 ? "foto associada" : "fotos associadas"} a ${obra.nome}.`
-            : `${n} ${n === 1 ? "foto reposta" : "fotos repostas"} para a obra original.`,
+            ? `${n} ${n === 1 ? "foto associada" : "fotos associadas"} a ${obra.nome}. O serviço do colaborador também foi atualizado${extra > 0 ? ` (mais ${extra} ${extra === 1 ? "foto do mesmo serviço seguiu" : "fotos do mesmo serviço seguiram"})` : ""}.`
+            : `${n} ${n === 1 ? "foto reposta" : "fotos repostas"}: o serviço voltou à obra que o colaborador escreveu.`,
       })
       sairDaSelecao()
       onChanged?.()
@@ -181,6 +187,9 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
       setAGuardar(false)
     }
   }
+
+  // quando os dados são atualizados, a obra já vem certa do serviço — as correções temporárias deixam de ser precisas
+  useEffect(() => { setCorrecoes(new Map()) }, [collaborators])
 
   // o aviso desaparece sozinho
   useEffect(() => {
@@ -381,7 +390,7 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
             <button
               onClick={() => aplicarObra(null)}
               disabled={selecionadas.size === 0 || aGuardar}
-              title="Repor a obra que o colaborador escreveu"
+              title="Voltar à obra que o colaborador escreveu"
               className="h-11 px-3.5 rounded-xl bg-muted/60 hover:bg-muted text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40"
             >
               <Undo2 className="h-4 w-4" /> Repor

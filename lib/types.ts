@@ -9,8 +9,7 @@ export interface ServiceFoto {
   publicId: string
   tipo: "antes" | "depois"
   uploadedAt: string // ISO string
-  // Correção do admin (Relatórios → Fotos): obra a que a foto realmente pertence.
-  // Se existir, tem prioridade sobre a obra escrita pelo colaborador no serviço.
+  // Legado: correção por foto (versão anterior). Agora a obra corrigida vive no serviço.
   obraId?: string
   obraNome?: string
 }
@@ -25,6 +24,9 @@ export interface Service {
   totalHoras?: number
   // Fotos opcionais — máx 2 "antes" + 2 "depois". Dados antigos não têm este campo.
   fotos?: ServiceFoto[]
+  // Título/obra que o colaborador escreveu, guardado quando o admin corrige a obra (Relatórios → Fotos).
+  // Serve para repor. Só existe em serviços corrigidos.
+  obraOriginal?: { obraNome: string; obraId?: string }
 }
 
 // Tipo principal do dia
