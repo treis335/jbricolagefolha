@@ -13,6 +13,8 @@ import {
   type Obra, type ObraEstado, type ObraLocalizacao,
 } from "@/lib/obras-service"
 import { fmt as fmtEurUtil } from "@/lib/utils"
+import { ObraFotosTab } from "@/components/admin/obra-fotos-tab"
+import type { FotoFlat } from "@/components/admin/visualizador-fotos"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -62,6 +64,7 @@ interface ObraStats {
   totalEntradas: number
   diario: DiaryEntry[]
   todosMateriais: string[]
+  fotos: FotoFlat[]
 }
 
 interface TransferTarget {
@@ -403,7 +406,7 @@ function ObraDetailTabs({
   fmtEur: (v: number) => string
   onTransferEntry: (target: TransferTarget) => void
 }) {
-  const [tab, setTab] = useState<"resumo" | "diario" | "materiais">("resumo")
+  const [tab, setTab] = useState<"resumo" | "diario" | "materiais" | "fotos">("resumo")
   const [expandedEntry, setExpandedEntry] = useState<string | null>(null)
 
   const diarioAgrupado = useMemo(() => {
@@ -433,6 +436,7 @@ function ObraDetailTabs({
           { id: "resumo",    label: "Resumo",    icon: BarChart3 },
           { id: "diario",    label: "Diário",    icon: BookOpen  },
           { id: "materiais", label: "Materiais", icon: Package   },
+          { id: "fotos",     label: "Fotos",     icon: Camera    },
         ] as const).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-[11px] font-semibold transition-all ${
@@ -441,6 +445,7 @@ function ObraDetailTabs({
           >
             <Icon className="h-3.5 w-3.5 shrink-0" />
             <span className="hidden sm:inline">{label}</span>
+            {id === "fotos" && stats.fotos.length > 0 && <span className="text-[10px] tabular-nums opacity-80">{stats.fotos.length}</span>}
           </button>
         ))}
       </div>
@@ -656,6 +661,9 @@ function ObraDetailTabs({
           )}
         </div>
       )}
+
+      {/* ── FOTOS ── */}
+      {tab === "fotos" && <ObraFotosTab fotos={stats.fotos} />}
     </div>
   )
 }
@@ -712,6 +720,7 @@ export function AdminObrasView() {
       const cols = new Set<string>()
       let ultimaAtividade: string | null = null
       const diario: DiaryEntry[] = []
+      const fotosObra: FotoFlat[] = []
 
       for (const d of snap.docs) {
         const ud = d.data()
@@ -738,6 +747,24 @@ export function AdminObrasView() {
 
           const svcsParaObra = svcsMatch.length > 0 ? svcsMatch : svcs
 
+          // fotos dos serviços desta obra (para a aba "Fotos")
+          svcsParaObra.forEach((s: any) => {
+            ;(Array.isArray(s.fotos) ? s.fotos : []).forEach((f: any) => {
+              if (!f?.url) return
+              fotosObra.push({
+                url: f.url,
+                tipo: f.tipo === "depois" ? "depois" : "antes",
+                uploadedAt: f.uploadedAt ?? "",
+                colaboradorId,
+                colaboradorNome: nome,
+                date: e.date,
+                obraNome: obra.nome,
+                descricao: s.descricao ?? "",
+                servicoKey: `${colaboradorId}|${e.date}|${s.id}`,
+              })
+            })
+          })
+
           diario.push({
             date: e.date,
             colaborador: nome,
@@ -760,7 +787,7 @@ export function AdminObrasView() {
 
       diario.sort((a, b) => b.date.localeCompare(a.date))
       const todosMateriais = [...new Set(diario.flatMap(e => e.services.flatMap(s => s.materiais)))]
-      setObraStats({ totalHoras, totalCusto, colaboradores: Array.from(cols), ultimaAtividade, totalEntradas, diario, todosMateriais })
+      setObraStats({ totalHoras, totalCusto, colaboradores: Array.from(cols), ultimaAtividade, totalEntradas, diario, todosMateriais, fotos: fotosObra })
     } catch { setObraStats(null) }
     finally { setLoadingStats(false) }
   }
