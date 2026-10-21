@@ -52,7 +52,8 @@ function TabPane({ active, children }: { active: boolean; children: React.ReactN
   return (
     <div style={{
       display: active ? undefined : "none",
-      animation: active ? "fade-in-up 0.25s cubic-bezier(0.16,1,0.3,1) both" : "none",
+      // "backwards" (e não "both"): evita que a aba fique com transform e prenda as janelas "fixed" lá dentro
+      animation: active ? "fade-in-up 0.25s cubic-bezier(0.16,1,0.3,1) backwards" : "none",
     }}>
       {children}
     </div>

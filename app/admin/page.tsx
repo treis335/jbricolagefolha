@@ -45,7 +45,9 @@ function AdminTabPane({ active, children }: { active: boolean; children: React.R
   return (
     <div style={{
       display: active ? undefined : "none",
-      animation: active ? "fade-in-up 0.25s cubic-bezier(0.16,1,0.3,1) both" : "none",
+      // "backwards" (e não "both"): depois de acabar, a aba deixa de ter transform — senão todas as janelas "fixed" lá dentro
+      // ficam presas à aba (altura da página toda) em vez de cobrirem o ecrã
+      animation: active ? "fade-in-up 0.25s cubic-bezier(0.16,1,0.3,1) backwards" : "none",
       overflowX: "hidden",
       width: "100%",
     }}>
