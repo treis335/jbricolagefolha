@@ -1,6 +1,6 @@
 // day-entry-form.tsx
 "use client"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { ServiceFotos } from "@/components/forms/service-fotos"
 import type { ServiceFoto } from "@/lib/types"
 import { PhotoLightbox } from "@/components/forms/photo-lightbox"
@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Plus, Minus, X, Trash2, Users, UserPlus, Check, Loader2,
-  Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight, ShieldCheck,
+  Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight, ShieldCheck, Lock,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -157,11 +157,17 @@ function servicesEqual(a: Service[], b: Service[]): boolean {
   })
 }
 
-function serviceHasData(s: Service): boolean {
+// O próprio colaborador está sempre na equipa de cada serviço (não conta como "dados preenchidos")
+type Eu = { uid: string; nome: string } | null
+function equipaSemEu(s: Service, eu: Eu): string[] {
+  return s.equipa.filter((nome, i) => !(eu && (s.equipaUids?.[i] === eu.uid || nome === eu.nome)))
+}
+
+function serviceHasData(s: Service, eu: Eu = null): boolean {
   return (
     s.descricao.trim() !== "" ||
     s.materiais.length > 0 ||
-    s.equipa.length > 0 ||
+    equipaSemEu(s, eu).length > 0 ||
     (s.totalHoras !== undefined && s.totalHoras > 0)
   )
 }
@@ -208,6 +214,18 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const [unlinkServiceId, setUnlinkServiceId] = useState<string | null>(null)
 
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
+
+  // O próprio colaborador: sempre na equipa, já selecionado e sem poder ser retirado
+  const eu = useMemo((): Eu => {
+    if (!user) return null
+    const nome = allCollaborators.find(c => c.uid === user.uid)?.nome
+      || meuNome || user.displayName || user.email?.split("@")[0] || "Eu"
+    return { uid: user.uid, nome }
+  }, [user, allCollaborators, meuNome])
+  // ref: o efeito que inicializa o formulário não deve voltar a correr (e apagar o que escreveste) quando a lista de colaboradores carrega
+  const euRef = useRef<Eu>(eu)
+  euRef.current = eu
+  const ehEu = (uid: string | null | undefined, nome: string) => !!eu && (uid === eu.uid || nome === eu.nome)
 
   const dateStr = date ? formatLocalDate(date) : ""
   const { settings: globalSettings } = useGlobalSettings()
@@ -275,8 +293,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         obraId: undefined,
         obraObj: undefined,
         descricao: "",
-        equipa: meuNome ? [meuNome] : [],
-        equipaUids: [],
+        equipa: euRef.current ? [euRef.current.nome] : [],
+        equipaUids: euRef.current ? [euRef.current.uid] : [],
         materiais: [],
         totalHoras: undefined,
       }
@@ -305,9 +323,9 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
     if (isEditing) return true
     return totalHoras !== 8 || services.some(s =>
       s.obraNome.trim() !== "" || s.descricao.trim() !== "" ||
-      s.materiais.length > 0 || s.equipa.length > 0
+      s.materiais.length > 0 || equipaSemEu(s, eu).length > 0
     )
-  }, [isEditing, totalHoras, services])
+  }, [isEditing, totalHoras, services, eu])
 
   const showSaveButton = isUploading || (isEditing ? hasChanges : hasAnyContent)
 
@@ -336,13 +354,16 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         current.push({ uid: uid || null, nome, isLegacy: !uid })
       })
     }
-    setTempEquipa(current)
+    // o próprio colaborador está sempre na equipa (primeiro); substitui a versão só-por-nome, se existir
+    const outros = current.filter(m => !ehEu(m.uid, m.nome))
+    setTempEquipa(eu ? [{ uid: eu.uid, nome: eu.nome, isLegacy: false }, ...outros] : current)
     setTeamFilter("")
     setManualName("")
     setShowTeamDialog(true)
   }
 
   const toggleTempMember = (collab: Collaborator) => {
+    if (ehEu(collab.uid, collab.nome)) return   // o próprio não se pode retirar
     setTempEquipa(prev =>
       prev.some(m => m.nome === collab.nome)
         ? prev.filter(m => m.nome !== collab.nome)
@@ -351,8 +372,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }
 
   const confirmTeamSelection = () => {
-    const nomes = tempEquipa.map(m => m.nome)
-    const uids = tempEquipa.filter(m => m.uid !== null).map(m => m.uid!) as string[]
+    // o próprio fica sempre em primeiro (nomes e identificadores alinhados)
+    const lista = eu
+      ? [{ uid: eu.uid, nome: eu.nome, isLegacy: false } as Collaborator, ...tempEquipa.filter(m => !ehEu(m.uid, m.nome))]
+      : tempEquipa
+    const nomes = lista.map(m => m.nome)
+    const uids = lista.filter(m => m.uid !== null).map(m => m.uid!) as string[]
     updateActiveService({
       equipa: nomes,
       equipaUids: uids.length > 0 ? uids : undefined,
@@ -367,8 +392,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       obraId: undefined,
       obraObj: undefined,
       descricao: "",
-      equipa: meuNome ? [meuNome] : [],
-      equipaUids: [],
+      equipa: euRef.current ? [euRef.current.nome] : [],
+      equipaUids: euRef.current ? [euRef.current.uid] : [],
       materiais: [],
       totalHoras: undefined,
     }
@@ -389,7 +414,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const handleUnlinkAttempt = (serviceId: string) => {
     const svc = services.find(s => s.id === serviceId)
     if (!svc) return
-    if (serviceHasData(svc)) {
+    if (serviceHasData(svc, eu)) {
       setUnlinkServiceId(serviceId)
     } else {
       updateService(serviceId, { obraNome: "", obraId: undefined, obraObj: undefined })
@@ -407,8 +432,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
         obraObj: undefined,
         descricao: "",
         materiais: [],
-        equipa: meuNome ? [meuNome] : [],
-        equipaUids: [],
+        equipa: euRef.current ? [euRef.current.nome] : [],
+        equipaUids: euRef.current ? [euRef.current.uid] : [],
         totalHoras: undefined,
       })
     } else {
@@ -724,7 +749,8 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                             <div className="flex items-center gap-2 flex-wrap">
                               {s.equipa.map((nome, index) => {
                                 const uid = s.equipaUids?.[index]
-                                const isLegacy = !uid
+                                const souEu = ehEu(uid, nome)
+                                const isLegacy = !uid && !souEu
                                 const colors = ["bg-blue-500","bg-emerald-500","bg-violet-500","bg-orange-500","bg-pink-500","bg-teal-500"]
                                 const colorIdx = nome.charCodeAt(0) % colors.length
                                 const initials = nome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("")
@@ -741,7 +767,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                                       {initials || "?"}
                                     </div>
                                     {nome}
-                                    {!isLocked && (
+                                    {!isLocked && !souEu && (
                                     <button
                                       type="button"
                                       onClick={() => updateService(s.id, {
@@ -902,9 +928,13 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                   }`}>
                     {member.nome}
                     {member.isLegacy && <span className="text-[9px] opacity-70">(manual)</span>}
-                    <button type="button" onClick={() => toggleTempMember(member)} className="w-4 h-4 rounded-full hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center ml-0.5">
-                      <X className="h-2.5 w-2.5" />
-                    </button>
+                    {ehEu(member.uid, member.nome) ? (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] opacity-70 pr-1.5"><Lock className="h-2.5 w-2.5" />tu</span>
+                    ) : (
+                      <button type="button" onClick={() => toggleTempMember(member)} className="w-4 h-4 rounded-full hover:bg-black/10 dark:hover:bg-white/10 flex items-center justify-center ml-0.5">
+                        <X className="h-2.5 w-2.5" />
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
@@ -916,9 +946,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
               <div className="py-12 text-center text-sm text-muted-foreground/60">Nenhum resultado encontrado</div>
             ) : (
               colaboradoresFiltrados.map((collab) => {
-                const isSelected = collab.uid
+                const souEu = ehEu(collab.uid, collab.nome)
+                const isSelected = souEu || (collab.uid
                   ? tempEquipa.some(m => m.uid === collab.uid)
-                  : tempEquipa.some(m => m.nome === collab.nome)
+                  : tempEquipa.some(m => m.nome === collab.nome))
                 const initials = collab.nome.split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0].toUpperCase()).join("")
                 const colors = ["bg-blue-500","bg-emerald-500","bg-violet-500","bg-orange-500","bg-pink-500","bg-teal-500"]
                 const colorIdx = collab.nome.charCodeAt(0) % colors.length
@@ -927,9 +958,11 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     key={collab.nome}
                     type="button"
                     onClick={() => toggleTempMember(collab)}
+                    disabled={souEu}
+                    aria-disabled={souEu}
                     className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all border-b border-border/10 last:border-0 press-effect ${
                       isSelected ? "bg-primary/6" : "hover:bg-muted/30"
-                    }`}
+                    } ${souEu ? "cursor-default" : ""}`}
                   >
                     {/* Avatar */}
                     <div className={`w-9 h-9 rounded-xl shrink-0 flex items-center justify-center text-white text-xs font-bold ${colors[colorIdx]} ${isSelected ? "ring-2 ring-primary/40 ring-offset-1" : ""} transition-all`}>
@@ -938,9 +971,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     <div className="flex-1 min-w-0">
                       <span className={`text-sm font-medium ${isSelected ? "text-primary font-semibold" : "text-foreground"}`}>{collab.nome}</span>
                       {collab.isLegacy && <span className="block text-[10px] text-amber-600 dark:text-amber-400 font-medium">Adicionado manualmente</span>}
+                      {souEu && <span className="block text-[10px] text-muted-foreground font-medium">Tu · sempre na equipa</span>}
                     </div>
                     <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${isSelected ? "bg-primary border-primary shadow-sm" : "border-border/60"}`}>
-                      {isSelected && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+                      {isSelected && (souEu ? <Lock className="h-3 w-3 text-primary-foreground" /> : <Check className="h-3.5 w-3.5 text-primary-foreground" />)}
                     </div>
                   </button>
                 )
