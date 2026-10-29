@@ -12,7 +12,7 @@ import {
   DatabaseBackup, ChevronRight,
   Phone, CreditCard, Camera, Building2,
   Hash, Loader2, Zap, ZapOff, Settings2, ImageIcon,
-  Eye, EyeOff, UserCircle2, Shield,
+  Eye, EyeOff, UserCircle2, Shield, PlayCircle,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -22,6 +22,7 @@ import { db } from "@/lib/firebase"
 import { uploadFotoObra } from "@/lib/obras-service"
 import { cn } from "@/lib/utils"
 import { syncCollaboratorName } from "@/hooks/useActiveCollaborators"
+import { TutorialColaborador } from "@/components/tutorial/tutorial-colaborador"
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface UserProfile {
@@ -593,6 +594,7 @@ function ActionRow({ icon, iconGradient, label, description, onClick }: {
 export function SettingsView() {
   const { data, importData, updateSettings } = useWorkTracker()
   const { user, logout } = useAuth()
+  const [tutorialAberto, setTutorialAberto] = useState(false)
 
   const [profile, setProfile] = useState<UserProfile>(PROFILE_DEFAULTS)
   const [loadingProfile, setLoadingProfile] = useState(true)
@@ -763,6 +765,18 @@ export function SettingsView() {
             </div>
 
             <div className="space-y-3 px-4 pt-4 pb-2 max-w-full overflow-x-hidden">
+
+              {/* ── AJUDA: tutorial ilustrado ── */}
+              <Section icon={<PlayCircle className="h-4 w-4" />} gradient="from-emerald-500 to-teal-600" title="Ajuda">
+                <ActionRow
+                  icon={<PlayCircle className="h-4 w-4" />}
+                  iconGradient="from-emerald-500 to-teal-600"
+                  label="Como funciona a app"
+                  description="Tutorial ilustrado, passo a passo"
+                  onClick={() => setTutorialAberto(true)}
+                />
+              </Section>
+              <TutorialColaborador open={tutorialAberto} onClose={() => setTutorialAberto(false)} />
 
               {/* ── PERFIL ── */}
               <Section icon={<User className="h-4 w-4" />} gradient="from-blue-500 to-indigo-600" title="Perfil">
