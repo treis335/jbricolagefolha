@@ -8,11 +8,14 @@ import type { ServiceFoto } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import {
   Camera, Upload, X, Loader2, AlertCircle,
-  ChevronLeft, ChevronRight, ZoomIn, Plus, ImagePlus,
+  ChevronLeft, ChevronRight, ZoomIn, Plus, ImagePlus, RefreshCw, Trash2,
 } from "lucide-react"
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
-function Lightbox({ fotos, index, onClose }: { fotos: ServiceFoto[]; index: number; onClose: () => void }) {
+function Lightbox({ fotos, index, onClose, onTrocar, onEliminar }: {
+  fotos: ServiceFoto[]; index: number; onClose: () => void
+  onTrocar?: (foto: ServiceFoto) => void; onEliminar?: (foto: ServiceFoto) => void
+}) {
   const [cur, setCur] = useState(index)
   const foto = fotos[cur]
   const isAntes = foto.tipo === "antes"
@@ -69,6 +72,27 @@ function Lightbox({ fotos, index, onClose }: { fotos: ServiceFoto[]; index: numb
         )}
       </div>
 
+      {/* Ações: trocar / eliminar (só quando o dia pode ser alterado) */}
+      {(onTrocar || onEliminar) && (
+        <div
+          className="flex gap-2 px-4 pt-1 shrink-0"
+          style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
+          onClick={e => e.stopPropagation()}
+        >
+          {onTrocar && (
+            <button type="button" onClick={() => onTrocar(foto)}
+              className="flex-1 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white text-sm font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <RefreshCw className="h-4 w-4" /> Trocar foto
+            </button>
+          )}
+          {onEliminar && (
+            <button type="button" onClick={() => onEliminar(foto)}
+              className="flex-1 h-12 rounded-2xl bg-red-500/90 hover:bg-red-500 text-white text-sm font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </button>
+          )}
+        </div>
+      )}
       {/* Dots */}
       {fotos.length > 1 && (
         <div className="flex justify-center gap-1.5 py-4 shrink-0" onClick={e => e.stopPropagation()}>
@@ -84,21 +108,21 @@ function Lightbox({ fotos, index, onClose }: { fotos: ServiceFoto[]; index: numb
 }
 
 // ─── Pick Sheet ───────────────────────────────────────────────────────────────
-function PickSheet({ tipo, onCamera, onGallery, onClose }: {
-  tipo: "antes" | "depois"; onCamera: () => void; onGallery: () => void; onClose: () => void
+function PickSheet({ tipo, onCamera, onGallery, onClose, titulo }: {
+  tipo: "antes" | "depois"; onCamera: () => void; onGallery: () => void; onClose: () => void; titulo?: string
 }) {
   const isAntes = tipo === "antes"
   const accent = isAntes ? "blue" : "emerald"
   return (
     <>
-      <div className="fixed inset-0 z-[150] bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 right-0 z-[160] max-w-sm mx-auto px-4 pb-6">
+      <div className="fixed inset-0 z-[250] bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-[260] max-w-sm mx-auto px-4 pb-6">
         <div className="rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden">
           <div className="flex justify-center pt-3 pb-0.5">
             <div className="w-8 h-1 rounded-full bg-muted-foreground/20" />
           </div>
           <p className="text-center text-xs font-bold uppercase tracking-widest text-muted-foreground py-3 px-4">
-            {isAntes ? "📷 Fotos — Antes" : "✅ Fotos — Depois"}
+            {titulo ?? (isAntes ? "📷 Fotos — Antes" : "✅ Fotos — Depois")}
           </p>
           <div className="grid grid-cols-2 gap-2 px-3 pb-3">
             <button type="button" onClick={() => { onCamera(); onClose() }}
@@ -135,9 +159,42 @@ function PickSheet({ tipo, onCamera, onGallery, onClose }: {
   )
 }
 
+// ─── Confirmar eliminação ─────────────────────────────────────────────────────
+function ConfirmarEliminar({ foto, onConfirm, onClose }: { foto: ServiceFoto; onConfirm: () => void; onClose: () => void }) {
+  return (
+    <>
+      <div className="fixed inset-0 z-[250] bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-[260] max-w-sm mx-auto px-4 pb-6" role="alertdialog" aria-label="Eliminar foto">
+        <div className="rounded-3xl bg-card border border-border/50 shadow-2xl overflow-hidden p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={foto.url} alt="" className="w-16 h-16 rounded-2xl object-cover border border-border/40 shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-bold">Eliminar esta foto?</p>
+              <p className="text-xs text-muted-foreground leading-snug mt-0.5">
+                Só desaparece de vez quando guardares o dia.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={onClose}
+              className="h-12 rounded-2xl bg-muted/60 hover:bg-muted text-sm font-semibold active:scale-95 transition-all">
+              Cancelar
+            </button>
+            <button type="button" onClick={onConfirm}
+              className="h-12 rounded-2xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all">
+              <Trash2 className="h-4 w-4" /> Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── Thumbnail ────────────────────────────────────────────────────────────────
-function Thumb({ foto, index, onView, onRemove, disabled }: {
-  foto: ServiceFoto; index: number; onView: () => void; onRemove: () => void; disabled?: boolean
+function Thumb({ foto, index, onView, onRemove, disabled, aTrocar }: {
+  foto: ServiceFoto; index: number; onView: () => void; onRemove: () => void; disabled?: boolean; aTrocar?: boolean
 }) {
   return (
     <div className="relative group w-[72px] h-[72px] shrink-0">
@@ -149,10 +206,16 @@ function Thumb({ foto, index, onView, onRemove, disabled }: {
       <div className="absolute inset-0 rounded-2xl bg-black/0 group-hover:bg-black/25 transition-colors flex items-center justify-center pointer-events-none">
         <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
       </div>
-      {!disabled && (
-        <button type="button" onClick={onRemove}
-          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive shadow-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <X className="h-2.5 w-2.5 text-white" />
+      {aTrocar && (
+        <div className="absolute inset-0 rounded-2xl bg-black/50 flex items-center justify-center pointer-events-none">
+          <Loader2 className="h-5 w-5 text-white animate-spin" />
+        </div>
+      )}
+      {!disabled && !aTrocar && (
+        // No telemóvel não há "passar o rato por cima": o botão fica sempre visível; no computador aparece ao passar o rato
+        <button type="button" onClick={onRemove} aria-label={`Eliminar foto ${index + 1}`}
+          className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-destructive shadow-md flex items-center justify-center transition-opacity opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100">
+          <X className="h-3 w-3 text-white" />
         </button>
       )}
     </div>
@@ -173,8 +236,14 @@ function FotoSection({ tipo, fotos, serviceId, userId, onChange, onUploadingChan
   const [uploading, setUploading] = useState<{ name: string; progress: number }[]>([])
   const [errors, setErrors]       = useState<string[]>([])
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
+  const [aEliminar, setAEliminar] = useState<ServiceFoto | null>(null)          // foto à espera de confirmação
+  const [trocarFoto, setTrocarFoto] = useState<ServiceFoto | null>(null)        // foto a trocar (escolher câmara/galeria)
+  const [aTrocarId, setATrocarId] = useState<string | null>(null)               // foto a ser substituída (a enviar)
   const cameraRef  = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
+  const trocarCameraRef  = useRef<HTMLInputElement>(null)
+  const trocarGaleriaRef = useRef<HTMLInputElement>(null)
+  const alvoTrocaRef = useRef<ServiceFoto | null>(null)
   const fotosRef   = useRef(fotos)
   fotosRef.current = fotos
 
@@ -217,6 +286,36 @@ function FotoSection({ tipo, fotos, serviceId, userId, onChange, onUploadingChan
     onChange(fotosRef.current.filter(f => f.publicId !== foto.publicId))
   }, [onChange])
 
+  // Troca: envia a foto nova e põe-na no lugar da antiga (mesmo tipo, mesma posição)
+  const substituirFoto = useCallback(async (file: File) => {
+    const alvo = alvoTrocaRef.current
+    alvoTrocaRef.current = null
+    if (!alvo) return
+    setATrocarId(alvo.publicId)
+    setUploading(prev => { onUploadingChange?.(true); return [...prev, { name: file.name, progress: 0 }] })
+    setErrors([])
+    try {
+      const compressed = await compressImage(file)
+      const nova = await uploadServiceFoto(compressed, userId, serviceId, tipo,
+        pct => setUploading(prev => prev.map(u => u.name === file.name ? { ...u, progress: pct } : u))
+      )
+      onChange(fotosRef.current.map(f => (f.publicId === alvo.publicId ? nova : f)))
+      deleteServiceFoto(alvo.publicId)
+    } catch (err: any) {
+      setErrors(prev => [...prev, err.message ?? "Erro ao trocar a foto"])   // a foto antiga mantém-se
+    } finally {
+      setATrocarId(null)
+      setUploading(prev => {
+        const next = prev.filter(u => u.name !== file.name)
+        if (next.length === 0) onUploadingChange?.(false)
+        return next
+      })
+    }
+  }, [onChange, onUploadingChange, serviceId, tipo, userId])
+
+  const pedirTroca = (foto: ServiceFoto) => { setLightboxIdx(null); setTrocarFoto(foto) }
+  const pedirEliminar = (foto: ServiceFoto) => setAEliminar(foto)
+
   return (
     <div className="space-y-2">
       {/* Label + counter */}
@@ -235,8 +334,9 @@ function FotoSection({ tipo, fotos, serviceId, userId, onChange, onUploadingChan
         {mine.map((foto, i) => (
           <Thumb key={foto.publicId} foto={foto} index={i}
             onView={() => setLightboxIdx(i)}
-            onRemove={() => handleRemove(foto)}
+            onRemove={() => pedirEliminar(foto)}
             disabled={disabled}
+            aTrocar={aTrocarId === foto.publicId}
           />
         ))}
 
@@ -290,6 +390,11 @@ function FotoSection({ tipo, fotos, serviceId, userId, onChange, onUploadingChan
         onChange={e => handleFiles(e.target.files).then(() => { if (cameraRef.current) cameraRef.current.value = "" })} />
       <input ref={galleryRef} type="file" accept="image/*" multiple className="sr-only"
         onChange={e => handleFiles(e.target.files).then(() => { if (galleryRef.current) galleryRef.current.value = "" })} />
+      {/* Para trocar uma foto: um só ficheiro */}
+      <input ref={trocarCameraRef} type="file" accept="image/*" capture="environment" className="sr-only"
+        onChange={e => { const f = e.target.files?.[0]; if (trocarCameraRef.current) trocarCameraRef.current.value = ""; if (f) substituirFoto(f) }} />
+      <input ref={trocarGaleriaRef} type="file" accept="image/*" className="sr-only"
+        onChange={e => { const f = e.target.files?.[0]; if (trocarGaleriaRef.current) trocarGaleriaRef.current.value = ""; if (f) substituirFoto(f) }} />
 
       {showPick && (
         <PickSheet tipo={tipo}
@@ -299,8 +404,26 @@ function FotoSection({ tipo, fotos, serviceId, userId, onChange, onUploadingChan
         />
       )}
 
-      {lightboxIdx !== null && (
-        <Lightbox fotos={mine} index={lightboxIdx} onClose={() => setLightboxIdx(null)} />
+      {trocarFoto && (
+        <PickSheet tipo={tipo} titulo="🔄 Trocar foto"
+          onCamera={() => { alvoTrocaRef.current = trocarFoto; trocarCameraRef.current?.click() }}
+          onGallery={() => { alvoTrocaRef.current = trocarFoto; trocarGaleriaRef.current?.click() }}
+          onClose={() => setTrocarFoto(null)}
+        />
+      )}
+
+      {aEliminar && (
+        <ConfirmarEliminar foto={aEliminar}
+          onConfirm={() => { handleRemove(aEliminar); setAEliminar(null); setLightboxIdx(null) }}
+          onClose={() => setAEliminar(null)}
+        />
+      )}
+
+      {lightboxIdx !== null && mine[lightboxIdx] && (
+        <Lightbox fotos={mine} index={lightboxIdx} onClose={() => setLightboxIdx(null)}
+          onTrocar={disabled ? undefined : pedirTroca}
+          onEliminar={disabled ? undefined : pedirEliminar}
+        />
       )}
     </div>
   )

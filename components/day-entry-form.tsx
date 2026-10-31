@@ -712,6 +712,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                           fotos={s.fotos ?? []}
                           onChange={fotos => updateService(s.id, { fotos })}
                           onUploadingChange={setIsUploading}
+                          disabled={isLocked}
                         />
 
                         {/* ── Equipa ── */}
