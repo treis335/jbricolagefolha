@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Plus, Minus, X, Trash2, Users, UserPlus, Check, Loader2,
-  Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight, ShieldCheck, Lock,
+  Clock, Hammer, Search, HardHat, MapPin, AlertTriangle, ChevronRight, ShieldCheck, Lock, Unlock,
 } from "lucide-react"
 import { useWorkTracker } from "@/lib/work-tracker-context"
 import { useAuth } from "@/lib/AuthProvider"
@@ -50,10 +50,24 @@ import { useActiveCollaborators } from "@/hooks/useActiveCollaborators"
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Modo admin: o admin abre o MESMO formulário do colaborador para corrigir o dia de outra pessoa.
+ * Os dados (dia, taxa, quem é o "tu" da equipa) são os desse colaborador e a gravação é feita pelo admin.
+ */
+export interface AdminEditCtx {
+  colaboradorId: string
+  colaboradorNome: string
+  entry?: DayEntry                                  // o dia atual do colaborador (se já houver registo)
+  taxaHoraria: number                               // taxa do colaborador, para a estimativa
+  onSave: (entry: DayEntry) => Promise<void> | void // grava (deve lançar erro se falhar)
+  onUnlock?: () => Promise<void> | void             // devolve a edição do dia ao colaborador
+}
+
 interface DayEntryFormProps {
   date: Date | null
   open: boolean
   onClose: () => void
+  adminEdit?: AdminEditCtx
 }
 
 interface Service {
@@ -178,10 +192,13 @@ function serviceHasData(s: Service, eu: Eu = null): boolean {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main DayEntryForm
 // ─────────────────────────────────────────────────────────────────────────────
-export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
+export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormProps) {
   const { getEntry, addEntry, deleteEntry, data } = useWorkTracker()
   const { user } = useAuth()
   const [isUploading, setIsUploading] = useState(false)
+  const [aGuardarAdmin, setAGuardarAdmin] = useState(false)
+  const [aDesbloquear, setADesbloquear] = useState(false)
+  const [erroGuardar, setErroGuardar] = useState("")
   const { activeCollaborators, loading: loadingCollaborators } = useActiveCollaborators()
 
   const allCollaborators = useMemo((): Collaborator[] => {
@@ -216,12 +233,16 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   const meuNome = typeof window !== "undefined" ? localStorage.getItem("meuNome") : null
 
   // O próprio colaborador: sempre na equipa, já selecionado e sem poder ser retirado
+  const adminColabId = adminEdit?.colaboradorId
+  const adminColabNome = adminEdit?.colaboradorNome
   const eu = useMemo((): Eu => {
+    // modo admin: o "tu" é o colaborador cujo dia está a ser editado (não o admin)
+    if (adminColabId) return { uid: adminColabId, nome: allCollaborators.find(c => c.uid === adminColabId)?.nome || adminColabNome || "Colaborador" }
     if (!user) return null
     const nome = allCollaborators.find(c => c.uid === user.uid)?.nome
       || meuNome || user.displayName || user.email?.split("@")[0] || "Eu"
     return { uid: user.uid, nome }
-  }, [user, allCollaborators, meuNome])
+  }, [user, allCollaborators, meuNome, adminColabId, adminColabNome])
   // ref: o efeito que inicializa o formulário não deve voltar a correr (e apagar o que escreveste) quando a lista de colaboradores carrega
   const euRef = useRef<Eu>(eu)
   euRef.current = eu
@@ -242,10 +263,12 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }, [user])
 
   const dayUnlocked = isDayUnlocked(unlockedDays, dateStr)
-  const existingEntry = dateStr ? getEntry(dateStr) : undefined
+  const existingEntry = adminEdit ? adminEdit.entry : (dateStr ? getEntry(dateStr) : undefined)
+  const taxaHoraria = adminEdit ? adminEdit.taxaHoraria : data.settings.taxaHoraria
   const isEditing = !!existingEntry
   const editadoPorAdmin = existingEntry?.editadoPorAdmin === true
-  const isLocked = editadoPorAdmin
+  // o admin pode sempre editar (os bloqueios são para o colaborador)
+  const isLocked = adminEdit ? false : editadoPorAdmin
     ? true
     : (dateStr && !userUnlocked && !dayUnlocked ? isDayLocked(dateStr, diasBloqueio) : false)
   const isWeekend = date ? (date.getDay() === 0 || date.getDay() === 6) : false
@@ -445,14 +468,14 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
   const unlinkService = unlinkServiceId ? services.find(s => s.id === unlinkServiceId) : null
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!date || services.length === 0) return
 
     const taxa = existingEntry
-      ? (resolveExistingTaxa(existingEntry) ?? data.settings.taxaHoraria)
-      : data.settings.taxaHoraria
+      ? (resolveExistingTaxa(existingEntry) ?? taxaHoraria)
+      : taxaHoraria
 
-    addEntry({
+    const entrada: DayEntry = {
       id: existingEntry?.id ?? uuidv4(),
       date: dateStr,
       totalHoras,
@@ -473,7 +496,18 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
       equipa: services.flatMap(s => s.equipa),
       materiais: services.flatMap(s => s.materiais),
       taxaHoraria: taxa,
-    })
+    }
+
+    // Admin: grava o dia do colaborador (sem sugestões de equipa); se falhar, o formulário fica aberto
+    if (adminEdit) {
+      setAGuardarAdmin(true); setErroGuardar("")
+      try { await adminEdit.onSave(entrada); onClose() }
+      catch (err) { console.error(err); setErroGuardar("Não foi possível guardar. Tenta novamente.") }
+      finally { setAGuardarAdmin(false) }
+      return
+    }
+
+    addEntry(entrada)
 
     // ── Sugestões de equipa — fire and forget, nunca bloqueia o save ──
     if (user && services.some(s => (s.equipaUids || []).some(Boolean))) {
@@ -495,7 +529,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
   }
 
   const handleDelete = () => {
-    if (!dateStr || isLocked) return
+    if (!dateStr || isLocked || adminEdit) return
     deleteEntry(dateStr)
     onClose()
   }
@@ -524,10 +558,10 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                     )}
                   </div>
                   {date && <SheetTitle className="text-lg font-black leading-tight text-foreground capitalize">{date.toLocaleDateString("pt-PT", { weekday: "long", day: "numeric", month: "long" })}</SheetTitle>}
-                  {totalHoras > 0 && data.settings.taxaHoraria > 0 && (
+                  {totalHoras > 0 && taxaHoraria > 0 && (
                     <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-1 flex items-center gap-1.5">
-                      <span>≈ {fmt(totalHoras * data.settings.taxaHoraria)}</span>
-                      <span className="text-[10px] text-muted-foreground/50 font-normal">({data.settings.taxaHoraria}€/h)</span>
+                      <span>≈ {fmt(totalHoras * taxaHoraria)}</span>
+                      <span className="text-[10px] text-muted-foreground/50 font-normal">({taxaHoraria}€/h)</span>
                     </p>
                   )}
                 </div>
@@ -538,6 +572,31 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 space-y-3 pb-6">
+              {adminEdit && (
+                <div className="rounded-2xl border border-amber-300/60 bg-amber-50 dark:bg-amber-950/20 px-3 py-2.5 space-y-1.5">
+                  <p className="text-xs font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 shrink-0" /> A editar o dia de {adminEdit.colaboradorNome}
+                  </p>
+                  <p className="text-[11px] text-amber-700/90 dark:text-amber-400/80 leading-snug">
+                    {editadoPorAdmin
+                      ? "Este dia já foi editado pelo admin: o colaborador não o pode alterar."
+                      : "Depois de guardares, este dia fica bloqueado para o colaborador."}
+                  </p>
+                  {editadoPorAdmin && adminEdit.onUnlock && (
+                    <button
+                      type="button"
+                      disabled={aDesbloquear}
+                      onClick={async () => {
+                        setADesbloquear(true)
+                        try { await adminEdit.onUnlock!() } catch (err) { console.error(err); setErroGuardar("Não foi possível desbloquear.") } finally { setADesbloquear(false) }
+                      }}
+                      className="h-9 px-3 rounded-xl bg-white dark:bg-white/10 border border-amber-300/60 text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-60"
+                    >
+                      {aDesbloquear ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />} Desbloquear para o colaborador
+                    </button>
+                  )}
+                </div>
+              )}
 
               {editadoPorAdmin && (
                 <div className="rounded-2xl border border-amber-200/60 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-950/25 px-3.5 py-3 flex items-start gap-2.5">
@@ -713,6 +772,7 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
                           onChange={fotos => updateService(s.id, { fotos })}
                           onUploadingChange={setIsUploading}
                           disabled={isLocked}
+                          userId={adminEdit?.colaboradorId}
                         />
 
                         {/* ── Equipa ── */}
@@ -858,14 +918,15 @@ export function DayEntryForm({ date, open, onClose }: DayEntryFormProps) {
 
             {showSaveButton && (
               <div className="shrink-0 px-5 py-4 border-t border-border/20 bg-background/95 backdrop-blur-sm pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                {erroGuardar && <p className="text-xs text-red-500 font-medium mb-2 text-center">{erroGuardar}</p>}
                 <button
                   type="button"
                   onClick={handleSave}
-                  disabled={services.length === 0 || isUploading || isLocked}
+                  disabled={services.length === 0 || isUploading || isLocked || aGuardarAdmin}
                   className="w-full h-14 flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 active:scale-[0.97] disabled:opacity-40 disabled:pointer-events-none text-white font-bold text-base transition-all shadow-xl shadow-emerald-600/25 press-effect"
                 >
-                  {isUploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
-                  {isUploading ? "A carregar fotos…" : isEditing ? "Guardar alterações" : "Guardar registo"}
+                  {isUploading || aGuardarAdmin ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+                  {isUploading ? "A carregar fotos…" : aGuardarAdmin ? "A guardar…" : isEditing ? "Guardar alterações" : "Guardar registo"}
                 </button>
               </div>
             )}

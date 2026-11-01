@@ -436,11 +436,13 @@ export interface ServiceFotosProps {
   onChange: (fotos: ServiceFoto[]) => void
   onUploadingChange?: (isUploading: boolean) => void
   disabled?: boolean
+  /** Dono das fotos (por defeito, o utilizador com sessão; o admin passa o colaborador cujo dia está a editar) */
+  userId?: string
 }
 
-export function ServiceFotos({ serviceId, fotos, onChange, onUploadingChange, disabled }: ServiceFotosProps) {
+export function ServiceFotos({ serviceId, fotos, onChange, onUploadingChange, disabled, userId: userIdProp }: ServiceFotosProps) {
   const { user } = useAuth()
-  const userId   = user?.uid ?? "anonymous"
+  const userId   = userIdProp ?? user?.uid ?? "anonymous"
   const safe     = fotos ?? []
   const total    = safe.length
 

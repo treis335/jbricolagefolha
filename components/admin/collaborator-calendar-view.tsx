@@ -14,7 +14,9 @@ import { formatLocalDate } from "@/lib/date-utils"
 import { CollaboratorReportsView } from "@/components/admin/collaborator-reports-view"
 import { EntryRateOverride } from "@/components/admin/entry-rate-override"
 import { DayUnlockPanel } from "@/components/admin/day-unlock-panel"
-import { EditDayModal } from "@/components/admin/edit-day-modal"
+import { DayEntryForm } from "@/components/day-entry-form"
+import { salvarEdicaoAdmin, desbloquearEdicaoAdmin } from "@/lib/admin-day-editor-service"
+import { useAuth } from "@/lib/AuthProvider"
 import { isDayUnlocked, type UnlockedDay } from "@/lib/useGlobalSettings"
 import { useGlobalSettings } from "@/lib/useGlobalSettings"
 import { isDayLocked } from "@/lib/utils"
@@ -317,6 +319,14 @@ export function CollaboratorCalendarView({
 
   const { settings: globalSettings } = useGlobalSettings()
   const diasBloqueio = globalSettings.diasBloqueio ?? 0
+  const { user: adminUser } = useAuth()
+
+  // data do dia a editar como Date (identidade estável: o formulário não pode reiniciar a meio da edição)
+  const dataEdicao = useMemo(() => {
+    if (!selectedDateStr) return null
+    const [y, m, d] = selectedDateStr.split("-").map(Number)
+    return new Date(y, m - 1, d)
+  }, [selectedDateStr])
 
   const entryMap = useMemo(() => {
     const map = new Map<string, any>()
@@ -842,17 +852,29 @@ export function CollaboratorCalendarView({
         </DialogContent>
       </Dialog>
 
+      {/* O admin vê e edita o dia exatamente como o colaborador o vê (horas, serviços, obra, equipa, materiais, fotos) */}
       {isAdmin && (
-        <EditDayModal
+        <DayEntryForm
+          date={dataEdicao}
           open={editModalOpen}
           onClose={() => setEditModalOpen(false)}
-          collaboratorId={collaboratorId}
-          entry={selectedEntry}
-          date={selectedDateStr}
-          dateLabel={selectedDateLabel}
-          onSaved={() => {
-            onEntryUpdated?.()
-            setModalOpen(false)
+          adminEdit={{
+            colaboradorId: collaboratorId,
+            colaboradorNome: collaboratorName,
+            entry: selectedEntry ?? undefined,
+            taxaHoraria: currentRate,
+            onSave: async entrada => {
+              if (!adminUser) throw new Error("Sem sessão")
+              await salvarEdicaoAdmin(collaboratorId, entrada, adminUser.uid, adminUser.displayName ?? "Admin")
+              onEntryUpdated?.()
+              setModalOpen(false)
+            },
+            onUnlock: async () => {
+              await desbloquearEdicaoAdmin(collaboratorId, selectedDateStr)
+              onEntryUpdated?.()
+              setModalOpen(false)
+              setEditModalOpen(false)
+            },
           }}
         />
       )}
