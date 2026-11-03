@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import {
   Wrench, Plus, Search, QrCode, Pencil, Loader2, Camera, Printer, Download,
-  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, HardHat, Clock, History, PackageCheck, ScanLine, X,
+  Archive, ArchiveRestore, Trash2, ImageIcon, User, PackageOpen, HardHat, Clock, History, PackageCheck, ScanLine, X, ChevronRight, LayoutList, LayoutGrid,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -367,11 +367,13 @@ function FerramentaDetalhe({ ferramenta, onClose, onQr, onEditar }: {
 }
 
 // ─── Ecrã principal ──────────────────────────────────────────────────────────
+/** Ferramentas fora há mais dias do que isto ficam a vermelho na lista (só um aviso visual) */
+const DIAS_ATENCAO = 14
+
 export function AdminFerramentasView() {
   const [ferramentas, setFerramentas] = useState<Ferramenta[]>([])
   const [loading, setLoading] = useState(true)
   const [pesquisa, setPesquisa] = useState("")
-  const [mostrarArquivadas, setMostrarArquivadas] = useState(false)
   const [formAberto, setFormAberto] = useState(false)
   const [emEdicao, setEmEdicao] = useState<Ferramenta | null>(null)
   const [qrDe, setQrDe] = useState<Ferramenta | null>(null)
@@ -380,7 +382,17 @@ export function AdminFerramentasView() {
   const [detalheId, setDetalheId] = useState<string | null>(null)
   const [scanAberto, setScanAberto] = useState(false)
   const [scanErro, setScanErro] = useState("")
-  const [filtro, setFiltro] = useState<"todas" | "obra" | "livres">("todas")
+  const [filtro, setFiltro] = useState<"todas" | "obra" | "livres" | "arquivadas">("todas")
+  const [vista, setVista] = useState<"lista" | "grelha">("lista")
+
+  // lembra a vista escolhida neste aparelho
+  useEffect(() => {
+    try { const v = localStorage.getItem("jb_ferramentas_vista"); if (v === "lista" || v === "grelha") setVista(v) } catch {}
+  }, [])
+  const mudarVista = (v: "lista" | "grelha") => {
+    setVista(v)
+    try { localStorage.setItem("jb_ferramentas_vista", v) } catch {}
+  }
 
   // Tempo real: entregas/devoluções e edições de qualquer admin aparecem logo
   useEffect(() => {
@@ -405,19 +417,25 @@ export function AdminFerramentasView() {
     const q = pesquisa.trim().toLowerCase().replace(/^#/, "")
     const n = /^\d+$/.test(q) ? Number(q) : null
     const lista = ferramentas.filter(f => {
-      if (filtro === "todas" ? !(mostrarArquivadas || f.ativa) : !f.ativa || (filtro === "obra") !== !!f.comQuem) return false
+      const passa = filtro === "arquivadas" ? !f.ativa
+        : filtro === "todas" ? f.ativa
+        : f.ativa && (filtro === "obra") === !!f.comQuem
+      if (!passa) return false
       return !q || f.nome.toLowerCase().includes(q) || (n !== null && f.numero === n)
     })
     // "Em obra": as que estão fora há mais tempo primeiro
     if (filtro === "obra") lista.sort((a, b) => (a.comQuem!.desde < b.comQuem!.desde ? -1 : 1))
     return lista
-  }, [ferramentas, pesquisa, mostrarArquivadas, filtro])
+  }, [ferramentas, pesquisa, filtro])
 
   const ativas = ferramentas.filter(f => f.ativa)
   const nObra = ativas.filter(f => f.comQuem).length
   const nLivres = ativas.length - nObra
   const detalhe = ferramentas.find(f => f.id === detalheId) ?? null
   const nArquivadas = ferramentas.length - ativas.length
+
+  // se já não há arquivadas, sai desse filtro
+  useEffect(() => { if (filtro === "arquivadas" && nArquivadas === 0) setFiltro("todas") }, [filtro, nArquivadas])
 
   // Picar QR (câmara ou pistola) ou escrever o número → abre logo a ferramenta
   const handleScan = (code: string) => {
@@ -490,7 +508,7 @@ export function AdminFerramentasView() {
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-5 pb-28">
 
-      {/* Header */}
+      {/* Cabeçalho */}
       <div className="flex items-center gap-3">
         <div className="w-11 h-11 rounded-2xl bg-indigo-100 dark:bg-indigo-950/40 flex items-center justify-center shrink-0">
           <Wrench className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
@@ -502,65 +520,40 @@ export function AdminFerramentasView() {
           </p>
         </div>
         <button
-          onClick={() => setArmazemAberto(true)}
-          className="h-10 px-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold flex items-center gap-1.5 shrink-0"
-        >
-          <PackageOpen className="h-4 w-4" /> <span className="hidden sm:inline">Armazém</span>
-        </button>
-        <button
-          onClick={abrirNova}
-          className="h-10 px-4 rounded-2xl bg-primary text-primary-foreground text-sm font-bold flex items-center gap-1.5 shrink-0"
-        >
-          <Plus className="h-4 w-4" /> Nova
-        </button>
-      </div>
-
-      {/* Pesquisa + ações */}
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
-          <input
-            type="text"
-            value={pesquisa}
-            onChange={e => setPesquisa(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") abrirPorNumero() }}
-            placeholder="Pesquisar por nome ou número…"
-            className="w-full h-11 pl-9 pr-3 rounded-xl border border-border/50 bg-card text-sm"
-          />
-        </div>
-        <button
-          onClick={() => { setScanAberto(v => !v); setScanErro("") }}
-          className={cn(
-            "h-11 px-4 rounded-xl text-sm font-bold flex items-center gap-1.5 shrink-0 transition-colors",
-            scanAberto ? "bg-red-500 text-white" : "bg-primary text-primary-foreground"
-          )}
-        >
-          {scanAberto ? <X className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />} {scanAberto ? "Fechar" : "Picar"}
-        </button>
-        <button
           onClick={handleImprimirTodas}
-          disabled={gerandoPdf || ferramentas.filter(f => f.ativa).length === 0}
+          disabled={gerandoPdf || ativas.length === 0}
           title="Imprimir todas as etiquetas"
-          className="h-11 px-3.5 rounded-xl bg-muted/60 hover:bg-muted disabled:opacity-40 text-xs font-semibold flex items-center gap-1.5 shrink-0"
+          aria-label="Imprimir todas as etiquetas"
+          className="h-10 px-3 rounded-xl bg-muted/60 hover:bg-muted disabled:opacity-40 text-xs font-semibold flex items-center gap-1.5 shrink-0"
         >
           {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
           <span className="hidden sm:inline">Etiquetas</span>
         </button>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto -mx-1 px-1">
-        {([["todas", "Todas", ativas.length], ["obra", "Em obra", nObra], ["livres", "Disponíveis", nLivres]] as const).map(([k, label, n]) => (
-          <button
-            key={k}
-            onClick={() => setFiltro(k)}
-            className={cn(
-              "h-9 px-3.5 rounded-full text-xs font-bold whitespace-nowrap border transition-colors",
-              filtro === k ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border/60 hover:text-foreground"
-            )}
-          >
-            {label} <span className="opacity-70 tabular-nums ml-0.5">{n}</span>
-          </button>
-        ))}
+      {/* Ações principais — com nome e fáceis de tocar */}
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          onClick={() => setArmazemAberto(true)}
+          className="h-12 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+        >
+          <PackageOpen className="h-4 w-4" /> Armazém
+        </button>
+        <button
+          onClick={() => { setScanAberto(v => !v); setScanErro("") }}
+          className={cn(
+            "h-12 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all",
+            scanAberto ? "bg-red-500 text-white" : "bg-primary text-primary-foreground"
+          )}
+        >
+          {scanAberto ? <X className="h-4 w-4" /> : <ScanLine className="h-4 w-4" />} {scanAberto ? "Fechar" : "Picar"}
+        </button>
+        <button
+          onClick={abrirNova}
+          className="h-12 rounded-2xl bg-card border border-border hover:bg-muted/40 text-sm font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+        >
+          <Plus className="h-4 w-4" /> Nova
+        </button>
       </div>
 
       {scanAberto && (
@@ -570,14 +563,52 @@ export function AdminFerramentasView() {
         </div>
       )}
 
-      {filtro === "todas" && nArquivadas > 0 && (
-        <button
-          onClick={() => setMostrarArquivadas(v => !v)}
-          className="text-xs font-semibold text-muted-foreground hover:text-foreground"
-        >
-          {mostrarArquivadas ? "Esconder" : "Mostrar"} {nArquivadas} arquivada{nArquivadas !== 1 ? "s" : ""}
-        </button>
-      )}
+      {/* Pesquisa */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/40" />
+        <input
+          type="text"
+          value={pesquisa}
+          onChange={e => setPesquisa(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") abrirPorNumero() }}
+          placeholder="Nome ou número…"
+          className="w-full h-11 pl-9 pr-3 rounded-xl border border-border/50 bg-card text-sm"
+        />
+      </div>
+
+      {/* Filtros + modo de vista */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-2 overflow-x-auto flex-1 min-w-0 -mx-1 px-1">
+          {([
+            ["todas", "Todas", ativas.length], ["obra", "Em obra", nObra], ["livres", "Disponíveis", nLivres],
+            ...(nArquivadas > 0 ? [["arquivadas", "Arquivadas", nArquivadas]] : []),
+          ] as [typeof filtro, string, number][]).map(([k, label, n]) => (
+            <button
+              key={k}
+              onClick={() => setFiltro(k)}
+              className={cn(
+                "h-9 px-3.5 rounded-full text-xs font-bold whitespace-nowrap border transition-colors",
+                filtro === k ? "bg-primary text-primary-foreground border-primary" : "bg-card text-muted-foreground border-border/60 hover:text-foreground"
+              )}
+            >
+              {label} <span className="opacity-70 tabular-nums ml-0.5">{n}</span>
+            </button>
+          ))}
+        </div>
+        <div className="flex rounded-xl bg-muted/60 p-0.5 shrink-0" role="group" aria-label="Modo de vista">
+          {([["lista", "Ver em lista", LayoutList], ["grelha", "Ver em cartões", LayoutGrid]] as const).map(([v, nome, Icone]) => (
+            <button
+              key={v}
+              onClick={() => mudarVista(v)}
+              aria-label={nome}
+              aria-pressed={vista === v}
+              className={cn("w-9 h-9 rounded-lg flex items-center justify-center transition-all", vista === v ? "bg-card shadow-sm text-foreground" : "text-muted-foreground")}
+            >
+              <Icone className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Lista */}
       {loading ? (
@@ -594,6 +625,57 @@ export function AdminFerramentasView() {
           </p>
         </div>
       ) : (
+        vista === "lista" ? (
+          <div className="space-y-2">
+            {visiveis.map(f => {
+              const dias = f.comQuem ? diasDesde(f.comQuem.desde) : 0
+              const atencao = !!f.comQuem && dias > DIAS_ATENCAO
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setDetalheId(f.id)}
+                  className={cn("w-full flex items-center gap-3 p-2.5 rounded-2xl border border-border/60 bg-card text-left transition-all hover:border-primary/40 active:scale-[0.99]", !f.ativa && "opacity-60")}
+                >
+                  <div className="relative w-14 h-14 rounded-xl overflow-hidden bg-muted/40 shrink-0 flex items-center justify-center">
+                    {f.fotoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={miniaturaUrl(f.fotoUrl, 160)} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    ) : (
+                      <ImageIcon className="h-5 w-5 text-muted-foreground/25" />
+                    )}
+                    {f.numero != null && (
+                      <span className="absolute top-0.5 left-0.5 min-w-5 h-5 px-1 rounded-md bg-black/70 text-white text-[10px] font-black tabular-nums flex items-center justify-center">
+                        {f.numero}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <p className="text-sm font-bold leading-tight line-clamp-2">{f.nome}</p>
+                    {!f.ativa ? (
+                      <p className="text-xs text-muted-foreground">Arquivada</p>
+                    ) : f.comQuem ? (
+                      <>
+                        <p className="flex items-center gap-1.5 text-xs font-semibold min-w-0">
+                          <span className={cn("w-2 h-2 rounded-full shrink-0", atencao ? "bg-red-500" : "bg-amber-500")} />
+                          <span className="truncate">{f.comQuem.colaboradorNome}</span>
+                        </p>
+                        <p className="flex items-center gap-1 text-[11px] text-muted-foreground min-w-0">
+                          <span className="truncate">{f.comQuem.obraNome}</span>
+                          <span className={cn("shrink-0", atencao ? "text-red-600 dark:text-red-400 font-bold" : "")}>· {haQuanto(f.comQuem.desde)}</span>
+                        </p>
+                      </>
+                    ) : (
+                      <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" /> Disponível
+                      </p>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                </button>
+              )
+            })}
+          </div>
+        ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {visiveis.map(f => (
             <button key={f.id} onClick={() => setDetalheId(f.id)} className={cn("rounded-2xl border border-border/60 bg-card overflow-hidden flex flex-col text-left transition-all hover:border-primary/40 active:scale-[0.98]", !f.ativa && "opacity-60")}>
@@ -632,6 +714,7 @@ export function AdminFerramentasView() {
             </button>
           ))}
         </div>
+        )
       )}
 
       {/* key força reset do estado interno do form ao trocar de ferramenta */}
