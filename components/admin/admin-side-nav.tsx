@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/AuthProvider"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard, Users, FileText, Settings,
-  Euro, HardHat, ChevronRight, ArrowLeft, LogOut, ShieldCheck, CalendarDays, Wrench,
+  Euro, HardHat, ChevronRight, ArrowLeft, LogOut, ShieldCheck, CalendarDays, Wrench, Building2,
 } from "lucide-react"
 import type { AdminTabType } from "./admin-bottom-nav"
 import Image from "next/image"
@@ -22,6 +22,7 @@ const navItems: { id: AdminTabType; label: string; icon: React.ElementType; desc
   { id: "obras",         label: "Obras",         icon: HardHat,         desc: "Projetos & localização", accent: "text-amber-500" },
   { id: "escalas",       label: "Escala",        icon: CalendarDays,    desc: "Distribuição diária",    accent: "text-orange-500" },
   { id: "ferramentas",   label: "Ferramentas",   icon: Wrench,          desc: "Catálogo & QR codes",    accent: "text-indigo-500" },
+  { id: "subs",          label: "Subempreiteiros", icon: Building2,      desc: "Empresas externas",      accent: "text-rose-500" },
   { id: "finance",       label: "Financeiro",    icon: Euro,            desc: "Pagamentos globais",     accent: "text-emerald-500" },
   { id: "reports",       label: "Relatórios",    icon: FileText,        desc: "Exportação & análise",   accent: "text-cyan-500" },
   { id: "settings",      label: "Configurações", icon: Settings,        desc: "Sistema & permissões",   accent: "text-slate-500" },
@@ -35,6 +36,7 @@ const accentBg: Record<string, string> = {
   "text-indigo-500":  "bg-indigo-100 dark:bg-indigo-950/40",
   "text-emerald-500": "bg-emerald-100 dark:bg-emerald-950/40",
   "text-cyan-500":    "bg-cyan-100 dark:bg-cyan-950/40",
+  "text-rose-500":    "bg-rose-100 dark:bg-rose-950/40",
   "text-slate-500":   "bg-slate-100 dark:bg-slate-800/60",
 }
 

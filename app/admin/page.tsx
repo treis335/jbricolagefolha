@@ -34,6 +34,7 @@ const AdminFinanceView       = dynamic(() => import("@/components/admin/admin-fi
 const AdminObrasView         = dynamic(() => import("@/components/admin/admin-obras-view").then(m => ({ default: m.AdminObrasView })), { loading: SkeletonView })
 const AdminEscalasView       = dynamic(() => import("@/components/admin/admin-escalas-view").then(m => ({ default: m.AdminEscalasView })), { loading: SkeletonView })
 const AdminFerramentasView   = dynamic(() => import("@/components/admin/admin-ferramentas-view").then(m => ({ default: m.AdminFerramentasView })), { loading: SkeletonView })
+const AdminSubempreiteirosView = dynamic(() => import("@/components/admin/admin-subempreiteiros-view").then(m => ({ default: m.AdminSubempreiteirosView })), { loading: SkeletonView })
 const AdminReportsView       = dynamic(() => import("@/components/admin/admin-reports-view").then(m => ({ default: m.AdminReportsView })), { loading: SkeletonView })
 const AdminSettingsView      = dynamic(() => import("@/components/admin/admin-settings-view").then(m => ({ default: m.AdminSettingsView })), { loading: SkeletonView })
 
@@ -127,6 +128,9 @@ function AdminContent() {
           </AdminTabPane>
           <AdminTabPane active={activeTab === "ferramentas"}>
             <AdminFerramentasView />
+          </AdminTabPane>
+          <AdminTabPane active={activeTab === "subs"}>
+            <AdminSubempreiteirosView />
           </AdminTabPane>
           <AdminTabPane active={activeTab === "reports"}>
             <AdminReportsView />

@@ -20,6 +20,7 @@ export interface Service {
   obraId?: string
   descricao: string
   equipa: string[]
+  equipaUids?: string[]
   materiais: string[]
   totalHoras?: number
   // Fotos opcionais — máx 2 "antes" + 2 "depois". Dados antigos não têm este campo.

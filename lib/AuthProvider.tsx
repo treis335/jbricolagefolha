@@ -20,6 +20,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore"
 import { usePathname, useRouter } from "next/navigation"
 import { isEmailAllowed, type GlobalSettings } from "@/lib/useGlobalSettings"
 import { isAuthorizedAdmin } from "@/lib/admin-config"
+import { isSubcontractorEmail } from "@/lib/subempreiteiros-service"
 
 interface AuthContextType {
   user: User | null
@@ -28,6 +29,8 @@ interface AuthContextType {
   isPatrao: boolean
   /** Admin (UIDs fixos) ou Patrão */
   isAdmin: boolean
+  /** Empresa subempreiteira: vê só o ecrã simplificado (trabalhos + empresa) */
+  isSubcontractor: boolean
   loginWithGoogle: () => Promise<void>
   logout: () => Promise<void>
 }
@@ -136,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSuspended, setIsSuspended] = useState(false)
   const [isUnauthorized, setIsUnauthorized] = useState(false)
   const [isPatrao, setIsPatrao] = useState(false)
+  const [isSubcontractor, setIsSubcontractor] = useState(false)
 
   const router = useRouter()
   const pathname = usePathname()
@@ -154,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsSuspended(false)
     setIsUnauthorized(false)
     setIsPatrao(false)
+    setIsSubcontractor(false)
     // Redireciona para o logout do Google para limpar a sessão em cache
     // Ao voltar, o login page vai pedir para selecionar conta novamente
     router.push("/login")
@@ -187,13 +192,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             name: firebaseUser.displayName ?? "",
             username: suggestedUsername,
             email: firebaseUser.email ?? "",
-            role: "worker",
+            role: isSubcontractorEmail(globalSettings as { subcontractorEmails?: string[] }, firebaseUser.email) ? "subcontractor" : "worker",
             ativo: true,          // ✅ todos os novos utilizadores começam ativos
             createdAt: serverTimestamp(),
             migrated: false,
           })
 
           console.log(`[Auth] Nova conta criada → username: ${suggestedUsername}`)
+          setIsSubcontractor(isSubcontractorEmail(globalSettings as { subcontractorEmails?: string[] }, firebaseUser.email))
           setIsPatrao(false)
           setIsSuspended(false)
           setIsUnauthorized(false)
@@ -201,6 +207,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const data = snap.data()
 
           setIsPatrao(data?.tipoContrato === "patrao")
+          setIsSubcontractor(data?.role === "subcontractor")
           setIsUnauthorized(false)
 
           // ✅ Verifica se a conta foi suspensa pelo admin
@@ -228,6 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setIsSuspended(false)
         setIsPatrao(false)
+        setIsSubcontractor(false)
       }
 
       setUser(firebaseUser)
@@ -283,8 +291,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user, isAuthLoading, isPatrao,
-        isAdmin: isPatrao || isAuthorizedAdmin(user?.uid),
+        user, isAuthLoading, isPatrao, isSubcontractor,
+        isAdmin: !isSubcontractor && (isPatrao || isAuthorizedAdmin(user?.uid)),
         loginWithGoogle, logout: performLogout,
       }}
     >

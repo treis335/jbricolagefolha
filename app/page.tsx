@@ -7,6 +7,8 @@ import { CalendarView } from "@/components/calendar-view"
 import { BottomNav, type TabType } from "@/components/bottom-nav"
 import { SideNav } from "@/components/side-nav"
 import dynamic from "next/dynamic"
+import { useAuth } from "@/lib/AuthProvider"
+import { SubApp } from "@/components/sub/sub-app"
 
 const DayEntryForm   = dynamic(() => import("@/components/day-entry-form").then(m => ({ default: m.DayEntryForm })))
 const MinhasFerramentasView = dynamic(() => import("@/components/minhas-ferramentas-view").then(m => ({ default: m.MinhasFerramentasView })))
@@ -118,5 +120,8 @@ function AppContent() {
 }
 
 export default function Page() {
+  const { isSubcontractor } = useAuth()
+  // Empresas subempreiteiras: ecrã simplificado, sem horas/€ nem daily form
+  if (isSubcontractor) return <SubApp />
   return <AppContent />
 }
