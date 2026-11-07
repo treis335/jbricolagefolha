@@ -5,7 +5,7 @@
 import { useState } from "react"
 import { Plus, MapPin, Pencil } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { type SubObra, type SubJob, calcEquipa, fmtEuro } from "@/lib/subempreiteiros-service"
+import { type SubObra, type SubJob, type SubDia, statsObra, fmtEuro } from "@/lib/subempreiteiros-service"
 import { SubJobCard } from "./sub-job-card"
 import { SubJobSheet } from "./sub-job-sheet"
 
@@ -14,6 +14,7 @@ interface Props {
   onClose: () => void
   obra: SubObra | null
   jobs: SubJob[]              // todos os serviços da empresa (filtra aqui pela obra)
+  dias: SubDia[]              // dias registados (horas e custo por obra)
   subUid: string
   empresaNome: string
   createdBy: "empresa" | "admin"
@@ -21,13 +22,13 @@ interface Props {
   onEditObra?: () => void     // só o admin/patrão
 }
 
-export function SubObraDetail({ open, onClose, obra, jobs, subUid, empresaNome, createdBy, onChanged, onEditObra }: Props) {
+export function SubObraDetail({ open, onClose, obra, jobs, dias, subUid, empresaNome, createdBy, onChanged, onEditObra }: Props) {
   const [jobOpen, setJobOpen] = useState(false)
   const [editing, setEditing] = useState<SubJob | null>(null)
   if (!obra) return null
 
   const daObra = jobs.filter(j => j.obraId === obra.id)
-  const t = daObra.reduce((a, j) => { const c = calcEquipa(j.equipa); return { h: a.h + c.horasHomem, e: a.e + c.custo } }, { h: 0, e: 0 })
+  const t = statsObra(obra.id, jobs, dias)
 
   return (
     <>
@@ -58,8 +59,8 @@ export function SubObraDetail({ open, onClose, obra, jobs, subUid, empresaNome, 
             )}
 
             <div className="rounded-xl bg-primary/5 border border-primary/15 p-3 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{daObra.length} serviço(s) · {t.h} h-homem</span>
-              <span className="text-sm font-black">{fmtEuro(t.e)}</span>
+              <span className="text-xs text-muted-foreground">{daObra.length} serviço(s) · {t.horas} h de equipa</span>
+              <span className="text-sm font-black">{fmtEuro(t.custo)}</span>
             </div>
 
             {obra.estado === "ativa" && (

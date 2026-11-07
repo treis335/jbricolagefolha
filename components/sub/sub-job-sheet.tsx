@@ -3,15 +3,15 @@
 // Usado pela empresa e pelo admin/patrão (que pode editar tudo).
 "use client"
 import { useEffect, useState } from "react"
-import { Loader2, Trash2, Plus, X } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { ServiceFotos } from "@/components/forms/service-fotos"
 import type { ServiceFoto } from "@/lib/types"
 import {
-  type SubJob, type SubObra, type SubJobStatus, type SubEquipaLinha,
-  SUB_STATUS_LABELS, newJobId, saveJob, deleteJob, calcEquipa, fmtEuro, explainFirebaseError,
+  type SubJob, type SubObra, type SubJobStatus,
+  SUB_STATUS_LABELS, newJobId, saveJob, deleteJob, explainFirebaseError,
 } from "@/lib/subempreiteiros-service"
 
 interface Props {
@@ -24,13 +24,6 @@ interface Props {
   empresaNome: string
   createdBy: "empresa" | "admin"
 }
-
-type Linha = { funcao: string; homens: string; horas: string; custoHora: string }
-const novaLinha = (): Linha => ({ funcao: "", homens: "1", horas: "8", custoHora: "" })
-const num = (v: string) => { const n = parseFloat(v.replace(",", ".")); return isFinite(n) && n > 0 ? n : 0 }
-const toEquipa = (ls: Linha[]): SubEquipaLinha[] =>
-  ls.map(l => ({ funcao: l.funcao.trim() || undefined, homens: num(l.homens), horas: num(l.horas), custoHora: num(l.custoHora) }))
-    .filter(l => l.homens > 0 && l.horas > 0)
 
 const hoje = () => {
   const d = new Date()
@@ -45,7 +38,6 @@ export function SubJobSheet({ open, onClose, onSaved, job, obra, subUid, empresa
   const [fotos, setFotos] = useState<ServiceFoto[]>([])
   const [status, setStatus] = useState<SubJobStatus>("em_curso")
   const [date, setDate] = useState(hoje())
-  const [linhas, setLinhas] = useState<Linha[]>([novaLinha()])
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -58,17 +50,10 @@ export function SubJobSheet({ open, onClose, onSaved, job, obra, subUid, empresa
     setFotos(job?.fotos ?? [])
     setStatus(job?.status ?? "em_curso")
     setDate(job?.date ?? hoje())
-    setLinhas(job?.equipa?.length
-      ? job.equipa.map(l => ({ funcao: l.funcao ?? "", homens: String(l.homens), horas: String(l.horas), custoHora: l.custoHora ? String(l.custoHora) : "" }))
-      : [novaLinha()])
     setConfirmDel(false)
   }, [open, job])
 
-  const equipa = toEquipa(linhas)
-  const tot = calcEquipa(equipa)
   const canSave = titulo.trim().length > 0 && !uploading && !saving
-
-  const setL = (i: number, k: keyof Linha, v: string) => setLinhas(ls => ls.map((l, j) => j === i ? { ...l, [k]: v } : l))
 
   const handleSave = async () => {
     if (!canSave) return
@@ -79,7 +64,6 @@ export function SubJobSheet({ open, onClose, onSaved, job, obra, subUid, empresa
         obraNome: obra.nome, obraId: obra.id,
         titulo: titulo.trim(), descricao: descricao.trim(),
         fotos, status, date,
-        equipa, totalHorasHomem: tot.horasHomem, totalCusto: tot.custo,
         createdBy: job?.createdBy ?? createdBy,
         createdAt: job?.createdAt,
       })
@@ -133,42 +117,6 @@ export function SubJobSheet({ open, onClose, onSaved, job, obra, subUid, empresa
                   <option key={s} value={s}>{SUB_STATUS_LABELS[s]}</option>
                 ))}
               </select>
-            </div>
-          </div>
-
-          {/* Mão-de-obra */}
-          <div className="space-y-2.5">
-            <label className={lbl}>Mão-de-obra do dia</label>
-            {linhas.map((l, i) => (
-              <div key={i} className="rounded-xl border border-border/40 bg-card p-3 space-y-2">
-                <div className="flex gap-2">
-                  <Input value={l.funcao} onChange={e => setL(i, "funcao", e.target.value)}
-                    placeholder="Função (ex: oficial, servente)" className="h-10 rounded-lg text-sm" />
-                  {linhas.length > 1 && (
-                    <button type="button" onClick={() => setLinhas(ls => ls.filter((_, j) => j !== i))}
-                      className="w-10 h-10 rounded-lg hover:bg-muted flex items-center justify-center shrink-0" aria-label="Remover linha">
-                      <X className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {([["homens", "Homens"], ["horas", "Horas/homem"], ["custoHora", "€ / hora"]] as const).map(([k, label]) => (
-                    <div key={k} className="space-y-1">
-                      <span className="text-[10px] text-muted-foreground/70">{label}</span>
-                      <Input inputMode="decimal" value={l[k]} onChange={e => setL(i, k, e.target.value)}
-                        placeholder="0" className="h-10 rounded-lg text-sm" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-            <button type="button" onClick={() => setLinhas(ls => [...ls, novaLinha()])}
-              className="h-9 px-3 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center gap-1.5 active:scale-95">
-              <Plus className="h-3.5 w-3.5" />Outra função
-            </button>
-            <div className="rounded-xl bg-muted/50 p-3 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{tot.homens} homem(ns) · {tot.horasHomem} h no total</span>
-              <span className="text-sm font-black">{fmtEuro(tot.custo)}</span>
             </div>
           </div>
 

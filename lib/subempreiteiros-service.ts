@@ -83,12 +83,43 @@ export interface EmpresaPerfil {
   logoUrl?: string
 }
 
+// ── Equipa do subempreiteiro (users/{uid}.subEquipa) ─────────────────────────
+export interface SubMembro {
+  id: string
+  nome: string
+  valorHora: number // € por hora
+}
+
+// ── Registo diário (subDias/{subUid_YYYY-MM-DD}) ─────────────────────────────
+export interface SubRegisto {
+  id: string
+  obraId: string
+  obraNome: string
+  membroId: string
+  membroNome: string
+  horas: number
+  valorHora: number // snapshot do valor/hora no dia do registo
+  custo: number     // horas × valorHora
+}
+
+export interface SubDia {
+  id: string
+  subUid: string
+  empresaNome: string
+  date: string // YYYY-MM-DD
+  registos: SubRegisto[]
+  totalHoras: number
+  totalCusto: number
+  updatedAt?: string
+}
+
 export interface SubEmpresa {
   uid: string
   email: string
   name: string
   ativo: boolean
   empresa: EmpresaPerfil
+  equipa: SubMembro[]
 }
 
 const jobsCol = () => collection(db, "subJobs")
@@ -169,6 +200,7 @@ export async function getSubEmpresas(): Promise<SubEmpresa[]> {
       name: x.name ?? x.username ?? "",
       ativo: x.ativo !== false,
       empresa: (x.empresa ?? {}) as EmpresaPerfil,
+      equipa: (x.subEquipa ?? []) as SubMembro[],
     }
   })
 }
@@ -223,4 +255,46 @@ export function uploadEmpresaLogo(file: File, uid: string): Promise<string> {
     xhr.onerror = () => reject(new Error("Erro de rede no upload."))
     xhr.send(fd)
   })
+}
+
+// ── Equipa ───────────────────────────────────────────────────────────────────
+export const newId = () => doc(collection(db, "subJobs")).id
+
+export async function getSubEquipa(uid: string): Promise<SubMembro[]> {
+  const snap = await getDoc(doc(db, "users", uid))
+  return snap.exists() ? ((snap.data().subEquipa ?? []) as SubMembro[]) : []
+}
+
+export async function saveSubEquipa(uid: string, equipa: SubMembro[]): Promise<void> {
+  await setDoc(doc(db, "users", uid), { subEquipa: clean(equipa) }, { merge: true })
+}
+
+// ── Dias (calendário) ────────────────────────────────────────────────────────
+export const diaId = (subUid: string, date: string) => `${subUid}_${date}`
+
+export async function getDiasBySub(subUid: string): Promise<SubDia[]> {
+  const snap = await getDocs(query(collection(db, "subDias"), where("subUid", "==", subUid)))
+  return snap.docs.map(d => ({ ...(d.data() as Omit<SubDia, "id">), id: d.id }))
+}
+
+export async function getAllDias(): Promise<SubDia[]> {
+  const snap = await getDocs(collection(db, "subDias"))
+  return snap.docs.map(d => ({ ...(d.data() as Omit<SubDia, "id">), id: d.id }))
+}
+
+export async function saveDia(subUid: string, empresaNome: string, date: string, registos: SubRegisto[]): Promise<void> {
+  const id = diaId(subUid, date)
+  if (registos.length === 0) { await deleteDoc(doc(db, "subDias", id)); return }
+  const totalHoras = registos.reduce((a, r) => a + r.horas, 0)
+  const totalCusto = registos.reduce((a, r) => a + r.custo, 0)
+  await setDoc(doc(db, "subDias", id), clean({
+    subUid, empresaNome, date, registos, totalHoras, totalCusto, updatedAt: new Date().toISOString(),
+  }))
+}
+
+/** Totais por obra a partir dos dias registados. */
+export function statsObra(obraId: string, jobs: SubJob[], dias: SubDia[]) {
+  let horas = 0, custo = 0
+  dias.forEach(d => d.registos.forEach(r => { if (r.obraId === obraId) { horas += r.horas; custo += r.custo } }))
+  return { servicos: jobs.filter(j => j.obraId === obraId).length, horas, custo }
 }

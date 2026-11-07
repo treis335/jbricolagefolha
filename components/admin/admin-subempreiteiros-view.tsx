@@ -1,5 +1,5 @@
 // components/admin/admin-subempreiteiros-view.tsx
-// Backoffice das empresas subempreiteiras: convidar, ver trabalhos/fotos, editar dados e trabalhos. Sem horas nem €.
+// Backoffice das empresas subempreiteiras: convidar, obras com ordens, calendário/equipa/custos, dados da empresa.
 "use client"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Building2, Loader2, Plus, Mail, ChevronRight, Power } from "lucide-react"
@@ -7,56 +7,119 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
-  type SubEmpresa, type SubJob, type SubObra, getSubEmpresas, getAllJobs, getAllSubObras, inviteSubcontractor,
-  getSubcontractorEmails, setSubAtivo, explainFirebaseError,
+  type SubEmpresa, type SubJob, type SubObra, type SubDia,
+  getSubEmpresas, getAllJobs, getAllSubObras, getAllDias, inviteSubcontractor,
+  getSubcontractorEmails, setSubAtivo, explainFirebaseError, statsObra, fmtEuro,
 } from "@/lib/subempreiteiros-service"
+import { useSubData } from "@/hooks/useSubData"
 import { SubObraCard } from "@/components/sub/sub-obra-card"
 import { SubObraSheet } from "@/components/sub/sub-obra-sheet"
 import { SubObraDetail } from "@/components/sub/sub-obra-detail"
+import { SubCalendar } from "@/components/sub/sub-calendar"
+import { SubEquipaView } from "@/components/sub/sub-equipa-view"
 import { EmpresaForm } from "@/components/sub/empresa-form"
+
+type PanelTab = "obras" | "calendario" | "equipa" | "empresa"
+const PANEL_TABS: [PanelTab, string][] = [["obras", "Obras"], ["calendario", "Calendário"], ["equipa", "Equipa"], ["empresa", "Empresa"]]
+
+const nomeDe = (e: SubEmpresa) => e.empresa.nome || e.name || e.email
+
+// Conteúdo de uma empresa — o admin/patrão pode editar tudo (obras, dias, equipa, dados)
+function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: () => void }) {
+  const { obras, jobs, dias, equipa, empresa: perfil, setEmpresa, loading, erro, reload } = useSubData(empresa.uid)
+  const [tab, setTab] = useState<PanelTab>("obras")
+  const [obraSheet, setObraSheet] = useState(false)
+  const [editingObra, setEditingObra] = useState<SubObra | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null)
+  const nome = perfil.nome || empresa.name || empresa.email
+
+  const changed = async () => { await reload(); onChanged() }
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-muted/50">
+        {PANEL_TABS.map(([id, l]) => (
+          <button key={id} onClick={() => setTab(id)}
+            className={cn("h-9 rounded-lg text-[11px] font-bold", tab === id ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
+        ))}
+      </div>
+
+      {erro && <p className="text-xs rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 p-3">{erro}</p>}
+
+      {loading ? (
+        <div className="py-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+      ) : tab === "obras" ? (
+        <div className="space-y-2.5">
+          <button onClick={() => { setEditingObra(null); setObraSheet(true) }}
+            className="w-full h-10 rounded-xl bg-primary/10 text-primary text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95">
+            <Plus className="h-4 w-4" />Nova obra para esta empresa
+          </button>
+          {obras.length === 0
+            ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só regista horas em obras criadas aqui.</p>
+            : obras.map(o => <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, jobs, dias)} onClick={() => setDetailId(o.id)} />)}
+        </div>
+      ) : tab === "calendario" ? (
+        <SubCalendar subUid={empresa.uid} empresaNome={nome} obras={obras} equipa={equipa} dias={dias} onChanged={changed} />
+      ) : tab === "equipa" ? (
+        <SubEquipaView uid={empresa.uid} equipa={equipa} onSaved={changed} />
+      ) : (
+        <div className="space-y-4">
+          <EmpresaForm uid={empresa.uid} empresa={perfil} onSaved={e => { setEmpresa(e); onChanged() }} />
+          <button onClick={async () => { await setSubAtivo(empresa.uid, !empresa.ativo); onChanged() }}
+            className={cn("w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5",
+              empresa.ativo ? "bg-destructive/10 text-destructive" : "bg-emerald-100 text-emerald-700")}>
+            <Power className="h-3.5 w-3.5" />{empresa.ativo ? "Suspender acesso" : "Reativar acesso"}
+          </button>
+        </div>
+      )}
+
+      <SubObraSheet open={obraSheet} onClose={() => setObraSheet(false)} onSaved={changed}
+        obra={editingObra} subUid={empresa.uid} empresaNome={nome} />
+      <SubObraDetail open={!!detailId} onClose={() => setDetailId(null)}
+        obra={obras.find(o => o.id === detailId) ?? null} jobs={jobs} dias={dias}
+        subUid={empresa.uid} empresaNome={nome} createdBy="admin" onChanged={changed}
+        onEditObra={() => { setEditingObra(obras.find(o => o.id === detailId) ?? null); setObraSheet(true) }} />
+    </div>
+  )
+}
 
 export function AdminSubempreiteirosView() {
   const [empresas, setEmpresas] = useState<SubEmpresa[]>([])
-  const [jobs, setJobs] = useState<SubJob[]>([])
   const [obras, setObras] = useState<SubObra[]>([])
-  const [obraSheet, setObraSheet] = useState(false)
-  const [editingObra, setEditingObra] = useState<SubObra | null>(null)
+  const [jobs, setJobs] = useState<SubJob[]>([])
+  const [dias, setDias] = useState<SubDia[]>([])
   const [convites, setConvites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState("")
   const [email, setEmail] = useState("")
   const [inviting, setInviting] = useState(false)
-  const [sel, setSel] = useState<SubEmpresa | null>(null)
-  const [tab, setTab] = useState<"obras" | "dados">("obras")
-  const [detailId, setDetailId] = useState<string | null>(null)
+  const [selUid, setSelUid] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    // allSettled: se uma leitura falhar (ex.: regras Firestore ainda sem subJobs) as outras continuam a funcionar
-    const [e, j, c, ob] = await Promise.allSettled([getSubEmpresas(), getAllJobs(), getSubcontractorEmails(), getAllSubObras()])
-    if (e.status === "fulfilled") {
-      setEmpresas(e.value)
-      setSel(prev => prev ? e.value.find(x => x.uid === prev.uid) ?? null : null)
-    }
-    if (j.status === "fulfilled") setJobs(j.value)
-    if (c.status === "fulfilled") setConvites(c.value)
-    if (ob.status === "fulfilled") setObras(ob.value)
-    const falhas = [e, j, c, ob].filter(r => r.status === "rejected") as PromiseRejectedResult[]
-    setErro(falhas.length ? `Sem permissão/erro a ler dados: ${falhas.map(f => f.reason?.code || f.reason?.message).join(", ")}` : "")
+    const r = await Promise.allSettled([getSubEmpresas(), getAllJobs(), getSubcontractorEmails(), getAllSubObras(), getAllDias()])
+    if (r[0].status === "fulfilled") setEmpresas(r[0].value)
+    if (r[1].status === "fulfilled") setJobs(r[1].value)
+    if (r[2].status === "fulfilled") setConvites(r[2].value)
+    if (r[3].status === "fulfilled") setObras(r[3].value)
+    if (r[4].status === "fulfilled") setDias(r[4].value)
+    const falhas = r.filter(x => x.status === "rejected") as PromiseRejectedResult[]
+    setErro(falhas.length ? `Erro a ler dados: ${explainFirebaseError(falhas[0].reason)}` : "")
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
 
-  const jobsDe = useMemo(() => {
-    const m: Record<string, SubJob[]> = {}
-    jobs.forEach(j => { (m[j.subUid] ||= []).push(j) })
-    return m
-  }, [jobs])
+  const sel = empresas.find(e => e.uid === selUid) ?? null
+  const mesAtual = new Date().toISOString().slice(0, 7)
 
-  const obrasDe = useMemo(() => {
-    const m: Record<string, SubObra[]> = {}
-    obras.forEach(o => { (m[o.subUid] ||= []).push(o) })
+  const resumo = useMemo(() => {
+    const m: Record<string, { obras: number; custoMes: number; horasMes: number }> = {}
+    empresas.forEach(e => { m[e.uid] = { obras: 0, custoMes: 0, horasMes: 0 } })
+    obras.forEach(o => { if (m[o.subUid]) m[o.subUid].obras++ })
+    dias.forEach(d => { if (m[d.subUid] && d.date.startsWith(mesAtual)) { m[d.subUid].custoMes += d.totalCusto; m[d.subUid].horasMes += d.totalHoras } })
     return m
-  }, [obras])
+  }, [empresas, obras, dias, mesAtual])
+
+  const totalMes = Object.values(resumo).reduce((a, x) => a + x.custoMes, 0)
 
   const pendentes = useMemo(() => {
     const reg = new Set(empresas.map(e => e.email.toLowerCase()))
@@ -68,22 +131,24 @@ export function AdminSubempreiteirosView() {
     if (!/^\S+@\S+\.\S+$/.test(v)) return
     setInviting(true)
     try { await inviteSubcontractor(v); setEmail("") }
-    catch (err) {
-      alert(`Não foi possível convidar: ${explainFirebaseError(err)}`)
-      setInviting(false); return
-    }
+    catch (err) { alert(`Não foi possível convidar: ${explainFirebaseError(err)}`); setInviting(false); return }
     await load()
     setInviting(false)
   }
-
-  const nomeDe = (e: SubEmpresa) => e.empresa.nome || e.name || e.email
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-3xl mx-auto">
       <div>
         <h1 className="text-xl font-black">Subempreiteiros</h1>
-        <p className="text-xs text-muted-foreground">Empresas externas — obras atribuídas, serviços, mão-de-obra e fotos.</p>
+        <p className="text-xs text-muted-foreground">Empresas externas — obras atribuídas, equipa, horas e custos.</p>
       </div>
+
+      {empresas.length > 0 && (
+        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Custo de subempreiteiros neste mês</span>
+          <span className="text-lg font-black">{fmtEuro(totalMes)}</span>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-border/40 bg-card p-4 space-y-2.5">
         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Convidar empresa (email Google)</p>
@@ -115,7 +180,7 @@ export function AdminSubempreiteirosView() {
       ) : (
         <div className="space-y-2.5">
           {empresas.map(e => (
-            <button key={e.uid} onClick={() => { setSel(e); setTab("obras") }}
+            <button key={e.uid} onClick={() => setSelUid(e.uid)}
               className="w-full text-left rounded-2xl border border-border/40 bg-card p-4 flex items-center gap-3 active:scale-[0.99]">
               <div className="w-11 h-11 rounded-xl bg-muted/50 overflow-hidden flex items-center justify-center shrink-0">
                 {e.empresa.logoUrl
@@ -126,7 +191,7 @@ export function AdminSubempreiteirosView() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black truncate">{nomeDe(e)}</p>
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {(obrasDe[e.uid]?.length ?? 0)} obra(s) · {(jobsDe[e.uid]?.length ?? 0)} trabalho(s){e.empresa.nif ? ` · NIF ${e.empresa.nif}` : ""}{!e.ativo ? " · suspensa" : ""}
+                  {resumo[e.uid]?.obras ?? 0} obra(s) · {resumo[e.uid]?.horasMes ?? 0} h · {fmtEuro(resumo[e.uid]?.custoMes ?? 0)} este mês{!e.ativo ? " · suspensa" : ""}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
@@ -135,7 +200,7 @@ export function AdminSubempreiteirosView() {
         </div>
       )}
 
-      <Sheet open={!!sel} onOpenChange={o => !o && setSel(null)}>
+      <Sheet open={!!sel} onOpenChange={o => !o && setSelUid(null)}>
         <SheetContent side="bottom" className="rounded-t-3xl border-0 bg-background max-h-[94dvh] overflow-y-auto p-0 sm:max-w-xl sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl">
           {sel && (
             <div className="px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-4">
@@ -143,52 +208,11 @@ export function AdminSubempreiteirosView() {
                 <SheetTitle className="text-xl font-black">{nomeDe(sel)}</SheetTitle>
                 <SheetDescription className="text-xs">{sel.email}</SheetDescription>
               </SheetHeader>
-
-              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted/50">
-                {([["obras", "Obras"], ["dados", "Empresa"]] as const).map(([id, l]) => (
-                  <button key={id} onClick={() => setTab(id)}
-                    className={cn("h-9 rounded-lg text-xs font-bold", tab === id ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
-                ))}
-              </div>
-
-              {tab === "obras" ? (
-                <div className="space-y-2.5">
-                  <button onClick={() => { setEditingObra(null); setObraSheet(true) }}
-                    className="w-full h-10 rounded-xl bg-primary/10 text-primary text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95">
-                    <Plus className="h-4 w-4" />Nova obra para esta empresa
-                  </button>
-                  {(obrasDe[sel.uid] ?? []).length === 0
-                    ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só consegue registar trabalhos em obras criadas aqui.</p>
-                    : (obrasDe[sel.uid] ?? []).map(o => (
-                        <SubObraCard key={o.id} obra={o} compact jobs={(jobsDe[sel.uid] ?? []).filter(j => j.obraId === o.id)} onClick={() => setDetailId(o.id)} />
-                      ))}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <EmpresaForm uid={sel.uid} empresa={sel.empresa} onSaved={load} />
-                  <button onClick={async () => { await setSubAtivo(sel.uid, !sel.ativo); load() }}
-                    className={cn("w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5",
-                      sel.ativo ? "bg-destructive/10 text-destructive" : "bg-emerald-100 text-emerald-700")}>
-                    <Power className="h-3.5 w-3.5" />{sel.ativo ? "Suspender acesso" : "Reativar acesso"}
-                  </button>
-                </div>
-              )}
+              <EmpresaPanel key={sel.uid} empresa={sel} onChanged={load} />
             </div>
           )}
         </SheetContent>
       </Sheet>
-
-      {sel && (
-        <SubObraSheet open={obraSheet} onClose={() => setObraSheet(false)} onSaved={load}
-          obra={editingObra} subUid={sel.uid} empresaNome={nomeDe(sel)} />
-      )}
-
-      {sel && (
-        <SubObraDetail open={!!detailId} onClose={() => setDetailId(null)}
-          obra={(obrasDe[sel.uid] ?? []).find(o => o.id === detailId) ?? null}
-          jobs={jobsDe[sel.uid] ?? []} subUid={sel.uid} empresaNome={nomeDe(sel)} createdBy="admin" onChanged={load}
-          onEditObra={() => { setEditingObra((obrasDe[sel.uid] ?? []).find(o => o.id === detailId) ?? null); setObraSheet(true) }} />
-      )}
     </div>
   )
 }

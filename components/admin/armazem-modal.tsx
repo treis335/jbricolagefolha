@@ -1,7 +1,7 @@
 // components/admin/armazem-modal.tsx
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import {
   X, PackageCheck, PackageOpen, HardHat, Check, AlertTriangle, Loader2,
   ChevronLeft, Pencil,
@@ -14,6 +14,7 @@ import type { Obra } from "@/lib/obras-service"
 import { QrScanInput } from "@/components/admin/qr-scan-input"
 import { entregarFerramentas, devolverFerramentas, buscarFerramentaPorCodigo } from "@/lib/ferramentas-service"
 import { feedbackScan } from "@/lib/scan-feedback"
+import { getSubEmpresas } from "@/lib/subempreiteiros-service"
 
 interface Props {
   open: boolean
@@ -65,6 +66,18 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
     () => [...collaborators, ...patroes].filter(c => c.ativo).sort((a, b) => a.name.localeCompare(b.name)),
     [collaborators, patroes],
   )
+
+  // Subempreiteiros também levam ferramentas (mesmo sistema; o uid da empresa faz de "colaborador")
+  const [subs, setSubs] = useState<Collaborator[]>([])
+  useEffect(() => {
+    if (!open) return
+    getSubEmpresas().then(lista => setSubs(
+      lista.filter(e => e.ativo).map(e => ({
+        id: e.uid, name: e.empresa.nome || e.name || e.email, fotoUrl: e.empresa.logoUrl, ativo: true,
+        username: "", legacyName: "", email: e.email, role: "subcontractor",
+      }) as unknown as Collaborator).sort((a, b) => a.name.localeCompare(b.name))
+    )).catch(() => setSubs([]))
+  }, [open])
 
   const [modo, setModo] = useState<Modo>("entregar")
   const [passo, setPasso] = useState<Passo>(0)
@@ -267,6 +280,19 @@ export function ArmazemModal({ open, onClose, onChanged }: Props) {
                       </button>
                     ))}
                   </div>
+                  {subs.length > 0 && (
+                    <>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50 pt-3">Subempreiteiros</p>
+                      <div className="grid grid-cols-4 gap-3">
+                        {subs.map(c => (
+                          <button key={c.id} onClick={() => escolherColaborador(c)} className="flex flex-col items-center gap-1.5 group">
+                            <div className="group-active:scale-90 transition-transform"><Avatar c={c} /></div>
+                            <span className="text-[10px] font-medium truncate w-full text-center">{c.name.split(" ")[0]}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 

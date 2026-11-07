@@ -1,10 +1,9 @@
 // components/sub/sub-obra-card.tsx
 "use client"
 import { HardHat, MapPin, ChevronRight } from "lucide-react"
-import { type SubObra, type SubJob, calcEquipa, fmtEuro } from "@/lib/subempreiteiros-service"
+import { type SubObra, fmtEuro } from "@/lib/subempreiteiros-service"
 
-export function SubObraCard({ obra, onClick, jobs, compact }: { obra: SubObra; onClick?: () => void; jobs?: SubJob[]; compact?: boolean }) {
-  const t = jobs ? jobs.reduce((a, j) => { const c = calcEquipa(j.equipa); return { h: a.h + c.horasHomem, e: a.e + c.custo } }, { h: 0, e: 0 }) : null
+export function SubObraCard({ obra, onClick, stats, compact }: { obra: SubObra; onClick?: () => void; stats?: { servicos: number; horas: number; custo: number }; compact?: boolean }) {
   const Tag = onClick ? "button" : "div"
   return (
     <Tag type={onClick ? "button" : undefined} onClick={onClick}
@@ -22,8 +21,8 @@ export function SubObraCard({ obra, onClick, jobs, compact }: { obra: SubObra; o
         </span>
         {onClick && <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-1" />}
       </div>
-      {t && (
-        <p className="text-[11px] font-semibold text-muted-foreground">{jobs!.length} serviço(s) · {t.h} h · {fmtEuro(t.e)}</p>
+      {stats && (
+        <p className="text-[11px] font-semibold text-muted-foreground">{stats.servicos} serviço(s) · {stats.horas} h · {fmtEuro(stats.custo)}</p>
       )}
       {!compact && obra.ordens && (
         <div className="rounded-xl bg-muted/40 p-3">
