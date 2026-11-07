@@ -3,15 +3,14 @@
 // Usado pela empresa subempreiteira e pelo admin/patrão (que pode editar tudo).
 "use client"
 import { useEffect, useState } from "react"
-import { HardHat, Loader2, Trash2 } from "lucide-react"
+import { Loader2, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { ObraPicker } from "@/components/forms/obra-picker"
 import { ServiceFotos } from "@/components/forms/service-fotos"
 import type { ServiceFoto } from "@/lib/types"
 import {
-  type SubJob, type SubJobStatus, SUB_STATUS_LABELS, newJobId, saveJob, deleteJob,
+  type SubJob, type SubObra, type SubJobStatus, SUB_STATUS_LABELS, newJobId, saveJob, deleteJob,
 } from "@/lib/subempreiteiros-service"
 
 interface Props {
@@ -19,6 +18,7 @@ interface Props {
   onClose: () => void
   onSaved: () => void
   job: SubJob | null            // null = novo
+  obras: SubObra[]              // só as obras atribuídas a esta empresa
   subUid: string
   empresaNome: string
   createdBy: "empresa" | "admin"
@@ -29,7 +29,7 @@ const hoje = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 }
 
-export function SubJobSheet({ open, onClose, onSaved, job, subUid, empresaNome, createdBy }: Props) {
+export function SubJobSheet({ open, onClose, onSaved, job, obras, subUid, empresaNome, createdBy }: Props) {
   const [id, setId] = useState("")
   const [obraNome, setObraNome] = useState("")
   const [obraId, setObraId] = useState<string | undefined>()
@@ -38,7 +38,6 @@ export function SubJobSheet({ open, onClose, onSaved, job, subUid, empresaNome, 
   const [fotos, setFotos] = useState<ServiceFoto[]>([])
   const [status, setStatus] = useState<SubJobStatus>("em_curso")
   const [date, setDate] = useState(hoje())
-  const [pickerOpen, setPickerOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -46,17 +45,19 @@ export function SubJobSheet({ open, onClose, onSaved, job, subUid, empresaNome, 
   useEffect(() => {
     if (!open) return
     setId(job?.id ?? newJobId())
-    setObraNome(job?.obraNome ?? "")
-    setObraId(job?.obraId)
+    const ativas = obras.filter(o => o.estado === "ativa")
+    const inicial = job ? obras.find(o => o.id === job.obraId) : ativas.length === 1 ? ativas[0] : undefined
+    setObraNome(job?.obraNome ?? inicial?.nome ?? "")
+    setObraId(job?.obraId ?? inicial?.id)
     setTitulo(job?.titulo ?? "")
     setDescricao(job?.descricao ?? "")
     setFotos(job?.fotos ?? [])
     setStatus(job?.status ?? "em_curso")
     setDate(job?.date ?? hoje())
     setConfirmDel(false)
-  }, [open, job])
+  }, [open, job, obras])
 
-  const canSave = titulo.trim().length > 0 && obraNome.trim().length > 0 && !uploading && !saving
+  const canSave = titulo.trim().length > 0 && !!obraId && !uploading && !saving
 
   const handleSave = async () => {
     if (!canSave) return
@@ -99,14 +100,19 @@ export function SubJobSheet({ open, onClose, onSaved, job, subUid, empresaNome, 
 
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Obra</label>
-              <div className="flex gap-2">
-                <Input value={obraNome} onChange={e => { setObraNome(e.target.value); setObraId(undefined) }}
-                  placeholder="Nome da obra" className="h-11 rounded-xl" />
-                <button type="button" onClick={() => setPickerOpen(true)}
-                  className="h-11 px-3 rounded-xl bg-primary/10 text-primary text-xs font-bold flex items-center gap-1.5 shrink-0 active:scale-95">
-                  <HardHat className="h-4 w-4" />Escolher
-                </button>
-              </div>
+              {obras.length === 0 ? (
+                <p className="text-xs rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 p-3">
+                  Ainda não tens obras atribuídas. Pede ao responsável para criar uma obra para a tua empresa.
+                </p>
+              ) : (
+                <select value={obraId ?? ""} onChange={e => { const o = obras.find(x => x.id === e.target.value); setObraId(o?.id); setObraNome(o?.nome ?? "") }}
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                  <option value="" disabled>Escolher obra…</option>
+                  {obras.filter(o => o.estado === "ativa" || o.id === obraId).map(o => (
+                    <option key={o.id} value={o.id}>{o.nome}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="space-y-1.5">
@@ -160,8 +166,6 @@ export function SubJobSheet({ open, onClose, onSaved, job, subUid, empresaNome, 
         </SheetContent>
       </Sheet>
 
-      <ObraPicker open={pickerOpen} onClose={() => setPickerOpen(false)} zClass="z-[110]"
-        onSelect={o => { setObraNome(o.nome); setObraId(o.id); setPickerOpen(false) }} />
     </>
   )
 }

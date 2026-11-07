@@ -34,6 +34,17 @@ export interface SubJob {
   updatedAt?: string
 }
 
+// Obra atribuída a uma empresa (coleção própria, separada das obras dos colaboradores)
+export interface SubObra {
+  id: string
+  subUid: string
+  nome: string
+  morada: string
+  ordens: string // instruções / o que a empresa tem de fazer
+  estado: "ativa" | "concluida"
+  criadaEm?: string
+}
+
 export interface EmpresaPerfil {
   nome?: string
   nif?: string
@@ -87,6 +98,32 @@ export async function saveJob(job: SubJob): Promise<void> {
 
 export async function deleteJob(id: string): Promise<void> {
   await deleteDoc(doc(db, "subJobs", id))
+}
+
+// ── Obras atribuídas ─────────────────────────────────────────────────────────
+const obrasCol = () => collection(db, "subObras")
+export const newSubObraId = () => doc(obrasCol()).id
+
+const sortObras = (a: SubObra, b: SubObra) =>
+  (a.estado === b.estado ? 0 : a.estado === "ativa" ? -1 : 1) || a.nome.localeCompare(b.nome)
+
+export async function getSubObrasBySub(subUid: string): Promise<SubObra[]> {
+  const snap = await getDocs(query(obrasCol(), where("subUid", "==", subUid)))
+  return snap.docs.map(d => ({ ...(d.data() as Omit<SubObra, "id">), id: d.id })).sort(sortObras)
+}
+
+export async function getAllSubObras(): Promise<SubObra[]> {
+  const snap = await getDocs(obrasCol())
+  return snap.docs.map(d => ({ ...(d.data() as Omit<SubObra, "id">), id: d.id })).sort(sortObras)
+}
+
+export async function saveSubObra(o: SubObra): Promise<void> {
+  const { id, ...rest } = o
+  await setDoc(doc(db, "subObras", id), { ...clean(rest), criadaEm: o.criadaEm ?? new Date().toISOString() }, { merge: true })
+}
+
+export async function deleteSubObra(id: string): Promise<void> {
+  await deleteDoc(doc(db, "subObras", id))
 }
 
 // ── Empresa (perfil) ─────────────────────────────────────────────────────────

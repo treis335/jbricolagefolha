@@ -7,36 +7,42 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
-  type SubEmpresa, type SubJob, getSubEmpresas, getAllJobs, inviteSubcontractor,
+  type SubEmpresa, type SubJob, type SubObra, getSubEmpresas, getAllJobs, getAllSubObras, inviteSubcontractor,
   getSubcontractorEmails, setSubAtivo,
 } from "@/lib/subempreiteiros-service"
 import { SubJobCard } from "@/components/sub/sub-job-card"
+import { SubObraCard } from "@/components/sub/sub-obra-card"
+import { SubObraSheet } from "@/components/sub/sub-obra-sheet"
 import { SubJobSheet } from "@/components/sub/sub-job-sheet"
 import { EmpresaForm } from "@/components/sub/empresa-form"
 
 export function AdminSubempreiteirosView() {
   const [empresas, setEmpresas] = useState<SubEmpresa[]>([])
   const [jobs, setJobs] = useState<SubJob[]>([])
+  const [obras, setObras] = useState<SubObra[]>([])
+  const [obraSheet, setObraSheet] = useState(false)
+  const [editingObra, setEditingObra] = useState<SubObra | null>(null)
   const [convites, setConvites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState("")
   const [email, setEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [sel, setSel] = useState<SubEmpresa | null>(null)
-  const [tab, setTab] = useState<"jobs" | "dados">("jobs")
+  const [tab, setTab] = useState<"obras" | "jobs" | "dados">("obras")
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<SubJob | null>(null)
 
   const load = useCallback(async () => {
     // allSettled: se uma leitura falhar (ex.: regras Firestore ainda sem subJobs) as outras continuam a funcionar
-    const [e, j, c] = await Promise.allSettled([getSubEmpresas(), getAllJobs(), getSubcontractorEmails()])
+    const [e, j, c, ob] = await Promise.allSettled([getSubEmpresas(), getAllJobs(), getSubcontractorEmails(), getAllSubObras()])
     if (e.status === "fulfilled") {
       setEmpresas(e.value)
       setSel(prev => prev ? e.value.find(x => x.uid === prev.uid) ?? null : null)
     }
     if (j.status === "fulfilled") setJobs(j.value)
     if (c.status === "fulfilled") setConvites(c.value)
-    const falhas = [e, j, c].filter(r => r.status === "rejected") as PromiseRejectedResult[]
+    if (ob.status === "fulfilled") setObras(ob.value)
+    const falhas = [e, j, c, ob].filter(r => r.status === "rejected") as PromiseRejectedResult[]
     setErro(falhas.length ? `Sem permissão/erro a ler dados: ${falhas.map(f => f.reason?.code || f.reason?.message).join(", ")}` : "")
     setLoading(false)
   }, [])
@@ -47,6 +53,12 @@ export function AdminSubempreiteirosView() {
     jobs.forEach(j => { (m[j.subUid] ||= []).push(j) })
     return m
   }, [jobs])
+
+  const obrasDe = useMemo(() => {
+    const m: Record<string, SubObra[]> = {}
+    obras.forEach(o => { (m[o.subUid] ||= []).push(o) })
+    return m
+  }, [obras])
 
   const pendentes = useMemo(() => {
     const reg = new Set(empresas.map(e => e.email.toLowerCase()))
@@ -117,7 +129,7 @@ export function AdminSubempreiteirosView() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black truncate">{nomeDe(e)}</p>
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {(jobsDe[e.uid]?.length ?? 0)} trabalho(s){e.empresa.nif ? ` · NIF ${e.empresa.nif}` : ""}{!e.ativo ? " · suspensa" : ""}
+                  {(obrasDe[e.uid]?.length ?? 0)} obra(s) · {(jobsDe[e.uid]?.length ?? 0)} trabalho(s){e.empresa.nif ? ` · NIF ${e.empresa.nif}` : ""}{!e.ativo ? " · suspensa" : ""}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground/40" />
@@ -135,14 +147,26 @@ export function AdminSubempreiteirosView() {
                 <SheetDescription className="text-xs">{sel.email}</SheetDescription>
               </SheetHeader>
 
-              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted/50">
-                {([["jobs", "Trabalhos"], ["dados", "Dados da empresa"]] as const).map(([id, l]) => (
+              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-muted/50">
+                {([["obras", "Obras"], ["jobs", "Trabalhos"], ["dados", "Empresa"]] as const).map(([id, l]) => (
                   <button key={id} onClick={() => setTab(id)}
                     className={cn("h-9 rounded-lg text-xs font-bold", tab === id ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
                 ))}
               </div>
 
-              {tab === "jobs" ? (
+              {tab === "obras" ? (
+                <div className="space-y-2.5">
+                  <button onClick={() => { setEditingObra(null); setObraSheet(true) }}
+                    className="w-full h-10 rounded-xl bg-primary/10 text-primary text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95">
+                    <Plus className="h-4 w-4" />Nova obra para esta empresa
+                  </button>
+                  {(obrasDe[sel.uid] ?? []).length === 0
+                    ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só consegue registar trabalhos em obras criadas aqui.</p>
+                    : (obrasDe[sel.uid] ?? []).map(o => (
+                        <SubObraCard key={o.id} obra={o} onClick={() => { setEditingObra(o); setObraSheet(true) }} />
+                      ))}
+                </div>
+              ) : tab === "jobs" ? (
                 <div className="space-y-2.5">
                   <button onClick={() => { setEditing(null); setSheetOpen(true) }}
                     className="w-full h-10 rounded-xl bg-primary/10 text-primary text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95">
@@ -170,8 +194,13 @@ export function AdminSubempreiteirosView() {
       </Sheet>
 
       {sel && (
+        <SubObraSheet open={obraSheet} onClose={() => setObraSheet(false)} onSaved={load}
+          obra={editingObra} subUid={sel.uid} empresaNome={nomeDe(sel)} />
+      )}
+
+      {sel && (
         <SubJobSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onSaved={load}
-          job={editing} subUid={sel.uid} empresaNome={nomeDe(sel)} createdBy="admin" />
+          job={editing} obras={obrasDe[sel.uid] ?? []} subUid={sel.uid} empresaNome={nomeDe(sel)} createdBy="admin" />
       )}
     </div>
   )
