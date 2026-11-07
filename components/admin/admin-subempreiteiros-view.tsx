@@ -82,7 +82,7 @@ export function AdminSubempreiteirosView() {
     <div className="p-4 sm:p-6 space-y-5 max-w-3xl mx-auto">
       <div>
         <h1 className="text-xl font-black">Subempreiteiros</h1>
-        <p className="text-xs text-muted-foreground">Empresas externas — só obra, título, descrição e fotos. Sem horas nem €.</p>
+        <p className="text-xs text-muted-foreground">Empresas externas — obras atribuídas, serviços, mão-de-obra e fotos.</p>
       </div>
 
       <div className="rounded-2xl border border-border/40 bg-card p-4 space-y-2.5">
