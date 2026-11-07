@@ -3,25 +3,23 @@
 "use client"
 import { useCallback, useEffect, useState } from "react"
 import { doc, getDoc } from "firebase/firestore"
-import { Briefcase, Building2, HardHat, Plus, LogOut, Loader2 } from "lucide-react"
+import { Building2, HardHat, LogOut, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { useAuth } from "@/lib/AuthProvider"
 import { cn } from "@/lib/utils"
 import { type SubJob, type SubObra, type EmpresaPerfil, getJobsBySub, getSubObrasBySub } from "@/lib/subempreiteiros-service"
 import { SubObraCard } from "./sub-obra-card"
-import { SubJobCard } from "./sub-job-card"
-import { SubJobSheet } from "./sub-job-sheet"
+import { SubObraDetail } from "./sub-obra-detail"
 import { EmpresaForm } from "./empresa-form"
 
 export function SubApp() {
   const { user, logout } = useAuth()
-  const [tab, setTab] = useState<"obras" | "jobs" | "empresa">("obras")
+  const [tab, setTab] = useState<"obras" | "empresa">("obras")
   const [jobs, setJobs] = useState<SubJob[]>([])
   const [obras, setObras] = useState<SubObra[]>([])
   const [empresa, setEmpresa] = useState<EmpresaPerfil>({})
   const [loading, setLoading] = useState(true)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [editing, setEditing] = useState<SubJob | null>(null)
+  const [selObraId, setSelObraId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     if (!user) return
@@ -64,19 +62,7 @@ export function SubApp() {
               <p className="text-sm font-semibold">Sem obras atribuídas</p>
               <p className="text-xs text-muted-foreground">Quando te atribuírem uma obra, aparece aqui com as ordens.</p>
             </div>
-          ) : obras.map(o => <SubObraCard key={o.id} obra={o} />)
-        ) : tab === "jobs" ? (
-          loading ? (
-            <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-          ) : jobs.length === 0 ? (
-            <div className="py-16 text-center space-y-2">
-              <Briefcase className="h-10 w-10 mx-auto text-muted-foreground/30" />
-              <p className="text-sm font-semibold">Ainda sem trabalhos</p>
-              <p className="text-xs text-muted-foreground">Toca em “Novo trabalho” para registar o primeiro.</p>
-            </div>
-          ) : jobs.map(j => (
-            <SubJobCard key={j.id} job={j} onClick={() => { setEditing(j); setSheetOpen(true) }} />
-          ))
+          ) : obras.map(o => <SubObraCard key={o.id} obra={o} compact jobs={jobs.filter(j => j.obraId === o.id)} onClick={() => setSelObraId(o.id)} />)
         ) : (
           <div className="rounded-2xl border border-border/40 bg-card p-4">
             <p className="text-xs text-muted-foreground mb-4">Preenche se quiseres — tudo opcional.</p>
@@ -85,16 +71,9 @@ export function SubApp() {
         )}
       </main>
 
-      {tab === "jobs" && obras.length > 0 && (
-        <button onClick={() => { setEditing(null); setSheetOpen(true) }}
-          className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] h-12 px-5 rounded-2xl bg-primary text-primary-foreground text-sm font-bold shadow-lg flex items-center gap-2 active:scale-95 z-40">
-          <Plus className="h-4 w-4" />Novo trabalho
-        </button>
-      )}
-
       <nav className="fixed bottom-0 inset-x-0 z-40 bg-card/90 backdrop-blur border-t border-border/50 pb-[env(safe-area-inset-bottom)]">
-        <div className="max-w-2xl mx-auto grid grid-cols-3 h-16">
-          {([["obras", "Obras", HardHat], ["jobs", "Trabalhos", Briefcase], ["empresa", "Empresa", Building2]] as const).map(([id, label, Icon]) => (
+        <div className="max-w-2xl mx-auto grid grid-cols-2 h-16">
+          {([["obras", "Obras", HardHat], ["empresa", "Empresa", Building2]] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => setTab(id)}
               className={cn("flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold", tab === id ? "text-primary" : "text-muted-foreground")}>
               <Icon className="h-5 w-5" />{label}
@@ -103,8 +82,8 @@ export function SubApp() {
         </div>
       </nav>
 
-      <SubJobSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onSaved={load}
-        job={editing} obras={obras} subUid={user.uid} empresaNome={nome} createdBy="empresa" />
+      <SubObraDetail open={!!selObraId} onClose={() => setSelObraId(null)} obra={obras.find(o => o.id === selObraId) ?? null}
+        jobs={jobs} subUid={user.uid} empresaNome={nome} createdBy="empresa" onChanged={load} />
     </div>
   )
 }

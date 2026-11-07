@@ -6,7 +6,7 @@ import { Loader2, Trash2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { type SubObra, newSubObraId, saveSubObra, deleteSubObra } from "@/lib/subempreiteiros-service"
+import { type SubObra, newSubObraId, saveSubObra, deleteSubObra, explainFirebaseError } from "@/lib/subempreiteiros-service"
 
 interface Props {
   open: boolean
@@ -40,7 +40,7 @@ export function SubObraSheet({ open, onClose, onSaved, obra, subUid, empresaNome
         ordens: ordens.trim(), estado, criadaEm: obra?.criadaEm,
       })
       onSaved(); onClose()
-    } catch { alert("Não foi possível guardar a obra.") }
+    } catch (err) { alert(`Não foi possível guardar a obra: ${explainFirebaseError(err)}`) }
     finally { setSaving(false) }
   }
 
@@ -53,7 +53,7 @@ export function SubObraSheet({ open, onClose, onSaved, obra, subUid, empresaNome
 
   return (
     <Sheet open={open} onOpenChange={o => !o && onClose()}>
-      <SheetContent side="bottom" className="rounded-t-3xl border-0 bg-background max-h-[94dvh] overflow-y-auto p-0 [&>button]:hidden sm:max-w-xl sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl z-[100]">
+      <SheetContent side="bottom" className="rounded-t-3xl border-0 bg-background max-h-[94dvh] overflow-y-auto p-0 [&>button]:hidden sm:max-w-xl sm:mx-auto sm:left-1/2 sm:-translate-x-1/2 sm:rounded-2xl z-[120]">
         <div className="px-5 pt-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] space-y-4">
           <SheetHeader className="text-left space-y-0">
             <SheetTitle className="text-xl font-black">{obra ? "Editar obra" : "Nova obra"}</SheetTitle>

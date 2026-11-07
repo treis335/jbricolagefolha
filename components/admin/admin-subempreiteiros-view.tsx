@@ -8,12 +8,11 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { cn } from "@/lib/utils"
 import {
   type SubEmpresa, type SubJob, type SubObra, getSubEmpresas, getAllJobs, getAllSubObras, inviteSubcontractor,
-  getSubcontractorEmails, setSubAtivo,
+  getSubcontractorEmails, setSubAtivo, explainFirebaseError,
 } from "@/lib/subempreiteiros-service"
-import { SubJobCard } from "@/components/sub/sub-job-card"
 import { SubObraCard } from "@/components/sub/sub-obra-card"
 import { SubObraSheet } from "@/components/sub/sub-obra-sheet"
-import { SubJobSheet } from "@/components/sub/sub-job-sheet"
+import { SubObraDetail } from "@/components/sub/sub-obra-detail"
 import { EmpresaForm } from "@/components/sub/empresa-form"
 
 export function AdminSubempreiteirosView() {
@@ -28,9 +27,8 @@ export function AdminSubempreiteirosView() {
   const [email, setEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [sel, setSel] = useState<SubEmpresa | null>(null)
-  const [tab, setTab] = useState<"obras" | "jobs" | "dados">("obras")
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [editing, setEditing] = useState<SubJob | null>(null)
+  const [tab, setTab] = useState<"obras" | "dados">("obras")
+  const [detailId, setDetailId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     // allSettled: se uma leitura falhar (ex.: regras Firestore ainda sem subJobs) as outras continuam a funcionar
@@ -71,8 +69,7 @@ export function AdminSubempreiteirosView() {
     setInviting(true)
     try { await inviteSubcontractor(v); setEmail("") }
     catch (err) {
-      const e = err as { code?: string; message?: string }
-      alert(`Não foi possível convidar: ${e.code || e.message || "erro desconhecido"}`)
+      alert(`Não foi possível convidar: ${explainFirebaseError(err)}`)
       setInviting(false); return
     }
     await load()
@@ -118,7 +115,7 @@ export function AdminSubempreiteirosView() {
       ) : (
         <div className="space-y-2.5">
           {empresas.map(e => (
-            <button key={e.uid} onClick={() => { setSel(e); setTab("jobs") }}
+            <button key={e.uid} onClick={() => { setSel(e); setTab("obras") }}
               className="w-full text-left rounded-2xl border border-border/40 bg-card p-4 flex items-center gap-3 active:scale-[0.99]">
               <div className="w-11 h-11 rounded-xl bg-muted/50 overflow-hidden flex items-center justify-center shrink-0">
                 {e.empresa.logoUrl
@@ -147,8 +144,8 @@ export function AdminSubempreiteirosView() {
                 <SheetDescription className="text-xs">{sel.email}</SheetDescription>
               </SheetHeader>
 
-              <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-muted/50">
-                {([["obras", "Obras"], ["jobs", "Trabalhos"], ["dados", "Empresa"]] as const).map(([id, l]) => (
+              <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted/50">
+                {([["obras", "Obras"], ["dados", "Empresa"]] as const).map(([id, l]) => (
                   <button key={id} onClick={() => setTab(id)}
                     className={cn("h-9 rounded-lg text-xs font-bold", tab === id ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
                 ))}
@@ -163,19 +160,7 @@ export function AdminSubempreiteirosView() {
                   {(obrasDe[sel.uid] ?? []).length === 0
                     ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só consegue registar trabalhos em obras criadas aqui.</p>
                     : (obrasDe[sel.uid] ?? []).map(o => (
-                        <SubObraCard key={o.id} obra={o} onClick={() => { setEditingObra(o); setObraSheet(true) }} />
-                      ))}
-                </div>
-              ) : tab === "jobs" ? (
-                <div className="space-y-2.5">
-                  <button onClick={() => { setEditing(null); setSheetOpen(true) }}
-                    className="w-full h-10 rounded-xl bg-primary/10 text-primary text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95">
-                    <Plus className="h-4 w-4" />Atribuir / adicionar trabalho
-                  </button>
-                  {(jobsDe[sel.uid] ?? []).length === 0
-                    ? <p className="text-xs text-muted-foreground text-center py-6">Sem trabalhos.</p>
-                    : (jobsDe[sel.uid] ?? []).map(j => (
-                        <SubJobCard key={j.id} job={j} onClick={() => { setEditing(j); setSheetOpen(true) }} />
+                        <SubObraCard key={o.id} obra={o} compact jobs={(jobsDe[sel.uid] ?? []).filter(j => j.obraId === o.id)} onClick={() => setDetailId(o.id)} />
                       ))}
                 </div>
               ) : (
@@ -199,8 +184,10 @@ export function AdminSubempreiteirosView() {
       )}
 
       {sel && (
-        <SubJobSheet open={sheetOpen} onClose={() => setSheetOpen(false)} onSaved={load}
-          job={editing} obras={obrasDe[sel.uid] ?? []} subUid={sel.uid} empresaNome={nomeDe(sel)} createdBy="admin" />
+        <SubObraDetail open={!!detailId} onClose={() => setDetailId(null)}
+          obra={(obrasDe[sel.uid] ?? []).find(o => o.id === detailId) ?? null}
+          jobs={jobsDe[sel.uid] ?? []} subUid={sel.uid} empresaNome={nomeDe(sel)} createdBy="admin" onChanged={load}
+          onEditObra={() => { setEditingObra((obrasDe[sel.uid] ?? []).find(o => o.id === detailId) ?? null); setObraSheet(true) }} />
       )}
     </div>
   )

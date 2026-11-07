@@ -1,9 +1,10 @@
 // components/sub/sub-obra-card.tsx
 "use client"
 import { HardHat, MapPin, ChevronRight } from "lucide-react"
-import type { SubObra } from "@/lib/subempreiteiros-service"
+import { type SubObra, type SubJob, calcEquipa, fmtEuro } from "@/lib/subempreiteiros-service"
 
-export function SubObraCard({ obra, onClick }: { obra: SubObra; onClick?: () => void }) {
+export function SubObraCard({ obra, onClick, jobs, compact }: { obra: SubObra; onClick?: () => void; jobs?: SubJob[]; compact?: boolean }) {
+  const t = jobs ? jobs.reduce((a, j) => { const c = calcEquipa(j.equipa); return { h: a.h + c.horasHomem, e: a.e + c.custo } }, { h: 0, e: 0 }) : null
   const Tag = onClick ? "button" : "div"
   return (
     <Tag type={onClick ? "button" : undefined} onClick={onClick}
@@ -21,7 +22,10 @@ export function SubObraCard({ obra, onClick }: { obra: SubObra; onClick?: () => 
         </span>
         {onClick && <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-1" />}
       </div>
-      {obra.ordens && (
+      {t && (
+        <p className="text-[11px] font-semibold text-muted-foreground">{jobs!.length} serviço(s) · {t.h} h · {fmtEuro(t.e)}</p>
+      )}
+      {!compact && obra.ordens && (
         <div className="rounded-xl bg-muted/40 p-3">
           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Ordens</p>
           <p className="text-xs whitespace-pre-wrap">{obra.ordens}</p>

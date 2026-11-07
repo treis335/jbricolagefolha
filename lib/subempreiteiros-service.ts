@@ -18,6 +18,31 @@ export const SUB_STATUS_LABELS: Record<SubJobStatus, string> = {
   concluido: "Concluído",
 }
 
+// Linha de mão-de-obra: ex. 2 oficiais × 8h × 20 €/h
+export interface SubEquipaLinha {
+  funcao?: string
+  homens: number
+  horas: number     // horas por homem nesse dia
+  custoHora: number // € por hora, por homem
+}
+
+export function calcEquipa(eq?: SubEquipaLinha[]) {
+  const l = eq ?? []
+  return {
+    homens: l.reduce((a, x) => a + (x.homens || 0), 0),
+    horasHomem: l.reduce((a, x) => a + (x.homens || 0) * (x.horas || 0), 0),
+    custo: l.reduce((a, x) => a + (x.homens || 0) * (x.horas || 0) * (x.custoHora || 0), 0),
+  }
+}
+
+export const fmtEuro = (n: number) => n.toLocaleString("pt-PT", { style: "currency", currency: "EUR" })
+
+export function explainFirebaseError(err: unknown): string {
+  const e = err as { code?: string; message?: string }
+  if (e?.code === "permission-denied") return "Sem permissão — falta publicar as regras do Firestore para esta coleção."
+  return e?.code || e?.message || "erro desconhecido"
+}
+
 export interface SubJob {
   id: string
   subUid: string
@@ -28,6 +53,9 @@ export interface SubJob {
   descricao: string
   fotos: ServiceFoto[]
   status: SubJobStatus
+  equipa?: SubEquipaLinha[]
+  totalHorasHomem?: number
+  totalCusto?: number
   date: string // YYYY-MM-DD
   createdBy: "empresa" | "admin"
   createdAt?: string

@@ -1,7 +1,7 @@
 // components/sub/sub-job-card.tsx
 "use client"
 import { HardHat, ChevronRight } from "lucide-react"
-import { type SubJob, SUB_STATUS_LABELS } from "@/lib/subempreiteiros-service"
+import { type SubJob, SUB_STATUS_LABELS, calcEquipa, fmtEuro } from "@/lib/subempreiteiros-service"
 
 const STATUS_CLS: Record<SubJob["status"], string> = {
   atribuido: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
@@ -31,6 +31,10 @@ export function SubJobCard({ job, onClick, showEmpresa }: { job: SubJob; onClick
         </span>
         <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-0.5" />
       </div>
+      {(job.equipa?.length ?? 0) > 0 && (() => {
+        const t = calcEquipa(job.equipa)
+        return <p className="text-[11px] font-semibold text-muted-foreground">{t.homens} homem(ns) · {t.horasHomem} h · {fmtEuro(t.custo)}</p>
+      })()}
       {job.descricao ? <p className="text-xs text-muted-foreground/80 line-clamp-2">{job.descricao}</p> : null}
       {fotos.length > 0 && (
         <div className="flex gap-1.5 overflow-hidden">
