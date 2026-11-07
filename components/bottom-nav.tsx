@@ -5,9 +5,14 @@ import { cn } from "@/lib/utils"
 
 export type TabType = "calendar" | "financeiro" | "ferramentas" | "settings"
 
+export interface NavItem { id: string; label: string; icon: React.ComponentType<{ className?: string; strokeWidth?: number }> }
+
 interface BottomNavProps {
-  activeTab: TabType
-  onTabChange: (tab: TabType) => void
+  activeTab: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onTabChange: (tab: any) => void
+  /** Itens personalizados (ex.: empreiteiro). Por omissão usa os do colaborador. */
+  items?: NavItem[]
 }
 
 const tabs = [
@@ -16,7 +21,8 @@ const tabs = [
   { id: "settings"   as TabType, label: "Definições",  icon: Settings     },
 ]
 
-export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, items }: BottomNavProps) {
+  const lista: NavItem[] = items ?? tabs
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 lg:hidden">
       {/* Blur backdrop */}
@@ -26,7 +32,7 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
       />
 
       <div className="relative flex items-center justify-around h-16 max-w-lg mx-auto px-2 pb-safe">
-        {tabs.map((tab) => {
+        {lista.map((tab) => {
           const Icon = tab.icon
           const isActive = activeTab === tab.id
 

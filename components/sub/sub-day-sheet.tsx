@@ -2,7 +2,7 @@
 // Registo de um dia: escolhe a obra, os colaboradores da equipa e as horas de cada um.
 "use client"
 import { useEffect, useMemo, useState } from "react"
-import { Loader2, Trash2, Plus, Check } from "lucide-react"
+import { Loader2, Trash2, Plus, Check, Repeat } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { ServiceFotos } from "@/components/forms/service-fotos"
@@ -18,6 +18,7 @@ interface Props {
   onSaved: () => void
   date: string                 // YYYY-MM-DD
   dia: SubDia | null
+  dias: SubDia[]               // todos os dias (para "repetir o último dia")
   obras: SubObra[]
   equipa: SubMembro[]
   subUid: string
@@ -28,7 +29,7 @@ const num = (v: string) => { const n = parseFloat(v.replace(",", ".")); return i
 const r2 = (n: number) => Math.round(n * 100) / 100
 const lbl = "text-[10px] font-black uppercase tracking-widest text-muted-foreground/60"
 
-export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, subUid, empresaNome }: Props) {
+export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, equipa, subUid, empresaNome }: Props) {
   const ativas = useMemo(() => obras.filter(o => o.estado === "ativa"), [obras])
   const [registos, setRegistos] = useState<SubRegisto[]>([])
   const [obraId, setObraId] = useState("")
@@ -47,6 +48,21 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, 
 
   const toggle = (id: string) => setSel(s => ({ ...s, [id]: { on: !s[id]?.on, horas: s[id]?.horas ?? "8" } }))
   const setHoras = (id: string, h: string) => setSel(s => ({ ...s, [id]: { on: s[id]?.on ?? true, horas: h } }))
+
+  // Atalho inteligente: repete a equipa/horas do último dia registado antes deste
+  const anterior = useMemo(
+    () => dias.filter(d => d.date < date && d.registos.length > 0).sort((a, b) => b.date.localeCompare(a.date))[0] ?? null,
+    [dias, date],
+  )
+  const repetirAnterior = () => {
+    if (!anterior) return
+    const ativasIds = new Set(ativas.map(o => o.id))
+    setRegistos(anterior.registos.filter(r => ativasIds.has(r.obraId)).map(r => {
+      const m = equipa.find(x => x.id === r.membroId)
+      const valorHora = m ? m.valorHora : r.valorHora // usa o valor/hora atual se o membro ainda existir
+      return { ...r, id: newId(), valorHora, custo: r2(r.horas * valorHora) }
+    }))
+  }
 
   const marcados = equipa.filter(m => sel[m.id]?.on && num(sel[m.id].horas) > 0)
 
@@ -136,6 +152,13 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, 
                 <span className="text-sm font-black">{fmtEuro(totalC)}</span>
               </div>
             </div>
+          )}
+
+          {registos.length === 0 && anterior && (
+            <button type="button" onClick={repetirAnterior}
+              className="w-full h-11 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 text-sm font-bold flex items-center justify-center gap-2 active:scale-[0.98]">
+              <Repeat className="h-4 w-4" />Repetir {new Date(anterior.date + "T00:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short" })}
+            </button>
           )}
 
           {/* Adicionar */}

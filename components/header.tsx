@@ -14,7 +14,7 @@ import { AlertaHorasButton } from "@/components/admin/alerta-horas-button"
 import { AvisoEdicaoAdmin } from "@/components/aviso-edicao-admin"
 
 export function Header() {
-  const { user, isAdmin, isPatrao } = useAuth()
+  const { user, isAdmin, isPatrao, isSubcontractor } = useAuth()
   const pathname = usePathname()
   const [isOnline, setIsOnline] = useState(true)
   const [scrolled, setScrolled] = useState(false)
@@ -51,6 +51,7 @@ export function Header() {
   }, [])
 
   const firstName = user?.displayName?.split(" ")[0] ?? ""
+  const iniciais = (user?.displayName ?? user?.email ?? "U").split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase()
 
   return (
     <header
@@ -94,7 +95,7 @@ export function Header() {
         <div className="flex items-center gap-2">
 
           {/* Escala do dia — só do lado colaborador */}
-          {!isOnAdminPage && <EscalaDoDia />}
+          {!isOnAdminPage && !isSubcontractor && <EscalaDoDia />}
 
           {/* Ferramentas — só em mobile (no desktop está no menu lateral), à esquerda dos avisos */}
           {!isOnAdminPage && user && (
@@ -114,7 +115,19 @@ export function Header() {
           )}
 
           {/* Aviso de dias corrigidos pelo admin — só do lado colaborador */}
-          {!isOnAdminPage && <AvisoEdicaoAdmin />}
+          {/* Empreiteiro: perfil sempre à mão, ao lado das ferramentas */}
+          {!isOnAdminPage && isSubcontractor && user && (
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent("jb:open-perfil"))}
+              title="Perfil"
+              aria-label="Perfil"
+              className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 transition-all press-effect bg-primary/10 border border-primary/25 text-primary text-[11px] font-black"
+            >
+              {iniciais}
+            </button>
+          )}
+
+          {!isOnAdminPage && !isSubcontractor && <AvisoEdicaoAdmin />}
 
           {/* Divergências de horas — só admin */}
           {isAdmin && <AlertaHorasButton />}
