@@ -4,7 +4,7 @@
 "use client"
 import { MapPin, Phone, CalendarClock, Pencil, Navigation } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
-import { type SubObra, type SubDia, statsObra, fmtEuro, mapsUrl } from "@/lib/subempreiteiros-service"
+import { type SubObra, type SubDia, statsObra, fmtEuro, mapsUrl, servicosDoDia } from "@/lib/subempreiteiros-service"
 
 interface Props {
   open: boolean
@@ -78,8 +78,8 @@ export function SubObraDetail({ open, onClose, obra, dias, onEditObra }: Props) 
             {historico.length === 0 ? (
               <p className="text-xs text-muted-foreground text-center py-4">Ainda sem registos. Regista no calendário.</p>
             ) : historico.map(d => {
-              const rs = d.registos.filter(r => r.obraId === obra.id)
-              const nota = d.notas?.[obra.id]
+              const servs = servicosDoDia(d).filter(sv => sv.obraId === obra.id)
+              const rs = servs.flatMap(sv => sv.registos)
               const h = rs.reduce((a, r) => a + r.horas, 0)
               const c = rs.reduce((a, r) => a + r.custo, 0)
               return (
@@ -90,17 +90,21 @@ export function SubObraDetail({ open, onClose, obra, dias, onEditObra }: Props) 
                     </p>
                     <p className="text-[11px] text-muted-foreground">{rs.length} pessoa(s) · {h} h · <b className="text-foreground">{fmtEuro(c)}</b></p>
                   </div>
-                  {nota?.descricao && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{nota.descricao}</p>}
-                  {(nota?.fotos?.length ?? 0) > 0 && (
-                    <div className="flex gap-1.5 flex-wrap">
-                      {nota!.fotos.map((f, i) => (
-                        <a key={i} href={f.url} target="_blank" rel="noopener noreferrer">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={f.url} alt={f.tipo} className="w-14 h-14 rounded-lg object-cover bg-muted" />
-                        </a>
-                      ))}
+                  {servs.map(sv => (
+                    <div key={sv.id} className="space-y-1.5">
+                      {sv.descricao && <p className="text-xs text-muted-foreground whitespace-pre-wrap">{sv.descricao}</p>}
+                      {sv.fotos.length > 0 && (
+                        <div className="flex gap-1.5 flex-wrap">
+                          {sv.fotos.map((f, i) => (
+                            <a key={i} href={f.url} target="_blank" rel="noopener noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={f.url} alt={f.tipo} className="w-14 h-14 rounded-lg object-cover bg-muted" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
               )
             })}

@@ -66,13 +66,24 @@ export interface SubNotaObra {
   fotos: ServiceFoto[]
 }
 
+// Um serviço dentro do dia: obra + equipa (com horas) + o que foi feito + fotos
+export interface SubServicoDia {
+  id: string
+  obraId: string
+  obraNome: string
+  descricao: string
+  fotos: ServiceFoto[]
+  registos: SubRegisto[]
+}
+
 export interface SubDia {
   id: string
   subUid: string
   empresaNome: string
   date: string // YYYY-MM-DD
   registos: SubRegisto[]
-  notas?: Record<string, SubNotaObra> // por obraId
+  servicos?: SubServicoDia[]
+  notas?: Record<string, SubNotaObra> // formato antigo (por obraId) — lido por compatibilidade
   totalHoras: number
   totalCusto: number
   updatedAt?: string
@@ -213,21 +224,28 @@ export async function getAllDias(): Promise<SubDia[]> {
   return snap.docs.map(d => ({ ...(d.data() as Omit<SubDia, "id">), id: d.id }))
 }
 
-export async function saveDia(
-  subUid: string, empresaNome: string, date: string,
-  registos: SubRegisto[], notas: Record<string, SubNotaObra> = {},
-): Promise<void> {
+/** Serviços de um dia (converte o formato antigo registos+notas, se necessário). */
+export function servicosDoDia(d: SubDia): SubServicoDia[] {
+  if (d.servicos?.length) return d.servicos
+  const porObra = new Map<string, SubRegisto[]>()
+  d.registos.forEach(r => porObra.set(r.obraId, [...(porObra.get(r.obraId) ?? []), r]))
+  return Array.from(porObra.entries()).map(([obraId, registos]) => ({
+    id: `legacy_${obraId}`, obraId, obraNome: registos[0].obraNome,
+    descricao: d.notas?.[obraId]?.descricao ?? "", fotos: d.notas?.[obraId]?.fotos ?? [], registos,
+  }))
+}
+
+export async function saveDia(subUid: string, empresaNome: string, date: string, servicos: SubServicoDia[]): Promise<void> {
   const id = diaId(subUid, date)
-  if (registos.length === 0) { await deleteDoc(doc(db, "subDias", id)); return }
-  const obraIds = new Set(registos.map(r => r.obraId))
-  const notasLimpas: Record<string, SubNotaObra> = {}
-  Object.entries(notas).forEach(([oid, n]) => {
-    if (obraIds.has(oid) && (n.descricao.trim() || n.fotos.length)) notasLimpas[oid] = { descricao: n.descricao.trim(), fotos: n.fotos }
-  })
+  const validos = servicos
+    .filter(s => s.obraId && s.registos.length > 0)
+    .map(s => ({ ...s, descricao: s.descricao.trim() }))
+  if (validos.length === 0) { await deleteDoc(doc(db, "subDias", id)); return }
+  const registos = validos.flatMap(s => s.registos)
   const totalHoras = registos.reduce((a, r) => a + r.horas, 0)
   const totalCusto = registos.reduce((a, r) => a + r.custo, 0)
   await setDoc(doc(db, "subDias", id), clean({
-    subUid, empresaNome, date, registos, notas: notasLimpas, totalHoras, totalCusto, updatedAt: new Date().toISOString(),
+    subUid, empresaNome, date, servicos: validos, registos, totalHoras, totalCusto, updatedAt: new Date().toISOString(),
   }))
 }
 
