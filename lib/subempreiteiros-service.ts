@@ -10,56 +10,12 @@ import {
 import { db } from "@/lib/firebase"
 import type { ServiceFoto } from "@/lib/types"
 
-export type SubJobStatus = "atribuido" | "em_curso" | "concluido"
-
-export const SUB_STATUS_LABELS: Record<SubJobStatus, string> = {
-  atribuido: "Atribuído",
-  em_curso: "Em curso",
-  concluido: "Concluído",
-}
-
-// Linha de mão-de-obra: ex. 2 oficiais × 8h × 20 €/h
-export interface SubEquipaLinha {
-  funcao?: string
-  homens: number
-  horas: number     // horas por homem nesse dia
-  custoHora: number // € por hora, por homem
-}
-
-export function calcEquipa(eq?: SubEquipaLinha[]) {
-  const l = eq ?? []
-  return {
-    homens: l.reduce((a, x) => a + (x.homens || 0), 0),
-    horasHomem: l.reduce((a, x) => a + (x.homens || 0) * (x.horas || 0), 0),
-    custo: l.reduce((a, x) => a + (x.homens || 0) * (x.horas || 0) * (x.custoHora || 0), 0),
-  }
-}
-
 export const fmtEuro = (n: number) => n.toLocaleString("pt-PT", { style: "currency", currency: "EUR" })
 
 export function explainFirebaseError(err: unknown): string {
   const e = err as { code?: string; message?: string }
   if (e?.code === "permission-denied") return "Sem permissão — falta publicar as regras do Firestore para esta coleção."
   return e?.code || e?.message || "erro desconhecido"
-}
-
-export interface SubJob {
-  id: string
-  subUid: string
-  empresaNome: string
-  obraId?: string
-  obraNome: string
-  titulo: string
-  descricao: string
-  fotos: ServiceFoto[]
-  status: SubJobStatus
-  equipa?: SubEquipaLinha[]
-  totalHorasHomem?: number
-  totalCusto?: number
-  date: string // YYYY-MM-DD
-  createdBy: "empresa" | "admin"
-  createdAt?: string
-  updatedAt?: string
 }
 
 // Obra atribuída a uma empresa (coleção própria, separada das obras dos colaboradores)
@@ -69,6 +25,8 @@ export interface SubObra {
   nome: string
   morada: string
   ordens: string // instruções / o que a empresa tem de fazer
+  contacto?: string // pessoa/telefone no local (opcional)
+  prazo?: string    // datas / prazo (texto livre, opcional)
   estado: "ativa" | "concluida"
   criadaEm?: string
 }
@@ -102,12 +60,19 @@ export interface SubRegisto {
   custo: number     // horas × valorHora
 }
 
+// O que foi feito numa obra nesse dia (descrição + fotos antes/depois)
+export interface SubNotaObra {
+  descricao: string
+  fotos: ServiceFoto[]
+}
+
 export interface SubDia {
   id: string
   subUid: string
   empresaNome: string
   date: string // YYYY-MM-DD
   registos: SubRegisto[]
+  notas?: Record<string, SubNotaObra> // por obraId
   totalHoras: number
   totalCusto: number
   updatedAt?: string
@@ -122,42 +87,8 @@ export interface SubEmpresa {
   equipa: SubMembro[]
 }
 
-const jobsCol = () => collection(db, "subJobs")
 const clean = <T extends object>(o: T): T =>
   JSON.parse(JSON.stringify(o)) as T // remove undefined (Firestore não aceita)
-
-// ── Trabalhos ─────────────────────────────────────────────────────────────────
-export function newJobId(): string {
-  return doc(jobsCol()).id
-}
-
-export async function getJobsBySub(subUid: string): Promise<SubJob[]> {
-  const snap = await getDocs(query(jobsCol(), where("subUid", "==", subUid)))
-  return snap.docs
-    .map(d => ({ ...(d.data() as Omit<SubJob, "id">), id: d.id }))
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-}
-
-export async function getAllJobs(): Promise<SubJob[]> {
-  const snap = await getDocs(jobsCol())
-  return snap.docs
-    .map(d => ({ ...(d.data() as Omit<SubJob, "id">), id: d.id }))
-    .sort((a, b) => (b.date || "").localeCompare(a.date || ""))
-}
-
-export async function saveJob(job: SubJob): Promise<void> {
-  const { id, ...rest } = job
-  await setDoc(
-    doc(db, "subJobs", id),
-    { ...clean(rest), fotos: job.fotos ?? [], updatedAt: new Date().toISOString(),
-      createdAt: job.createdAt ?? new Date().toISOString() },
-    { merge: true },
-  )
-}
-
-export async function deleteJob(id: string): Promise<void> {
-  await deleteDoc(doc(db, "subJobs", id))
-}
 
 // ── Obras atribuídas ─────────────────────────────────────────────────────────
 const obrasCol = () => collection(db, "subObras")
@@ -282,19 +213,32 @@ export async function getAllDias(): Promise<SubDia[]> {
   return snap.docs.map(d => ({ ...(d.data() as Omit<SubDia, "id">), id: d.id }))
 }
 
-export async function saveDia(subUid: string, empresaNome: string, date: string, registos: SubRegisto[]): Promise<void> {
+export async function saveDia(
+  subUid: string, empresaNome: string, date: string,
+  registos: SubRegisto[], notas: Record<string, SubNotaObra> = {},
+): Promise<void> {
   const id = diaId(subUid, date)
   if (registos.length === 0) { await deleteDoc(doc(db, "subDias", id)); return }
+  const obraIds = new Set(registos.map(r => r.obraId))
+  const notasLimpas: Record<string, SubNotaObra> = {}
+  Object.entries(notas).forEach(([oid, n]) => {
+    if (obraIds.has(oid) && (n.descricao.trim() || n.fotos.length)) notasLimpas[oid] = { descricao: n.descricao.trim(), fotos: n.fotos }
+  })
   const totalHoras = registos.reduce((a, r) => a + r.horas, 0)
   const totalCusto = registos.reduce((a, r) => a + r.custo, 0)
   await setDoc(doc(db, "subDias", id), clean({
-    subUid, empresaNome, date, registos, totalHoras, totalCusto, updatedAt: new Date().toISOString(),
+    subUid, empresaNome, date, registos, notas: notasLimpas, totalHoras, totalCusto, updatedAt: new Date().toISOString(),
   }))
 }
 
 /** Totais por obra a partir dos dias registados. */
-export function statsObra(obraId: string, jobs: SubJob[], dias: SubDia[]) {
-  let horas = 0, custo = 0
-  dias.forEach(d => d.registos.forEach(r => { if (r.obraId === obraId) { horas += r.horas; custo += r.custo } }))
-  return { servicos: jobs.filter(j => j.obraId === obraId).length, horas, custo }
+export function statsObra(obraId: string, dias: SubDia[]) {
+  let horas = 0, custo = 0, nDias = 0
+  dias.forEach(d => {
+    const rs = d.registos.filter(r => r.obraId === obraId)
+    if (rs.length) { nDias++; rs.forEach(r => { horas += r.horas; custo += r.custo }) }
+  })
+  return { dias: nDias, horas, custo }
 }
+
+export const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`

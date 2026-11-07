@@ -21,6 +21,8 @@ export function SubObraSheet({ open, onClose, onSaved, obra, subUid, empresaNome
   const [nome, setNome] = useState("")
   const [morada, setMorada] = useState("")
   const [ordens, setOrdens] = useState("")
+  const [contacto, setContacto] = useState("")
+  const [prazo, setPrazo] = useState("")
   const [estado, setEstado] = useState<SubObra["estado"]>("ativa")
   const [saving, setSaving] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
@@ -28,7 +30,7 @@ export function SubObraSheet({ open, onClose, onSaved, obra, subUid, empresaNome
   useEffect(() => {
     if (!open) return
     setNome(obra?.nome ?? ""); setMorada(obra?.morada ?? "")
-    setOrdens(obra?.ordens ?? ""); setEstado(obra?.estado ?? "ativa"); setConfirmDel(false)
+    setOrdens(obra?.ordens ?? ""); setContacto(obra?.contacto ?? ""); setPrazo(obra?.prazo ?? ""); setEstado(obra?.estado ?? "ativa"); setConfirmDel(false)
   }, [open, obra])
 
   const save = async () => {
@@ -37,7 +39,7 @@ export function SubObraSheet({ open, onClose, onSaved, obra, subUid, empresaNome
     try {
       await saveSubObra({
         id: obra?.id ?? newSubObraId(), subUid, nome: nome.trim(), morada: morada.trim(),
-        ordens: ordens.trim(), estado, criadaEm: obra?.criadaEm,
+        ordens: ordens.trim(), contacto: contacto.trim(), prazo: prazo.trim(), estado, criadaEm: obra?.criadaEm,
       })
       onSaved(); onClose()
     } catch (err) { alert(`Não foi possível guardar a obra: ${explainFirebaseError(err)}`) }
@@ -67,6 +69,16 @@ export function SubObraSheet({ open, onClose, onSaved, obra, subUid, empresaNome
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Morada <span className="normal-case font-medium opacity-60">(opcional)</span></label>
             <Input value={morada} onChange={e => setMorada(e.target.value)} placeholder="Rua, código postal, cidade" className="h-11 rounded-xl" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Contacto <span className="normal-case font-medium opacity-60">(opc.)</span></label>
+              <Input value={contacto} onChange={e => setContacto(e.target.value)} placeholder="Nome / telefone" className="h-11 rounded-xl" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Prazo <span className="normal-case font-medium opacity-60">(opc.)</span></label>
+              <Input value={prazo} onChange={e => setPrazo(e.target.value)} placeholder="Ex: até 30/11" className="h-11 rounded-xl" />
+            </div>
           </div>
           <div className="space-y-1.5">
             <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Ordens / o que fazer</label>

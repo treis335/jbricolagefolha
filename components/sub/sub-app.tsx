@@ -19,7 +19,7 @@ type Tab = "calendar" | "obras" | "equipa"
 
 export function SubApp() {
   const { user, logout } = useAuth()
-  const { obras, jobs, dias, equipa, empresa, setEmpresa, loading, erro, reload } = useSubData(user?.uid)
+  const { obras, dias, equipa, empresa, setEmpresa, loading, erro, reload } = useSubData(user?.uid)
   const [tab, setTab] = useState<Tab>("calendar")
   const [ferramentas, setFerramentas] = useState(false)
   const [perfil, setPerfil] = useState(false)
@@ -79,7 +79,7 @@ export function SubApp() {
               <p className="text-xs text-muted-foreground">Quando te atribuírem uma obra, aparece aqui com as ordens.</p>
             </div>
           ) : obras.map(o => (
-            <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, jobs, dias)} onClick={() => setSelObraId(o.id)} />
+            <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, dias)} onClick={() => setSelObraId(o.id)} />
           ))
         ) : (
           <SubEquipaView uid={user.uid} equipa={equipa} onSaved={reload} />
@@ -99,7 +99,7 @@ export function SubApp() {
       </nav>
 
       <SubObraDetail open={!!selObraId} onClose={() => setSelObraId(null)} obra={obras.find(o => o.id === selObraId) ?? null}
-        jobs={jobs} dias={dias} subUid={user.uid} empresaNome={nome} createdBy="empresa" onChanged={reload} />
+        dias={dias} />
 
       {/* Perfil: dados da empresa + sair */}
       <Sheet open={perfil} onOpenChange={setPerfil}>

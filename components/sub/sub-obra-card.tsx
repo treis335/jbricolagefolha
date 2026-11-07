@@ -3,7 +3,7 @@
 import { HardHat, MapPin, ChevronRight } from "lucide-react"
 import { type SubObra, fmtEuro } from "@/lib/subempreiteiros-service"
 
-export function SubObraCard({ obra, onClick, stats, compact }: { obra: SubObra; onClick?: () => void; stats?: { servicos: number; horas: number; custo: number }; compact?: boolean }) {
+export function SubObraCard({ obra, onClick, stats, compact }: { obra: SubObra; onClick?: () => void; stats?: { dias: number; horas: number; custo: number }; compact?: boolean }) {
   const Tag = onClick ? "button" : "div"
   return (
     <Tag type={onClick ? "button" : undefined} onClick={onClick}
@@ -22,7 +22,7 @@ export function SubObraCard({ obra, onClick, stats, compact }: { obra: SubObra; 
         {onClick && <ChevronRight className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-1" />}
       </div>
       {stats && (
-        <p className="text-[11px] font-semibold text-muted-foreground">{stats.servicos} serviço(s) · {stats.horas} h · {fmtEuro(stats.custo)}</p>
+        <p className="text-[11px] font-semibold text-muted-foreground">{stats.dias} dia(s) · {stats.horas} h · {fmtEuro(stats.custo)}</p>
       )}
       {!compact && obra.ordens && (
         <div className="rounded-xl bg-muted/40 p-3">

@@ -4,9 +4,11 @@
 import { useEffect, useMemo, useState } from "react"
 import { Loader2, Trash2, Plus, Check } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { ServiceFotos } from "@/components/forms/service-fotos"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import {
-  type SubDia, type SubObra, type SubMembro, type SubRegisto,
+  type SubDia, type SubObra, type SubMembro, type SubRegisto, type SubNotaObra,
   newId, saveDia, fmtEuro, explainFirebaseError,
 } from "@/lib/subempreiteiros-service"
 
@@ -31,11 +33,14 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, 
   const [registos, setRegistos] = useState<SubRegisto[]>([])
   const [obraId, setObraId] = useState("")
   const [sel, setSel] = useState<Record<string, { on: boolean; horas: string }>>({})
+  const [notas, setNotas] = useState<Record<string, SubNotaObra>>({})
+  const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setRegistos(dia?.registos ?? [])
+    setNotas(dia?.notas ?? {})
     setObraId(ativas.length === 1 ? ativas[0].id : "")
     setSel({})
   }, [open, dia, ativas])
@@ -75,7 +80,7 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, 
   const guardar = async () => {
     setSaving(true)
     try {
-      await saveDia(subUid, empresaNome, date, registos.filter(r => r.horas > 0))
+      await saveDia(subUid, empresaNome, date, registos.filter(r => r.horas > 0), notas)
       onSaved(); onClose()
     } catch (err) { alert(`Não foi possível guardar: ${explainFirebaseError(err)}`) }
     finally { setSaving(false) }
@@ -116,6 +121,14 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, 
                       </button>
                     </div>
                   ))}
+                  <div className="pt-2 mt-1 border-t border-border/40 space-y-2">
+                    <Textarea value={notas[oid]?.descricao ?? ""} rows={2} placeholder="O que foi feito nesta obra (opcional)…"
+                      onChange={e => setNotas(n => ({ ...n, [oid]: { descricao: e.target.value, fotos: n[oid]?.fotos ?? [] } }))}
+                      className="rounded-xl resize-none text-sm" />
+                    <ServiceFotos serviceId={`${subUid}_${date}_${oid}`} fotos={notas[oid]?.fotos ?? []}
+                      onChange={f => setNotas(n => ({ ...n, [oid]: { descricao: n[oid]?.descricao ?? "", fotos: f } }))}
+                      onUploadingChange={setUploading} userId={subUid} />
+                  </div>
                 </div>
               ))}
               <div className="rounded-xl bg-primary/5 border border-primary/15 p-3 flex items-center justify-between">
@@ -173,9 +186,9 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, obras, equipa, 
 
           <div className="flex gap-2.5">
             <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl border border-border/45 text-sm font-semibold">Cancelar</button>
-            <button type="button" onClick={guardar} disabled={saving}
+            <button type="button" onClick={guardar} disabled={saving || uploading}
               className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold disabled:opacity-40 flex items-center justify-center gap-2 active:scale-[0.98]">
-              {saving && <Loader2 className="h-4 w-4 animate-spin" />}Guardar dia
+              {(saving || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}{uploading ? "A enviar fotos…" : "Guardar dia"}
             </button>
           </div>
         </div>

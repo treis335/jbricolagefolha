@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
-  type SubEmpresa, type SubJob, type SubObra, type SubDia,
-  getSubEmpresas, getAllJobs, getAllSubObras, getAllDias, inviteSubcontractor,
+  type SubEmpresa, type SubObra, type SubDia,
+  getSubEmpresas, getAllSubObras, getAllDias, inviteSubcontractor,
   getSubcontractorEmails, setSubAtivo, explainFirebaseError, statsObra, fmtEuro,
 } from "@/lib/subempreiteiros-service"
 import { useSubData } from "@/hooks/useSubData"
@@ -26,7 +26,7 @@ const nomeDe = (e: SubEmpresa) => e.empresa.nome || e.name || e.email
 
 // Conteúdo de uma empresa — o admin/patrão pode editar tudo (obras, dias, equipa, dados)
 function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: () => void }) {
-  const { obras, jobs, dias, equipa, empresa: perfil, setEmpresa, loading, erro, reload } = useSubData(empresa.uid)
+  const { obras, dias, equipa, empresa: perfil, setEmpresa, loading, erro, reload } = useSubData(empresa.uid)
   const [tab, setTab] = useState<PanelTab>("obras")
   const [obraSheet, setObraSheet] = useState(false)
   const [editingObra, setEditingObra] = useState<SubObra | null>(null)
@@ -55,8 +55,8 @@ function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: 
             <Plus className="h-4 w-4" />Nova obra para esta empresa
           </button>
           {obras.length === 0
-            ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só regista horas em obras criadas aqui.</p>
-            : obras.map(o => <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, jobs, dias)} onClick={() => setDetailId(o.id)} />)}
+            ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só regista horas e fotos em obras criadas aqui.</p>
+            : obras.map(o => <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, dias)} onClick={() => setDetailId(o.id)} />)}
         </div>
       ) : tab === "calendario" ? (
         <SubCalendar subUid={empresa.uid} empresaNome={nome} obras={obras} equipa={equipa} dias={dias} onChanged={changed} />
@@ -76,8 +76,7 @@ function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: 
       <SubObraSheet open={obraSheet} onClose={() => setObraSheet(false)} onSaved={changed}
         obra={editingObra} subUid={empresa.uid} empresaNome={nome} />
       <SubObraDetail open={!!detailId} onClose={() => setDetailId(null)}
-        obra={obras.find(o => o.id === detailId) ?? null} jobs={jobs} dias={dias}
-        subUid={empresa.uid} empresaNome={nome} createdBy="admin" onChanged={changed}
+        obra={obras.find(o => o.id === detailId) ?? null} dias={dias}
         onEditObra={() => { setEditingObra(obras.find(o => o.id === detailId) ?? null); setObraSheet(true) }} />
     </div>
   )
@@ -86,7 +85,6 @@ function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: 
 export function AdminSubempreiteirosView() {
   const [empresas, setEmpresas] = useState<SubEmpresa[]>([])
   const [obras, setObras] = useState<SubObra[]>([])
-  const [jobs, setJobs] = useState<SubJob[]>([])
   const [dias, setDias] = useState<SubDia[]>([])
   const [convites, setConvites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -96,12 +94,11 @@ export function AdminSubempreiteirosView() {
   const [selUid, setSelUid] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const r = await Promise.allSettled([getSubEmpresas(), getAllJobs(), getSubcontractorEmails(), getAllSubObras(), getAllDias()])
+    const r = await Promise.allSettled([getSubEmpresas(), getSubcontractorEmails(), getAllSubObras(), getAllDias()])
     if (r[0].status === "fulfilled") setEmpresas(r[0].value)
-    if (r[1].status === "fulfilled") setJobs(r[1].value)
-    if (r[2].status === "fulfilled") setConvites(r[2].value)
-    if (r[3].status === "fulfilled") setObras(r[3].value)
-    if (r[4].status === "fulfilled") setDias(r[4].value)
+    if (r[1].status === "fulfilled") setConvites(r[1].value)
+    if (r[2].status === "fulfilled") setObras(r[2].value)
+    if (r[3].status === "fulfilled") setDias(r[3].value)
     const falhas = r.filter(x => x.status === "rejected") as PromiseRejectedResult[]
     setErro(falhas.length ? `Erro a ler dados: ${explainFirebaseError(falhas[0].reason)}` : "")
     setLoading(false)
