@@ -19,6 +19,7 @@ export function AdminSubempreiteirosView() {
   const [jobs, setJobs] = useState<SubJob[]>([])
   const [convites, setConvites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState("")
   const [email, setEmail] = useState("")
   const [inviting, setInviting] = useState(false)
   const [sel, setSel] = useState<SubEmpresa | null>(null)
@@ -27,11 +28,17 @@ export function AdminSubempreiteirosView() {
   const [editing, setEditing] = useState<SubJob | null>(null)
 
   const load = useCallback(async () => {
-    try {
-      const [e, j, c] = await Promise.all([getSubEmpresas(), getAllJobs(), getSubcontractorEmails()])
-      setEmpresas(e); setJobs(j); setConvites(c)
-      setSel(prev => prev ? e.find(x => x.uid === prev.uid) ?? null : null)
-    } finally { setLoading(false) }
+    // allSettled: se uma leitura falhar (ex.: regras Firestore ainda sem subJobs) as outras continuam a funcionar
+    const [e, j, c] = await Promise.allSettled([getSubEmpresas(), getAllJobs(), getSubcontractorEmails()])
+    if (e.status === "fulfilled") {
+      setEmpresas(e.value)
+      setSel(prev => prev ? e.value.find(x => x.uid === prev.uid) ?? null : null)
+    }
+    if (j.status === "fulfilled") setJobs(j.value)
+    if (c.status === "fulfilled") setConvites(c.value)
+    const falhas = [e, j, c].filter(r => r.status === "rejected") as PromiseRejectedResult[]
+    setErro(falhas.length ? `Sem permissão/erro a ler dados: ${falhas.map(f => f.reason?.code || f.reason?.message).join(", ")}` : "")
+    setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -50,9 +57,14 @@ export function AdminSubempreiteirosView() {
     const v = email.trim()
     if (!/^\S+@\S+\.\S+$/.test(v)) return
     setInviting(true)
-    try { await inviteSubcontractor(v); setEmail(""); await load() }
-    catch { alert("Não foi possível convidar.") }
-    finally { setInviting(false) }
+    try { await inviteSubcontractor(v); setEmail("") }
+    catch (err) {
+      const e = err as { code?: string; message?: string }
+      alert(`Não foi possível convidar: ${e.code || e.message || "erro desconhecido"}`)
+      setInviting(false); return
+    }
+    await load()
+    setInviting(false)
   }
 
   const nomeDe = (e: SubEmpresa) => e.empresa.nome || e.name || e.email
@@ -84,6 +96,8 @@ export function AdminSubempreiteirosView() {
           </div>
         )}
       </div>
+
+      {erro && <p className="text-xs rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 p-3">{erro}</p>}
 
       {loading ? (
         <div className="py-12 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
