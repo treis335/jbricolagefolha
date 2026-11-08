@@ -107,10 +107,10 @@ export function SubApp() {
               <div className="py-16 text-center space-y-2">
                 <HardHat className="h-10 w-10 mx-auto text-muted-foreground/30" />
                 <p className="text-sm font-semibold">Sem obras atribuídas</p>
-                <p className="text-xs text-muted-foreground">Quando te atribuírem uma obra, aparece aqui com a morada e as ordens.</p>
+                <p className="text-xs text-muted-foreground">Quando te atribuírem uma obra, aparece aqui com a foto, o mapa e as ordens.</p>
               </div>
             ) : obras.map(o => (
-              <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, dias)} onClick={() => setSelObraId(o.id)} />
+              <SubObraCard key={o.id} obra={o} ordens={o.subOrdens?.[user.uid]} stats={statsObra(o.id, dias)} onClick={() => setSelObraId(o.id)} />
             ))}
           </div>
         ) : (
@@ -122,7 +122,7 @@ export function SubApp() {
 
       <BottomNav activeTab={ferramentas ? "" : tab} onTabChange={irPara} items={ITENS} />
 
-      <SubObraDetail open={!!selObraId} onClose={() => setSelObraId(null)} obra={obras.find(o => o.id === selObraId) ?? null} dias={dias} />
+      <SubObraDetail open={!!selObraId} onClose={() => setSelObraId(null)} obra={obras.find(o => o.id === selObraId) ?? null} dias={dias} subUid={user.uid} />
 
       {/* Perfil: dados da empresa + sair */}
       <Sheet open={perfil} onOpenChange={setPerfil}>

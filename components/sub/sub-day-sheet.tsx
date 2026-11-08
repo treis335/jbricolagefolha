@@ -10,8 +10,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ServiceFotos } from "@/components/forms/service-fotos"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import type { ServiceFoto } from "@/lib/types"
+import type { Obra } from "@/lib/obras-service"
 import {
-  type SubDia, type SubObra, type SubMembro, type SubRegisto,
+  type SubDia, type SubMembro, type SubRegisto,
   newId, saveDia, fmtEuro, explainFirebaseError, servicosDoDia,
 } from "@/lib/subempreiteiros-service"
 
@@ -22,7 +23,7 @@ interface Props {
   date: string                 // YYYY-MM-DD
   dia: SubDia | null
   dias: SubDia[]               // todos os dias (para "repetir o último dia")
-  obras: SubObra[]
+  obras: Obra[]
   equipa: SubMembro[]
   subUid: string
   empresaNome: string

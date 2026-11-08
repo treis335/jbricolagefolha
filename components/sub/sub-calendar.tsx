@@ -6,13 +6,14 @@ import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type SubDia, type SubObra, type SubMembro, fmtEuro } from "@/lib/subempreiteiros-service"
+import { type SubDia, type SubMembro, fmtEuro } from "@/lib/subempreiteiros-service"
+import type { Obra } from "@/lib/obras-service"
 import { SubDaySheet } from "./sub-day-sheet"
 
 interface Props {
   subUid: string
   empresaNome: string
-  obras: SubObra[]
+  obras: Obra[]
   equipa: SubMembro[]
   dias: SubDia[]
   onChanged: () => void

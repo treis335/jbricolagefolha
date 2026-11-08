@@ -2,6 +2,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import { getSubEmpresas, type SubEmpresa } from "@/lib/subempreiteiros-service"
 import { useAuth } from "@/lib/AuthProvider"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
@@ -696,6 +697,9 @@ export function AdminObrasView() {
   const [formFotoUrl, setFormFotoUrl] = useState<string | undefined>()
   const [formFotoPublicId, setFormFotoPublicId] = useState<string | undefined>()
   const [formLocalizacao, setFormLocalizacao] = useState<ObraLocalizacao | undefined>()
+  const [formSubUids, setFormSubUids] = useState<string[]>([])
+  const [empreiteiros, setEmpreiteiros] = useState<SubEmpresa[]>([])
+  useEffect(() => { getSubEmpresas().then(l => setEmpreiteiros(l.filter(e => e.ativo))).catch(() => {}) }, [])
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -848,7 +852,7 @@ export function AdminObrasView() {
     setFormDescricao(""); setFormEstado("ativa")
     setFormFotoUrl(undefined); setFormFotoPublicId(undefined); setFormLocalizacao(undefined)
     setPendingFile(null); setUploading(false); setUploadProgress(0)
-    setGeocoding(false); setFormError("")
+    setGeocoding(false); setFormError(""); setFormSubUids([])
   }
 
   const openCreate = () => { resetForm(); setView("create") }
@@ -858,7 +862,7 @@ export function AdminObrasView() {
     setFormEstado(o.estado); setFormFotoUrl(o.fotoUrl)
     setFormFotoPublicId(o.fotoPublicId); setFormLocalizacao(o.localizacao)
     setPendingFile(null); setUploading(false); setUploadProgress(0)
-    setGeocoding(false); setFormError("")
+    setGeocoding(false); setFormError(""); setFormSubUids(o.subUids ?? [])
     setSelectedObra(o); setView("edit")
   }
   const openDetail = (o: Obra) => { setSelectedObra(o); setView("detail"); loadObraStats(o) }
@@ -894,7 +898,7 @@ export function AdminObrasView() {
           nome: formNome.trim(), moradaRua: formRua.trim(),
           moradaCodigoPostal: formCp.trim(), moradaCidade: formCidade.trim(),
           localizacao, descricao: formDescricao.trim(),
-          estado: formEstado, cor: COR_POR_ESTADO[formEstado],
+          estado: formEstado, cor: COR_POR_ESTADO[formEstado], subUids: formSubUids,
           criadaPor: user?.uid ?? "",
           criadaPorNome: user?.displayName ?? user?.email ?? "Admin",
         })
@@ -910,6 +914,9 @@ export function AdminObrasView() {
           nome: formNome.trim(), moradaRua: formRua.trim(),
           moradaCodigoPostal: formCp.trim(), moradaCidade: formCidade.trim(),
           descricao: formDescricao.trim(), estado: formEstado, cor: COR_POR_ESTADO[formEstado],
+          subUids: formSubUids,
+          // ordens só das empresas que continuam atribuídas
+          subOrdens: Object.fromEntries(Object.entries(selectedObra.subOrdens ?? {}).filter(([uid]) => formSubUids.includes(uid))),
         }
         if (localizacao) updates.localizacao = localizacao
         if (pendingFile) {
@@ -1257,6 +1264,27 @@ export function AdminObrasView() {
                 </div>
               </div>
             </div>
+
+            {empreiteiros.length > 0 && (
+              <div className="p-4 sm:p-5 pt-0">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Empreiteiros</label>
+                  <p className="text-xs text-muted-foreground">Empresas que também trabalham nesta obra (veem a morada, o mapa e as ordens).</p>
+                  <div className="flex flex-wrap gap-2">
+                    {empreiteiros.map(e => {
+                      const on = formSubUids.includes(e.uid)
+                      return (
+                        <button key={e.uid} type="button"
+                          onClick={() => setFormSubUids(prev => on ? prev.filter(x => x !== e.uid) : [...prev, e.uid])}
+                          className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${on ? "bg-primary/10 text-primary border-primary/40" : "bg-background border-border/50 text-muted-foreground hover:bg-muted"}`}>
+                          {on ? "✓ " : ""}{e.empresa.nome || e.name || e.email}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {formError && <p className="text-xs text-destructive font-medium text-center">{formError}</p>}

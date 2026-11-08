@@ -4,13 +4,14 @@
 import { useCallback, useEffect, useState } from "react"
 import { doc, getDoc } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { type Obra, getObrasDaEmpresa } from "@/lib/obras-service"
 import {
-  type SubObra, type SubDia, type SubMembro, type EmpresaPerfil,
-  getSubObrasBySub, getDiasBySub, explainFirebaseError,
+  type SubDia, type SubMembro, type EmpresaPerfil,
+  getDiasBySub, explainFirebaseError,
 } from "@/lib/subempreiteiros-service"
 
 export function useSubData(subUid?: string) {
-  const [obras, setObras] = useState<SubObra[]>([])
+  const [obras, setObras] = useState<Obra[]>([])
   const [dias, setDias] = useState<SubDia[]>([])
   const [equipa, setEquipa] = useState<SubMembro[]>([])
   const [empresa, setEmpresa] = useState<EmpresaPerfil>({})
@@ -20,7 +21,7 @@ export function useSubData(subUid?: string) {
   const reload = useCallback(async () => {
     if (!subUid) return
     const [o, d, u] = await Promise.allSettled([
-      getSubObrasBySub(subUid), getDiasBySub(subUid), getDoc(doc(db, "users", subUid)),
+      getObrasDaEmpresa(subUid), getDiasBySub(subUid), getDoc(doc(db, "users", subUid)),
     ])
     if (o.status === "fulfilled") setObras(o.value)
     if (d.status === "fulfilled") setDias(d.value)

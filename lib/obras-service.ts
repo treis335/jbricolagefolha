@@ -1,7 +1,7 @@
 // lib/obras-service.ts
 import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
-  query, orderBy, serverTimestamp, Timestamp,
+  query, orderBy, where, serverTimestamp, Timestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 
@@ -30,6 +30,9 @@ export interface Obra {
   criadaEm: string
   criadaPor: string
   criadaPorNome: string
+  // Empreiteiros a quem a obra está atribuída (uids) e ordens específicas por empresa
+  subUids?: string[]
+  subOrdens?: Record<string, string>
 }
 
 export interface CreateObraInput {
@@ -43,6 +46,7 @@ export interface CreateObraInput {
   cor: string
   criadaPor: string
   criadaPorNome: string
+  subUids?: string[]
 }
 
 // Morada completa formatada para exibição e geocoding
@@ -116,30 +120,40 @@ export const ESTADO_COLORS: Record<ObraEstado, { bg: string; text: string; dot: 
 
 // ── CRUD Firestore ─────────────────────────────────────────────────────────
 
+function mapObra(d: { id: string; data: () => Record<string, any> }): Obra {
+  const data = d.data()
+  return {
+    id: d.id,
+    nome: data.nome ?? "",
+    moradaRua: data.moradaRua ?? data.morada ?? "",
+    moradaCodigoPostal: data.moradaCodigoPostal ?? "",
+    moradaCidade: data.moradaCidade ?? "",
+    localizacao: data.localizacao ?? undefined,
+    descricao: data.descricao ?? "",
+    estado: data.estado ?? "ativa",
+    cor: data.cor ?? "#3B82F6",
+    fotoUrl: data.fotoUrl ?? undefined,
+    fotoPublicId: data.fotoPublicId ?? undefined,
+    criadaEm: data.criadaEm instanceof Timestamp
+      ? data.criadaEm.toDate().toISOString()
+      : data.criadaEm ?? new Date().toISOString(),
+    criadaPor: data.criadaPor ?? "",
+    criadaPorNome: data.criadaPorNome ?? "",
+    subUids: data.subUids ?? [],
+    subOrdens: data.subOrdens ?? {},
+  }
+}
+
 export async function getObras(): Promise<Obra[]> {
   const q = query(collection(db, "obras"), orderBy("criadaEm", "desc"))
   const snap = await getDocs(q)
-  return snap.docs.map(d => {
-    const data = d.data()
-    return {
-      id: d.id,
-      nome: data.nome ?? "",
-      moradaRua: data.moradaRua ?? data.morada ?? "",
-      moradaCodigoPostal: data.moradaCodigoPostal ?? "",
-      moradaCidade: data.moradaCidade ?? "",
-      localizacao: data.localizacao ?? undefined,
-      descricao: data.descricao ?? "",
-      estado: data.estado ?? "ativa",
-      cor: data.cor ?? "#3B82F6",
-      fotoUrl: data.fotoUrl ?? undefined,
-      fotoPublicId: data.fotoPublicId ?? undefined,
-      criadaEm: data.criadaEm instanceof Timestamp
-        ? data.criadaEm.toDate().toISOString()
-        : data.criadaEm ?? new Date().toISOString(),
-      criadaPor: data.criadaPor ?? "",
-      criadaPorNome: data.criadaPorNome ?? "",
-    }
-  })
+  return snap.docs.map(mapObra)
+}
+
+/** Obras atribuídas a uma empresa subempreiteira (a única leitura de obras que ela pode fazer). */
+export async function getObrasDaEmpresa(subUid: string): Promise<Obra[]> {
+  const snap = await getDocs(query(collection(db, "obras"), where("subUids", "array-contains", subUid)))
+  return snap.docs.map(mapObra).sort((a, b) => b.criadaEm.localeCompare(a.criadaEm))
 }
 
 export async function createObra(input: CreateObraInput): Promise<string> {

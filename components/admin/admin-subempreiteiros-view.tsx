@@ -7,13 +7,14 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
-  type SubEmpresa, type SubObra, type SubDia,
-  getSubEmpresas, getAllSubObras, getAllDias, inviteSubcontractor,
+  type SubEmpresa, type SubDia,
+  getSubEmpresas, getAllDias, inviteSubcontractor,
   getSubcontractorEmails, setSubAtivo, explainFirebaseError, statsObra, fmtEuro,
 } from "@/lib/subempreiteiros-service"
 import { useSubData } from "@/hooks/useSubData"
+import { type Obra, getObras } from "@/lib/obras-service"
 import { SubObraCard } from "@/components/sub/sub-obra-card"
-import { SubObraSheet } from "@/components/sub/sub-obra-sheet"
+import { SubAtribuirSheet } from "@/components/sub/sub-atribuir-sheet"
 import { SubObraDetail } from "@/components/sub/sub-obra-detail"
 import { SubCalendar } from "@/components/sub/sub-calendar"
 import { SubEquipaView } from "@/components/sub/sub-equipa-view"
@@ -25,11 +26,10 @@ const PANEL_TABS: [PanelTab, string][] = [["obras", "Obras"], ["calendario", "Ca
 const nomeDe = (e: SubEmpresa) => e.empresa.nome || e.name || e.email
 
 // Conteúdo de uma empresa — o admin/patrão pode editar tudo (obras, dias, equipa, dados)
-function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: () => void }) {
+function EmpresaPanel({ empresa, todasObras, onChanged, onGoObras }: { empresa: SubEmpresa; todasObras: Obra[]; onChanged: () => void; onGoObras: () => void }) {
   const { obras, dias, equipa, empresa: perfil, setEmpresa, loading, erro, reload } = useSubData(empresa.uid)
   const [tab, setTab] = useState<PanelTab>("obras")
-  const [obraSheet, setObraSheet] = useState(false)
-  const [editingObra, setEditingObra] = useState<SubObra | null>(null)
+  const [atribuir, setAtribuir] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
   const nome = perfil.nome || empresa.name || empresa.email
 
@@ -50,13 +50,13 @@ function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: 
         <div className="py-10 flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
       ) : tab === "obras" ? (
         <div className="space-y-2.5">
-          <button onClick={() => { setEditingObra(null); setObraSheet(true) }}
+          <button onClick={() => setAtribuir(true)}
             className="w-full h-10 rounded-xl bg-primary/10 text-primary text-sm font-bold flex items-center justify-center gap-1.5 active:scale-95">
-            <Plus className="h-4 w-4" />Nova obra para esta empresa
+            <Plus className="h-4 w-4" />Atribuir obra
           </button>
           {obras.length === 0
-            ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só regista horas e fotos em obras criadas aqui.</p>
-            : obras.map(o => <SubObraCard key={o.id} obra={o} compact stats={statsObra(o.id, dias)} onClick={() => setDetailId(o.id)} />)}
+            ? <p className="text-xs text-muted-foreground text-center py-6">Sem obras atribuídas. A empresa só regista horas e fotos em obras que lhe atribuíres.</p>
+            : obras.map(o => <SubObraCard key={o.id} obra={o} ordens={o.subOrdens?.[empresa.uid]} stats={statsObra(o.id, dias)} onClick={() => setDetailId(o.id)} />)}
         </div>
       ) : tab === "calendario" ? (
         <SubCalendar subUid={empresa.uid} empresaNome={nome} obras={obras} equipa={equipa} dias={dias} onChanged={changed} />
@@ -73,18 +73,17 @@ function EmpresaPanel({ empresa, onChanged }: { empresa: SubEmpresa; onChanged: 
         </div>
       )}
 
-      <SubObraSheet open={obraSheet} onClose={() => setObraSheet(false)} onSaved={changed}
-        obra={editingObra} subUid={empresa.uid} empresaNome={nome} />
+      <SubAtribuirSheet open={atribuir} onClose={() => setAtribuir(false)} empresaUid={empresa.uid} empresaNome={nome}
+        obras={todasObras} onDone={changed} onGoObras={onGoObras} />
       <SubObraDetail open={!!detailId} onClose={() => setDetailId(null)}
-        obra={obras.find(o => o.id === detailId) ?? null} dias={dias}
-        onEditObra={() => { setEditingObra(obras.find(o => o.id === detailId) ?? null); setObraSheet(true) }} />
+        obra={obras.find(o => o.id === detailId) ?? null} dias={dias} subUid={empresa.uid} admin onChanged={changed} />
     </div>
   )
 }
 
 export function AdminSubempreiteirosView() {
   const [empresas, setEmpresas] = useState<SubEmpresa[]>([])
-  const [obras, setObras] = useState<SubObra[]>([])
+  const [obras, setObras] = useState<Obra[]>([])
   const [dias, setDias] = useState<SubDia[]>([])
   const [convites, setConvites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -94,7 +93,7 @@ export function AdminSubempreiteirosView() {
   const [selUid, setSelUid] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const r = await Promise.allSettled([getSubEmpresas(), getSubcontractorEmails(), getAllSubObras(), getAllDias()])
+    const r = await Promise.allSettled([getSubEmpresas(), getSubcontractorEmails(), getObras(), getAllDias()])
     if (r[0].status === "fulfilled") setEmpresas(r[0].value)
     if (r[1].status === "fulfilled") setConvites(r[1].value)
     if (r[2].status === "fulfilled") setObras(r[2].value)
@@ -111,7 +110,7 @@ export function AdminSubempreiteirosView() {
   const resumo = useMemo(() => {
     const m: Record<string, { obras: number; custoMes: number; horasMes: number }> = {}
     empresas.forEach(e => { m[e.uid] = { obras: 0, custoMes: 0, horasMes: 0 } })
-    obras.forEach(o => { if (m[o.subUid]) m[o.subUid].obras++ })
+    obras.forEach(o => (o.subUids ?? []).forEach(u => { if (m[u]) m[u].obras++ }))
     dias.forEach(d => { if (m[d.subUid] && d.date.startsWith(mesAtual)) { m[d.subUid].custoMes += d.totalCusto; m[d.subUid].horasMes += d.totalHoras } })
     return m
   }, [empresas, obras, dias, mesAtual])
@@ -205,7 +204,8 @@ export function AdminSubempreiteirosView() {
                 <SheetTitle className="text-xl font-black">{nomeDe(sel)}</SheetTitle>
                 <SheetDescription className="text-xs">{sel.email}</SheetDescription>
               </SheetHeader>
-              <EmpresaPanel key={sel.uid} empresa={sel} onChanged={load} />
+              <EmpresaPanel key={sel.uid} empresa={sel} todasObras={obras} onChanged={load}
+                onGoObras={() => { setSelUid(null); window.dispatchEvent(new CustomEvent("jb:admin-goto", { detail: "obras" })) }} />
             </div>
           )}
         </SheetContent>

@@ -12,9 +12,11 @@ interface ObraInfoSheetProps {
   open: boolean
   onClose: () => void
   obra: Obra
+  /** Conteúdo extra por baixo das notas (ex.: ordens e histórico do empreiteiro) */
+  extra?: React.ReactNode
 }
 
-export function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
+export function ObraInfoSheet({ open, onClose, obra, extra }: ObraInfoSheetProps) {
   const morada = formatMorada(obra)
   const hasLocation = !!obra.localizacao
   const mapsUrl = hasLocation
@@ -178,6 +180,7 @@ export function ObraInfoSheet({ open, onClose, obra }: ObraInfoSheetProps) {
                 <p className="text-sm text-muted-foreground leading-relaxed">{obra.descricao}</p>
               </div>
             )}
+            {extra}
             <div className="h-4" />
           </div>
 

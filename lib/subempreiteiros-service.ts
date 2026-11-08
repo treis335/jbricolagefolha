@@ -4,7 +4,7 @@
 //   - empresa:    users/{uid}.empresa (opcional; o admin/patrão pode editar sempre)
 //   - convites:   config/global.subcontractorEmails (+ allowedEmails)
 import {
-  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, arrayUnion, arrayRemove, deleteField,
   query, where, serverTimestamp,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
@@ -16,19 +16,6 @@ export function explainFirebaseError(err: unknown): string {
   const e = err as { code?: string; message?: string }
   if (e?.code === "permission-denied") return "Sem permissão — falta publicar as regras do Firestore para esta coleção."
   return e?.code || e?.message || "erro desconhecido"
-}
-
-// Obra atribuída a uma empresa (coleção própria, separada das obras dos colaboradores)
-export interface SubObra {
-  id: string
-  subUid: string
-  nome: string
-  morada: string
-  ordens: string // instruções / o que a empresa tem de fazer
-  contacto?: string // pessoa/telefone no local (opcional)
-  prazo?: string    // datas / prazo (texto livre, opcional)
-  estado: "ativa" | "concluida"
-  criadaEm?: string
 }
 
 export interface EmpresaPerfil {
@@ -101,30 +88,15 @@ export interface SubEmpresa {
 const clean = <T extends object>(o: T): T =>
   JSON.parse(JSON.stringify(o)) as T // remove undefined (Firestore não aceita)
 
-// ── Obras atribuídas ─────────────────────────────────────────────────────────
-const obrasCol = () => collection(db, "subObras")
-export const newSubObraId = () => doc(obrasCol()).id
-
-const sortObras = (a: SubObra, b: SubObra) =>
-  (a.estado === b.estado ? 0 : a.estado === "ativa" ? -1 : 1) || a.nome.localeCompare(b.nome)
-
-export async function getSubObrasBySub(subUid: string): Promise<SubObra[]> {
-  const snap = await getDocs(query(obrasCol(), where("subUid", "==", subUid)))
-  return snap.docs.map(d => ({ ...(d.data() as Omit<SubObra, "id">), id: d.id })).sort(sortObras)
+// ── Atribuição de obras (as obras são as MESMAS dos colaboradores: coleção `obras`) ──
+export async function atribuirObra(obraId: string, uid: string, ordens: string): Promise<void> {
+  await updateDoc(doc(db, "obras", obraId), { subUids: arrayUnion(uid), [`subOrdens.${uid}`]: ordens.trim() })
 }
-
-export async function getAllSubObras(): Promise<SubObra[]> {
-  const snap = await getDocs(obrasCol())
-  return snap.docs.map(d => ({ ...(d.data() as Omit<SubObra, "id">), id: d.id })).sort(sortObras)
+export async function guardarOrdens(obraId: string, uid: string, ordens: string): Promise<void> {
+  await updateDoc(doc(db, "obras", obraId), { [`subOrdens.${uid}`]: ordens.trim() })
 }
-
-export async function saveSubObra(o: SubObra): Promise<void> {
-  const { id, ...rest } = o
-  await setDoc(doc(db, "subObras", id), { ...clean(rest), criadaEm: o.criadaEm ?? new Date().toISOString() }, { merge: true })
-}
-
-export async function deleteSubObra(id: string): Promise<void> {
-  await deleteDoc(doc(db, "subObras", id))
+export async function retirarObra(obraId: string, uid: string): Promise<void> {
+  await updateDoc(doc(db, "obras", obraId), { subUids: arrayRemove(uid), [`subOrdens.${uid}`]: deleteField() })
 }
 
 // ── Empresa (perfil) ─────────────────────────────────────────────────────────
@@ -259,4 +231,3 @@ export function statsObra(obraId: string, dias: SubDia[]) {
   return { dias: nDias, horas, custo }
 }
 
-export const mapsUrl = (q: string) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`

@@ -59,6 +59,13 @@ function AdminTabPane({ active, children }: { active: boolean; children: React.R
 
 function AdminContent() {
   const [activeTab, setActiveTab] = useState<AdminTabType>("dashboard")
+
+  // Permite a outras vistas (ex.: Subempreiteiros) saltarem para um separador
+  useEffect(() => {
+    const goto = (e: Event) => setActiveTab(String((e as CustomEvent).detail) as AdminTabType)
+    window.addEventListener("jb:admin-goto", goto)
+    return () => window.removeEventListener("jb:admin-goto", goto)
+  }, [])
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const { isLoading } = useWorkTracker()
   const { user, isAdmin } = useAuth()
