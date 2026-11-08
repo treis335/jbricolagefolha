@@ -2,7 +2,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
-import { getSubEmpresas, type SubEmpresa } from "@/lib/subempreiteiros-service"
+import { getSubEmpresas, getAllDias, fotosDeEmpreiteiros, type SubEmpresa } from "@/lib/subempreiteiros-service"
 import { useAuth } from "@/lib/AuthProvider"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
@@ -788,6 +788,9 @@ export function AdminObrasView() {
           })
         }
       }
+
+      // fotos dos empreiteiros atribuídos a esta obra (vêm do calendário deles)
+      try { fotosObra.push(...fotosDeEmpreiteiros(await getAllDias(), obra.id)) } catch {}
 
       diario.sort((a, b) => b.date.localeCompare(a.date))
       const todosMateriais = [...new Set(diario.flatMap(e => e.services.flatMap(s => s.materiais)))]

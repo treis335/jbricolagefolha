@@ -43,7 +43,7 @@ export function ObraFotosTab({ fotos }: { fotos: FotoFlat[] }) {
         </div>
         <div className="px-4">
           <p className="text-sm font-medium">Ainda sem fotos nesta obra</p>
-          <p className="text-xs text-muted-foreground mt-0.5">As fotos que os colaboradores anexam aos serviços desta obra aparecem aqui.</p>
+          <p className="text-xs text-muted-foreground mt-0.5">As fotos que os colaboradores e os empreiteiros anexam a esta obra aparecem aqui.</p>
         </div>
       </div>
     )

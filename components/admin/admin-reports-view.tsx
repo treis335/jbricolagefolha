@@ -103,7 +103,7 @@ const REPORTS = [
     id: "fotos",
     icon: Camera,
     title: "Fotos (antes/depois)",
-    description: "Todas as fotos carregadas pelos colaboradores, num só sítio — filtra por colaborador, obra ou antes/depois.",
+    description: "Todas as fotos carregadas pelos colaboradores e empreiteiros, num só sítio — filtra por colaborador, obra ou antes/depois.",
     accent: "text-pink-600 dark:text-pink-400",
     bg: "bg-pink-50 dark:bg-pink-950/20 border-pink-100 dark:border-pink-900/40",
     tags: ["Fotos", "Obras", "Antes/Depois"],

@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
 import type { ServiceFoto } from "@/lib/types"
+import type { FotoFlat } from "@/components/admin/visualizador-fotos"
 
 export const fmtEuro = (n: number) => n.toLocaleString("pt-PT", { style: "currency", currency: "EUR" })
 
@@ -231,3 +232,26 @@ export function statsObra(obraId: string, dias: SubDia[]) {
   return { dias: nDias, horas, custo }
 }
 
+
+/** Fotos dos empreiteiros (do calendário) no mesmo formato das dos colaboradores — para a aba Fotos da obra e para os relatórios. */
+export function fotosDeEmpreiteiros(dias: SubDia[], obraId?: string): FotoFlat[] {
+  const lista: FotoFlat[] = []
+  dias.forEach(d => servicosDoDia(d).forEach(sv => {
+    if (obraId && sv.obraId !== obraId) return
+    sv.fotos.forEach(f => {
+      if (!f?.url) return
+      lista.push({
+        url: f.url,
+        tipo: f.tipo === "depois" ? "depois" : "antes",
+        uploadedAt: f.uploadedAt ?? "",
+        colaboradorId: d.subUid,
+        colaboradorNome: `${d.empresaNome || "Empreiteiro"} (empreiteiro)`,
+        date: d.date,
+        obraNome: sv.obraNome || "Sem obra",
+        descricao: sv.descricao || "",
+        servicoKey: `sub|${d.subUid}|${d.date}|${sv.id}`,
+      })
+    })
+  }))
+  return lista
+}

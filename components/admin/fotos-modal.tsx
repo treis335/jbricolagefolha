@@ -9,6 +9,7 @@ import { VisualizadorFotos, type FotoFlat } from "@/components/admin/visualizado
 import type { Collaborator } from "@/hooks/useCollaborators"
 import { ObraPicker } from "@/components/forms/obra-picker"
 import { associarFotosAObra } from "@/lib/fotos-obra-service"
+import { getAllDias, fotosDeEmpreiteiros, type SubDia } from "@/lib/subempreiteiros-service"
 
 interface Props {
   open: boolean
@@ -33,6 +34,10 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null)
   // correções feitas nesta sessão (aparecem logo, sem esperar pela atualização dos dados); null = obra original
   const [correcoes, setCorrecoes] = useState<Map<string, { obraId: string; obraNome: string } | null>>(new Map())  // chave = serviço
+
+  // Fotos dos empreiteiros (calendário deles) — aparecem junto com as dos colaboradores
+  const [diasSub, setDiasSub] = useState<SubDia[]>([])
+  useEffect(() => { if (open) getAllDias().then(setDiasSub).catch(() => setDiasSub([])) }, [open])
 
   const todasFotos = useMemo<FotoFlat[]>(() => {
     const lista: FotoFlat[] = []
@@ -59,8 +64,9 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
         })
       })
     })
+    lista.push(...fotosDeEmpreiteiros(diasSub))
     return lista.sort((a, b) => (b.uploadedAt || b.date).localeCompare(a.uploadedAt || a.date))
-  }, [collaborators, correcoes])
+  }, [collaborators, correcoes, diasSub])
 
   const filtradas = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -71,10 +77,12 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
     )
   }, [todasFotos, colaboradorId, tipo, busca])
 
-  const colaboradoresComFotos = useMemo(
-    () => collaborators.filter(c => todasFotos.some(f => f.colaboradorId === c.id)).sort((a, b) => a.name.localeCompare(b.name)),
-    [collaborators, todasFotos]
-  )
+  // quem tem fotos: colaboradores + empreiteiros
+  const colaboradoresComFotos = useMemo(() => {
+    const m = new Map<string, string>()
+    todasFotos.forEach(f => { if (!m.has(f.colaboradorId)) m.set(f.colaboradorId, collaborators.find(c => c.id === f.colaboradorId)?.name ?? f.colaboradorNome) })
+    return Array.from(m, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [collaborators, todasFotos])
 
   const alternarSelecao = (url: string) =>
     setSelecionadas(prev => { const n = new Set(prev); n.has(url) ? n.delete(url) : n.add(url); return n })
@@ -83,8 +91,14 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
 
   // Aplica a obra (ou repõe a original, com null) a todas as fotos selecionadas
   const aplicarObra = async (obra: { id: string; nome: string } | null) => {
-    const escolhidas = todasFotos.filter(f => selecionadas.has(f.url))
-    if (escolhidas.length === 0) return
+    const todasEsc = todasFotos.filter(f => selecionadas.has(f.url))
+    // as fotos dos empreiteiros ficam na obra que eles registaram no calendário
+    const escolhidas = todasEsc.filter(f => !f.servicoKey.startsWith("sub|"))
+    const deEmpreiteiros = todasEsc.length - escolhidas.length
+    if (escolhidas.length === 0) {
+      if (deEmpreiteiros > 0) setAviso({ ok: false, texto: "As fotos de empreiteiros ficam na obra registada por eles no calendário — não podem ser movidas daqui." })
+      return
+    }
     setAGuardar(true); setAviso(null)
     try {
       const servicosAlterados = await associarFotosAObra(escolhidas.map(f => ({ colaboradorId: f.colaboradorId, url: f.url })), obra)
@@ -104,6 +118,7 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
             ? `${n} ${n === 1 ? "foto associada" : "fotos associadas"} a ${obra.nome}. O serviço do colaborador também foi atualizado${extra > 0 ? ` (mais ${extra} ${extra === 1 ? "foto do mesmo serviço seguiu" : "fotos do mesmo serviço seguiram"})` : ""}.`
             : `${n} ${n === 1 ? "foto reposta" : "fotos repostas"}: o serviço voltou à obra que o colaborador escreveu.`,
       })
+      if (deEmpreiteiros > 0) setAviso(a => a ? { ...a, texto: `${a.texto} (${deEmpreiteiros} de empreiteiros ignoradas: a obra vem do calendário deles.)` } : a)
       sairDaSelecao()
       onChanged?.()
     } catch (e) {
@@ -198,7 +213,7 @@ export function FotosModal({ open, onClose, collaborators = [], onChanged }: Pro
               onChange={e => setColaboradorId(e.target.value)}
               className="h-9 px-3 rounded-xl border border-border/50 bg-background text-xs font-medium"
             >
-              <option value="todos">Todos os colaboradores</option>
+              <option value="todos">Todos (colaboradores e empreiteiros)</option>
               {colaboradoresComFotos.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
 
