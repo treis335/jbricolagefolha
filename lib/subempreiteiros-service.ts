@@ -255,3 +255,51 @@ export function fotosDeEmpreiteiros(dias: SubDia[], obraId?: string): FotoFlat[]
   }))
   return lista
 }
+
+// ── Pagamentos (subPagamentos/{id}) — só o admin/patrão escreve; a empresa só lê os seus ──
+export type SubMetodo = "MBWay" | "Dinheiro" | "Transferência"
+
+export interface SubPagamento {
+  id: string
+  subUid: string
+  empresaNome: string
+  date: string // YYYY-MM-DD
+  valor: number
+  metodo: SubMetodo
+  nota?: string // ex.: nº da fatura
+  criadoEm: string
+}
+
+export async function getPagamentosBySub(subUid: string): Promise<SubPagamento[]> {
+  const snap = await getDocs(query(collection(db, "subPagamentos"), where("subUid", "==", subUid)))
+  return snap.docs.map(d => ({ ...(d.data() as Omit<SubPagamento, "id">), id: d.id }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+}
+
+export async function getAllPagamentos(): Promise<SubPagamento[]> {
+  const snap = await getDocs(collection(db, "subPagamentos"))
+  return snap.docs.map(d => ({ ...(d.data() as Omit<SubPagamento, "id">), id: d.id }))
+}
+
+export async function addPagamento(p: Omit<SubPagamento, "id" | "criadoEm">): Promise<void> {
+  const ref = doc(collection(db, "subPagamentos"))
+  await setDoc(ref, clean({ ...p, criadoEm: new Date().toISOString() }))
+}
+
+export async function deletePagamento(id: string): Promise<void> {
+  await deleteDoc(doc(db, "subPagamentos", id))
+}
+
+/** Mesmo critério dos colaboradores: os pagamentos cobrem os dias mais antigos primeiro (FIFO). */
+export function resumoFinanceiro(dias: SubDia[], pagamentos: SubPagamento[]) {
+  const ord = [...dias].sort((a, b) => a.date.localeCompare(b.date))
+  const totalGanho = ord.reduce((a, d) => a + d.totalCusto, 0)
+  const totalPago = pagamentos.reduce((a, p) => a + p.valor, 0)
+  const diasPagos = new Set<string>()
+  let acum = 0
+  for (const d of ord) {
+    acum += d.totalCusto
+    if (acum <= totalPago + 0.005) diasPagos.add(d.date); else break
+  }
+  return { totalGanho, totalPago, emDivida: Math.max(0, totalGanho - totalPago), diasPagos }
+}

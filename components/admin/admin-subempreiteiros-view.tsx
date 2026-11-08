@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
 import {
-  type SubEmpresa, type SubDia,
-  getSubEmpresas, getAllDias, inviteSubcontractor,
+  type SubEmpresa, type SubDia, type SubPagamento,
+  getSubEmpresas, getAllDias, getAllPagamentos, resumoFinanceiro, inviteSubcontractor,
   getSubcontractorEmails, setSubAtivo, explainFirebaseError, statsObra, fmtEuro,
 } from "@/lib/subempreiteiros-service"
 import { useSubData } from "@/hooks/useSubData"
@@ -19,15 +19,16 @@ import { SubObraDetail } from "@/components/sub/sub-obra-detail"
 import { SubCalendar } from "@/components/sub/sub-calendar"
 import { SubEquipaView } from "@/components/sub/sub-equipa-view"
 import { EmpresaForm } from "@/components/sub/empresa-form"
+import { SubFinanceiroView } from "@/components/sub/sub-financeiro-view"
 
-type PanelTab = "obras" | "calendario" | "equipa" | "empresa"
-const PANEL_TABS: [PanelTab, string][] = [["obras", "Obras"], ["calendario", "Calendário"], ["equipa", "Equipa"], ["empresa", "Empresa"]]
+type PanelTab = "obras" | "calendario" | "equipa" | "financeiro" | "empresa"
+const PANEL_TABS: [PanelTab, string][] = [["obras", "Obras"], ["calendario", "Calendário"], ["equipa", "Equipa"], ["financeiro", "Financeiro"], ["empresa", "Empresa"]]
 
 const nomeDe = (e: SubEmpresa) => e.empresa.nome || e.name || e.email
 
 // Conteúdo de uma empresa — o admin/patrão pode editar tudo (obras, dias, equipa, dados)
 function EmpresaPanel({ empresa, todasObras, onChanged, onGoObras }: { empresa: SubEmpresa; todasObras: Obra[]; onChanged: () => void; onGoObras: () => void }) {
-  const { obras, dias, equipa, empresa: perfil, setEmpresa, loading, erro, reload } = useSubData(empresa.uid)
+  const { obras, dias, pagamentos, equipa, empresa: perfil, setEmpresa, loading, erro, reload } = useSubData(empresa.uid)
   const [tab, setTab] = useState<PanelTab>("obras")
   const [atribuir, setAtribuir] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -37,10 +38,10 @@ function EmpresaPanel({ empresa, todasObras, onChanged, onGoObras }: { empresa: 
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-muted/50">
+      <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-muted/50">
         {PANEL_TABS.map(([id, l]) => (
           <button key={id} onClick={() => setTab(id)}
-            className={cn("h-9 rounded-lg text-[11px] font-bold", tab === id ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
+            className={cn("h-9 rounded-lg text-[10px] font-bold", tab === id ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
         ))}
       </div>
 
@@ -62,6 +63,8 @@ function EmpresaPanel({ empresa, todasObras, onChanged, onGoObras }: { empresa: 
         <SubCalendar subUid={empresa.uid} empresaNome={nome} obras={obras} equipa={equipa} dias={dias} onChanged={changed} />
       ) : tab === "equipa" ? (
         <SubEquipaView uid={empresa.uid} equipa={equipa} onSaved={changed} />
+      ) : tab === "financeiro" ? (
+        <SubFinanceiroView subUid={empresa.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} admin onChanged={changed} />
       ) : (
         <div className="space-y-4">
           <EmpresaForm uid={empresa.uid} empresa={perfil} onSaved={e => { setEmpresa(e); onChanged() }} />
@@ -85,6 +88,7 @@ export function AdminSubempreiteirosView() {
   const [empresas, setEmpresas] = useState<SubEmpresa[]>([])
   const [obras, setObras] = useState<Obra[]>([])
   const [dias, setDias] = useState<SubDia[]>([])
+  const [pagamentos, setPagamentos] = useState<SubPagamento[]>([])
   const [convites, setConvites] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState("")
@@ -93,11 +97,12 @@ export function AdminSubempreiteirosView() {
   const [selUid, setSelUid] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const r = await Promise.allSettled([getSubEmpresas(), getSubcontractorEmails(), getObras(), getAllDias()])
+    const r = await Promise.allSettled([getSubEmpresas(), getSubcontractorEmails(), getObras(), getAllDias(), getAllPagamentos()])
     if (r[0].status === "fulfilled") setEmpresas(r[0].value)
     if (r[1].status === "fulfilled") setConvites(r[1].value)
     if (r[2].status === "fulfilled") setObras(r[2].value)
     if (r[3].status === "fulfilled") setDias(r[3].value)
+    if (r[4].status === "fulfilled") setPagamentos(r[4].value)
     const falhas = r.filter(x => x.status === "rejected") as PromiseRejectedResult[]
     setErro(falhas.length ? `Erro a ler dados: ${explainFirebaseError(falhas[0].reason)}` : "")
     setLoading(false)
@@ -108,14 +113,17 @@ export function AdminSubempreiteirosView() {
   const mesAtual = new Date().toISOString().slice(0, 7)
 
   const resumo = useMemo(() => {
-    const m: Record<string, { obras: number; custoMes: number; horasMes: number }> = {}
-    empresas.forEach(e => { m[e.uid] = { obras: 0, custoMes: 0, horasMes: 0 } })
+    const m: Record<string, { obras: number; custoMes: number; horasMes: number; divida: number }> = {}
+    empresas.forEach(e => {
+      m[e.uid] = { obras: 0, custoMes: 0, horasMes: 0, divida: resumoFinanceiro(dias.filter(d => d.subUid === e.uid), pagamentos.filter(p => p.subUid === e.uid)).emDivida }
+    })
     obras.forEach(o => (o.subUids ?? []).forEach(u => { if (m[u]) m[u].obras++ }))
     dias.forEach(d => { if (m[d.subUid] && d.date.startsWith(mesAtual)) { m[d.subUid].custoMes += d.totalCusto; m[d.subUid].horasMes += d.totalHoras } })
     return m
-  }, [empresas, obras, dias, mesAtual])
+  }, [empresas, obras, dias, pagamentos, mesAtual])
 
   const totalMes = Object.values(resumo).reduce((a, x) => a + x.custoMes, 0)
+  const totalDivida = Object.values(resumo).reduce((a, x) => a + x.divida, 0)
 
   const pendentes = useMemo(() => {
     const reg = new Set(empresas.map(e => e.email.toLowerCase()))
@@ -143,6 +151,12 @@ export function AdminSubempreiteirosView() {
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">Custo de subempreiteiros neste mês</span>
           <span className="text-lg font-black">{fmtEuro(totalMes)}</span>
+        </div>
+      )}
+      {empresas.length > 0 && totalDivida > 0 && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">Por pagar a empreiteiros</span>
+          <span className="text-lg font-black text-amber-600 dark:text-amber-400">{fmtEuro(totalDivida)}</span>
         </div>
       )}
 
@@ -187,7 +201,7 @@ export function AdminSubempreiteirosView() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black truncate">{nomeDe(e)}</p>
                 <p className="text-[11px] text-muted-foreground truncate">
-                  {resumo[e.uid]?.obras ?? 0} obra(s) · {resumo[e.uid]?.horasMes ?? 0} h · {fmtEuro(resumo[e.uid]?.custoMes ?? 0)} este mês{!e.ativo ? " · suspensa" : ""}
+                  {resumo[e.uid]?.obras ?? 0} obra(s) · {resumo[e.uid]?.horasMes ?? 0} h · {fmtEuro(resumo[e.uid]?.custoMes ?? 0)} este mês{(resumo[e.uid]?.divida ?? 0) > 0 ? ` · deve ${fmtEuro(resumo[e.uid].divida)}` : ""}{!e.ativo ? " · suspensa" : ""}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground/40" />

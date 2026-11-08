@@ -2,7 +2,7 @@
 // Ecrã do empreiteiro: Calendário · Obras · Equipa (rodapé). Ferramentas e Perfil ficam no header global (sempre visíveis).
 "use client"
 import { useCallback, useEffect, useState } from "react"
-import { Building2, CalendarDays, HardHat, Users, Wrench, LogOut, Loader2 } from "lucide-react"
+import { Building2, CalendarDays, HardHat, Users, Wallet, Wrench, LogOut, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/AuthProvider"
 import { useSubData } from "@/hooks/useSubData"
 import { cn } from "@/lib/utils"
@@ -15,18 +15,20 @@ import { SubObraDetail } from "./sub-obra-detail"
 import { SubCalendar } from "./sub-calendar"
 import { SubEquipaView } from "./sub-equipa-view"
 import { EmpresaForm } from "./empresa-form"
+import { SubFinanceiroView } from "./sub-financeiro-view"
 
-type Tab = "calendar" | "obras" | "equipa"
+type Tab = "calendar" | "obras" | "equipa" | "financeiro"
 
 const ITENS: NavItem[] = [
   { id: "calendar", label: "Calendário", icon: CalendarDays },
   { id: "obras", label: "Obras", icon: HardHat },
   { id: "equipa", label: "Equipa", icon: Users },
+  { id: "financeiro", label: "Financeiro", icon: Wallet },
 ]
 
 export function SubApp() {
   const { user, logout } = useAuth()
-  const { obras, dias, equipa, empresa, setEmpresa, loading, erro, reload } = useSubData(user?.uid)
+  const { obras, dias, pagamentos, equipa, empresa, setEmpresa, loading, erro, reload } = useSubData(user?.uid)
   const [tab, setTab] = useState<Tab>("calendar")
   const [ferramentas, setFerramentas] = useState(false)
   const [perfil, setPerfil] = useState(false)
@@ -112,6 +114,10 @@ export function SubApp() {
             ) : obras.map(o => (
               <SubObraCard key={o.id} obra={o} ordens={o.subOrdens?.[user.uid]} stats={statsObra(o.id, dias)} onClick={() => setSelObraId(o.id)} />
             ))}
+          </div>
+        ) : tab === "financeiro" ? (
+          <div className="px-4 pt-4">
+            <SubFinanceiroView subUid={user.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} />
           </div>
         ) : (
           <div className="px-4 pt-4">
