@@ -13,7 +13,7 @@ import type { ServiceFoto } from "@/lib/types"
 import type { Obra } from "@/lib/obras-service"
 import {
   type SubDia, type SubMembro, type SubRegisto,
-  newId, saveDia, fmtEuro, explainFirebaseError, servicosDoDia,
+  newId, saveDia, fmtEuro, explainFirebaseError, servicosDoDia, cap1,
 } from "@/lib/subempreiteiros-service"
 
 interface Props {
@@ -146,7 +146,7 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
           {/* Topo fixo com X */}
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur px-5 pt-5 pb-3 flex items-start gap-3">
             <SheetHeader className="flex-1 min-w-0 text-left space-y-0">
-              <SheetTitle className="text-xl font-black capitalize">{titulo}</SheetTitle>
+              <SheetTitle className="text-xl font-black">{cap1(titulo)}</SheetTitle>
               <SheetDescription className="text-xs">{empresaNome}</SheetDescription>
             </SheetHeader>
             <button type="button" onClick={onClose} aria-label="Fechar"

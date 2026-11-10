@@ -6,7 +6,7 @@ import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type SubDia, type SubMembro, fmtEuro } from "@/lib/subempreiteiros-service"
+import { type SubDia, type SubMembro, fmtEuro, cap1 } from "@/lib/subempreiteiros-service"
 import type { Obra } from "@/lib/obras-service"
 import { SubDaySheet } from "./sub-day-sheet"
 
@@ -74,8 +74,8 @@ export function SubCalendar({ subUid, empresaNome, obras, equipa, dias, onChange
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="text-center">
-          <h2 className="text-base font-bold capitalize tracking-tight">
-            {mes.toLocaleDateString("pt-PT", { month: "long", year: "numeric" })}
+          <h2 className="text-base font-bold tracking-tight">
+            {cap1(mes.toLocaleDateString("pt-PT", { month: "long", year: "numeric" }))}
           </h2>
           {isCurrentMonth && <p className="text-[10px] text-muted-foreground/60 mt-0.5 uppercase tracking-widest">mês atual</p>}
         </div>

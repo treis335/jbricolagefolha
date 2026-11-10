@@ -290,16 +290,33 @@ export async function deletePagamento(id: string): Promise<void> {
   await deleteDoc(doc(db, "subPagamentos", id))
 }
 
-/** Mesmo critério dos colaboradores: os pagamentos cobrem os dias mais antigos primeiro (FIFO). */
+export const cap1 = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+const r2c = (n: number) => Math.round(n * 100) / 100
+
+export interface SubMesFin {
+  mes: string // YYYY-MM
+  dias: SubDia[]
+  horas: number
+  custo: number
+  pago: number // quanto deste mês já está coberto pelos pagamentos
+  falta: number
+}
+
+/** Os pagamentos cobrem o que é mais antigo primeiro (como nos colaboradores), mas POR VALOR: um pagamento parcial conta. */
 export function resumoFinanceiro(dias: SubDia[], pagamentos: SubPagamento[]) {
   const ord = [...dias].sort((a, b) => a.date.localeCompare(b.date))
-  const totalGanho = ord.reduce((a, d) => a + d.totalCusto, 0)
-  const totalPago = pagamentos.reduce((a, p) => a + p.valor, 0)
-  const diasPagos = new Set<string>()
-  let acum = 0
+  const totalGanho = r2c(ord.reduce((a, d) => a + d.totalCusto, 0))
+  const totalPago = r2c(pagamentos.reduce((a, p) => a + p.valor, 0))
+  let restante = totalPago
+  const m = new Map<string, SubMesFin>()
   for (const d of ord) {
-    acum += d.totalCusto
-    if (acum <= totalPago + 0.005) diasPagos.add(d.date); else break
+    const k = d.date.slice(0, 7)
+    const x = m.get(k) ?? { mes: k, dias: [], horas: 0, custo: 0, pago: 0, falta: 0 }
+    const cobre = Math.min(d.totalCusto, Math.max(0, restante))
+    restante = r2c(restante - cobre)
+    m.set(k, { ...x, dias: [d, ...x.dias], horas: x.horas + d.totalHoras, custo: r2c(x.custo + d.totalCusto), pago: r2c(x.pago + cobre) })
   }
-  return { totalGanho, totalPago, emDivida: Math.max(0, totalGanho - totalPago), diasPagos }
+  const porMes = Array.from(m.values()).map(x => ({ ...x, falta: r2c(x.custo - x.pago) })).sort((a, b) => b.mes.localeCompare(a.mes))
+  const saldo = r2c(totalGanho - totalPago) // > 0 falta pagar; < 0 pago a mais (adiantamento)
+  return { totalGanho, totalPago, saldo, emDivida: Math.max(0, saldo), porMes }
 }
