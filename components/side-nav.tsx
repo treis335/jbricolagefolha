@@ -12,6 +12,7 @@ import type { TabType } from "./bottom-nav"
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo } from "react"
+import { ObservacoesButton } from "@/components/admin/observacoes-button"
 
 interface SideNavProps {
   activeTab: TabType
@@ -120,7 +121,10 @@ export function SideNav({ activeTab, onTabChange, onAddToday }: SideNavProps) {
         {isAdmin && (
           <>
             <div className="my-3 border-t border-border/50" />
-            <p className="px-3 text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50 mb-2">Admin</p>
+            <div className="px-3 mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/50">Admin</p>
+              <ObservacoesButton />
+            </div>
             <Link href="/admin"
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground transition-all duration-150 text-left group"
             >

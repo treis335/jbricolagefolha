@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { useState, useEffect } from "react"
 import { EscalaDoDia } from "@/components/escala-do-dia"
 import { AlertaHorasButton } from "@/components/admin/alerta-horas-button"
+import { ObservacoesButton } from "@/components/admin/observacoes-button"
 import { AvisoEdicaoAdmin } from "@/components/aviso-edicao-admin"
 
 export function Header() {
@@ -131,6 +132,9 @@ export function Header() {
 
           {/* Divergências de horas — só admin */}
           {isAdmin && <AlertaHorasButton />}
+
+          {/* Observações dos colaboradores — admin e patrão */}
+          {isAdmin && <ObservacoesButton />}
 
           {/* Greeting — hidden on very small screens */}
           {firstName && (

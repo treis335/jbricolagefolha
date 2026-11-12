@@ -8,6 +8,7 @@ import {
   Euro, HardHat, ChevronRight, ArrowLeft, LogOut, ShieldCheck, CalendarDays, Wrench, Building2,
 } from "lucide-react"
 import type { AdminTabType } from "./admin-bottom-nav"
+import { ObservacoesButton } from "./observacoes-button"
 import Image from "next/image"
 import Link from "next/link"
 
@@ -59,8 +60,11 @@ export function AdminSideNav({ activeTab, onTabChange }: AdminSideNavProps) {
           <p className="text-sm font-black tracking-tight truncate">Painel Admin</p>
           <p className="text-[10px] text-muted-foreground/60 font-medium tracking-wider uppercase">JBRICOLAGE</p>
         </div>
-        <div className="ml-auto flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+        <div className="ml-auto flex items-center gap-2">
+          <ObservacoesButton />
+        <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse-dot" />
+        </div>
         </div>
       </div>
 

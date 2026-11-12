@@ -220,6 +220,8 @@ export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormPro
   const [totalHoras, setTotalHoras] = useState(8)
   const [services, setServices] = useState<Service[]>([])
   const [activeServiceId, setActiveServiceId] = useState<string | null>(null)
+  const [observacoes, setObservacoes] = useState("")
+  const [initialObservacoes, setInitialObservacoes] = useState("")
   const [initialHoras, setInitialHoras] = useState(8)
   const [initialServices, setInitialServices] = useState<Service[]>([])
   const [showTeamDialog, setShowTeamDialog] = useState(false)
@@ -307,6 +309,8 @@ export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormPro
       setServices(loaded)
       setActiveServiceId(loaded[0]?.id ?? null)
       setInitialHoras(h)
+      setObservacoes(existingEntry.observacoes ?? "")
+      setInitialObservacoes(existingEntry.observacoes ?? "")
       setInitialServices(JSON.parse(JSON.stringify(loaded)))
       hydrateObras(loaded).then(h => setServices(h))
     } else {
@@ -325,6 +329,8 @@ export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormPro
       setActiveServiceId(ns.id)
       setTotalHoras(8)
       setInitialHoras(8)
+      setObservacoes("")
+      setInitialObservacoes("")
       setInitialServices(JSON.parse(JSON.stringify([ns])))
     }
   }, [date, open, existingEntry, meuNome])
@@ -338,8 +344,8 @@ export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormPro
     activeServiceId && updateService(activeServiceId, updates)
 
   const hasChanges = useMemo(() =>
-    totalHoras !== initialHoras || !servicesEqual(services, initialServices),
-    [totalHoras, initialHoras, services, initialServices]
+    totalHoras !== initialHoras || !servicesEqual(services, initialServices) || observacoes.trim() !== initialObservacoes.trim(),
+    [totalHoras, initialHoras, services, initialServices, observacoes, initialObservacoes]
   )
 
   const hasAnyContent = useMemo(() => {
@@ -496,6 +502,7 @@ export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormPro
       equipa: services.flatMap(s => s.equipa),
       materiais: services.flatMap(s => s.materiais),
       taxaHoraria: taxa,
+      observacoes: observacoes.trim() || undefined,
     }
 
     // Admin: grava o dia do colaborador (sem sugestões de equipa); se falhar, o formulário fica aberto
@@ -860,6 +867,22 @@ export function DayEntryForm({ date, open, onClose, adminEdit }: DayEntryFormPro
                     ))}
                   </Tabs>
                 )}
+              </div>
+
+              {/* ── Observações (opcional) — se preenchidas, o responsável é avisado ── */}
+              <div className="space-y-1.5 px-0.5">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+                  Observações <span className="normal-case font-medium opacity-60">(opcional)</span>
+                </label>
+                <Textarea
+                  value={observacoes}
+                  onChange={e => setObservacoes(e.target.value)}
+                  disabled={isLocked}
+                  rows={2}
+                  placeholder="Algo que o responsável deva saber…"
+                  className="rounded-2xl resize-none text-sm"
+                />
+                {observacoes.trim() && <p className="text-[10px] text-muted-foreground/60">O responsável vai ser avisado desta observação.</p>}
               </div>
 
               {/* ── Remover serviço ── */}

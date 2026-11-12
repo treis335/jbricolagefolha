@@ -55,6 +55,9 @@ export interface DayEntry {
   editadoPorAdminInfo?: { adminUid: string; adminNome?: string; em: string }
   /** false enquanto o colaborador ainda não viu o aviso desta edição */
   notificacaoVista?: boolean
+
+  /** Observações opcionais do colaborador — se preenchidas, o admin/patrão é avisado */
+  observacoes?: string
 }
 
 // Calculate normal and extra hours based on weekday rules
