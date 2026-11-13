@@ -10,7 +10,9 @@ import {
 import { useAuth } from "@/lib/AuthProvider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { DataBackupTools } from "@/components/admin/data-backup-tools"
 import { FirebaseExportButton } from "@/components/admin/FirebaseExportButton"
+import { DataBackupTools } from "@/components/admin/data-backup-tools"
 import { cn } from "@/lib/utils"
 import { useGlobalSettings, saveGlobalSettings, addAllowedEmail, removeAllowedEmail } from "@/lib/useGlobalSettings"
 import { useState } from "react"
@@ -457,6 +459,16 @@ export function AdminSettingsView() {
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                 <span>O ficheiro exportado contém dados sensíveis. Guarda-o em local seguro e não o partilhes.</span>
               </div>
+            </SectionCard>
+
+            {/* ── Cópia completa e tamanho dos dados ── */}
+            <SectionCard
+              icon={<HardDrive className="h-4 w-4" />}
+              title="Cópia completa e tamanho"
+              description="Segurança dos dados — só leitura"
+              accent="blue"
+            >
+              <DataBackupTools />
             </SectionCard>
           </div>
         </div>
