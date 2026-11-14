@@ -62,6 +62,8 @@ export interface SubServicoDia {
   descricao: string
   fotos: ServiceFoto[]
   registos: SubRegisto[]
+  /** Serviço faturado por valor fixo (€), em vez de horas da equipa */
+  valorFixo?: number
 }
 
 export interface SubDia {
@@ -211,12 +213,12 @@ export function servicosDoDia(d: SubDia): SubServicoDia[] {
 export async function saveDia(subUid: string, empresaNome: string, date: string, servicos: SubServicoDia[]): Promise<void> {
   const id = diaId(subUid, date)
   const validos = servicos
-    .filter(s => s.obraId && s.registos.length > 0)
+    .filter(s => s.obraId && (s.registos.length > 0 || (s.valorFixo ?? 0) > 0))
     .map(s => ({ ...s, descricao: s.descricao.trim() }))
   if (validos.length === 0) { await deleteDoc(doc(db, "subDias", id)); return }
   const registos = validos.flatMap(s => s.registos)
   const totalHoras = registos.reduce((a, r) => a + r.horas, 0)
-  const totalCusto = registos.reduce((a, r) => a + r.custo, 0)
+  const totalCusto = r2c(registos.reduce((a, r) => a + r.custo, 0) + validos.reduce((a, s) => a + (s.valorFixo ?? 0), 0))
   await setDoc(doc(db, "subDias", id), clean({
     subUid, empresaNome, date, servicos: validos, registos, totalHoras, totalCusto, updatedAt: new Date().toISOString(),
   }))
@@ -226,10 +228,13 @@ export async function saveDia(subUid: string, empresaNome: string, date: string,
 export function statsObra(obraId: string, dias: SubDia[]) {
   let horas = 0, custo = 0, nDias = 0
   dias.forEach(d => {
-    const rs = d.registos.filter(r => r.obraId === obraId)
-    if (rs.length) { nDias++; rs.forEach(r => { horas += r.horas; custo += r.custo }) }
+    const sv = servicosDoDia(d).filter(s => s.obraId === obraId)
+    if (sv.length) {
+      nDias++
+      sv.forEach(s => { s.registos.forEach(r => { horas += r.horas; custo += r.custo }); custo += s.valorFixo ?? 0 })
+    }
   })
-  return { dias: nDias, horas, custo }
+  return { dias: nDias, horas, custo: r2c(custo) }
 }
 
 

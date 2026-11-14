@@ -6,7 +6,7 @@ import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { type SubDia, type SubMembro, fmtEuro, cap1 } from "@/lib/subempreiteiros-service"
+import { type SubDia, type SubMembro, fmtEuro, cap1, servicosDoDia } from "@/lib/subempreiteiros-service"
 import type { Obra } from "@/lib/obras-service"
 import { SubDaySheet } from "./sub-day-sheet"
 
@@ -56,9 +56,11 @@ export function SubCalendar({ subUid, empresaNome, obras, equipa, dias, onChange
   const totC = doMes.reduce((a, d) => a + d.totalCusto, 0)
   const porObra = useMemo(() => {
     const m = new Map<string, { nome: string; h: number; c: number }>()
-    doMes.forEach(d => d.registos.forEach(r => {
-      const x = m.get(r.obraId) ?? { nome: r.obraNome, h: 0, c: 0 }
-      m.set(r.obraId, { nome: x.nome, h: x.h + r.horas, c: x.c + r.custo })
+    doMes.forEach(d => servicosDoDia(d).forEach(sv => {
+      const x = m.get(sv.obraId) ?? { nome: sv.obraNome, h: 0, c: 0 }
+      const h = sv.registos.reduce((a, r) => a + r.horas, 0)
+      const c = sv.registos.reduce((a, r) => a + r.custo, 0) + (sv.valorFixo ?? 0)
+      m.set(sv.obraId, { nome: x.nome, h: x.h + h, c: x.c + c })
     }))
     return Array.from(m.values()).sort((a, b) => b.c - a.c)
   }, [doMes])
@@ -123,7 +125,7 @@ export function SubCalendar({ subUid, empresaNome, obras, equipa, dias, onChange
                     {date.getDate()}
                   </span>
                   {dia && (
-                    <span className="text-[9px] leading-none mt-0.5 font-semibold tabular-nums text-muted-foreground">{dia.totalHoras}h</span>
+                    <span className="text-[9px] leading-none mt-0.5 font-semibold tabular-nums text-muted-foreground">{dia.totalHoras > 0 ? `${dia.totalHoras}h` : "€"}</span>
                   )}
                   {dia && <span className="absolute top-1.5 left-1.5 rounded-full w-1.5 h-1.5 bg-primary" />}
                 </button>
@@ -143,7 +145,7 @@ export function SubCalendar({ subUid, empresaNome, obras, equipa, dias, onChange
               {porObra.map(o => (
                 <div key={o.nome} className="flex items-center justify-between text-xs">
                   <span className="truncate pr-3">{o.nome}</span>
-                  <span className="text-muted-foreground shrink-0">{o.h} h · <b className="text-foreground">{fmtEuro(o.c)}</b></span>
+                  <span className="text-muted-foreground shrink-0">{o.h > 0 ? `${o.h} h · ` : ""}<b className="text-foreground">{fmtEuro(o.c)}</b></span>
                 </div>
               ))}
             </div>

@@ -138,7 +138,7 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
                 <div className="flex items-center gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-black">{cap1(new Date(m.mes + "-01T00:00:00").toLocaleDateString("pt-PT", { month: "long", year: "numeric" }))}</p>
-                    <p className="text-[11px] text-muted-foreground">{m.dias.length} dia(s) · {m.horas} h</p>
+                    <p className="text-[11px] text-muted-foreground">{m.dias.length} dia(s){m.horas > 0 ? ` · ${m.horas} h` : ""}</p>
                   </div>
                   <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
                     estado === "pago" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
@@ -162,7 +162,7 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
                 <div className="border-t border-border/40 divide-y divide-border/40">
                   {m.dias.map(d => (
                     <div key={d.id} className="flex items-center justify-between px-3.5 py-2 text-xs">
-                      <span className="text-muted-foreground">{cap1(new Date(d.date + "T00:00:00").toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }))} · {d.totalHoras} h</span>
+                      <span className="text-muted-foreground">{cap1(new Date(d.date + "T00:00:00").toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }))}{d.totalHoras > 0 ? ` · ${d.totalHoras} h` : " · valor fixo"}</span>
                       <b className="tabular-nums">{fmtEuro(d.totalCusto)}</b>
                     </div>
                   ))}

@@ -29,7 +29,7 @@ function Extra({ obra, dias, subUid, admin, onChanged, onClose }: Omit<Props, "o
   useEffect(() => { setOrdens(ordensAtuais) }, [ordensAtuais, obra.id])
 
   const t = statsObra(obra.id, dias)
-  const historico = dias.filter(d => d.registos.some(r => r.obraId === obra.id)).sort((a, b) => b.date.localeCompare(a.date))
+  const historico = dias.filter(d => servicosDoDia(d).some(sv => sv.obraId === obra.id)).sort((a, b) => b.date.localeCompare(a.date))
 
   const guardar = async () => {
     setSaving(true)
@@ -78,14 +78,14 @@ function Extra({ obra, dias, subUid, admin, onChanged, onClose }: Omit<Props, "o
           const servs = servicosDoDia(d).filter(sv => sv.obraId === obra.id)
           const rs = servs.flatMap(sv => sv.registos)
           const h = rs.reduce((a, r) => a + r.horas, 0)
-          const c = rs.reduce((a, r) => a + r.custo, 0)
+          const c = rs.reduce((a, r) => a + r.custo, 0) + servs.reduce((a, sv) => a + (sv.valorFixo ?? 0), 0)
           return (
             <div key={d.id} className="rounded-xl border border-border/40 bg-card p-3 space-y-1.5">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-black capitalize">
                   {new Date(d.date + "T00:00:00").toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })}
                 </p>
-                <p className="text-[11px] text-muted-foreground">{rs.length} pessoa(s) · {h} h · <b className="text-foreground">{fmtEuro(c)}</b></p>
+                <p className="text-[11px] text-muted-foreground">{rs.length > 0 ? `${rs.length} pessoa(s) · ${h} h · ` : "Valor fixo · "}<b className="text-foreground">{fmtEuro(c)}</b></p>
               </div>
               {servs.map(sv => (
                 <div key={sv.id} className="space-y-1.5">

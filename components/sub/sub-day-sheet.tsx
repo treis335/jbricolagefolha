@@ -30,12 +30,12 @@ interface Props {
 }
 
 type LReg = SubRegisto & { txt: string }
-type LServ = { id: string; obraId: string; descricao: string; fotos: ServiceFoto[]; registos: LReg[] }
+type LServ = { id: string; obraId: string; descricao: string; fotos: ServiceFoto[]; registos: LReg[]; modo: "equipa" | "fixo"; valorTxt: string }
 
 const num = (v: string) => { const n = parseFloat(v.replace(",", ".")); return isFinite(n) && n > 0 ? n : 0 }
 const r2 = (n: number) => Math.round(n * 100) / 100
 const lbl = "text-[10px] font-black uppercase tracking-widest text-muted-foreground/60"
-const vazio = (obraId = ""): LServ => ({ id: newId(), obraId, descricao: "", fotos: [], registos: [] })
+const vazio = (obraId = ""): LServ => ({ id: newId(), obraId, descricao: "", fotos: [], registos: [], modo: "equipa", valorTxt: "" })
 const mantemTxt = (r: SubRegisto): LReg => ({ ...r, txt: String(r.horas) })
 
 export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, equipa, subUid, empresaNome }: Props) {
@@ -51,7 +51,8 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
   useEffect(() => {
     if (!open) return
     const existentes: LServ[] = dia
-      ? servicosDoDia(dia).map(s => ({ id: s.id, obraId: s.obraId, descricao: s.descricao, fotos: s.fotos, registos: s.registos.map(mantemTxt) }))
+      ? servicosDoDia(dia).map(s => ({ id: s.id, obraId: s.obraId, descricao: s.descricao, fotos: s.fotos, registos: s.registos.map(mantemTxt),
+          modo: s.valorFixo ? "fixo" as const : "equipa" as const, valorTxt: s.valorFixo ? String(s.valorFixo) : "" }))
       : []
     const inicial = existentes.length ? existentes : [vazio(ativas.length === 1 ? ativas[0].id : "")]
     setServicos(inicial); setActiveId(inicial[0].id)
@@ -89,12 +90,12 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
     () => dias.filter(d => d.date < date && d.registos.length > 0).sort((a, b) => b.date.localeCompare(a.date))[0] ?? null,
     [dias, date],
   )
-  const diaVazio = servicos.every(s => s.registos.length === 0 && !s.descricao.trim() && s.fotos.length === 0)
+  const diaVazio = servicos.every(s => s.registos.length === 0 && !s.descricao.trim() && s.fotos.length === 0 && !num(s.valorTxt))
   const repetirAnterior = () => {
     if (!anterior) return
     const ids = new Set(ativas.map(o => o.id))
-    const novos: LServ[] = servicosDoDia(anterior).filter(s => ids.has(s.obraId)).map(s => ({
-      id: newId(), obraId: s.obraId, descricao: "", fotos: [],
+    const novos: LServ[] = servicosDoDia(anterior).filter(s => ids.has(s.obraId) && s.registos.length > 0).map(s => ({
+      id: newId(), obraId: s.obraId, descricao: "", fotos: [], modo: "equipa" as const, valorTxt: "",
       registos: s.registos.map(r => {
         const m = equipa.find(x => x.id === r.membroId)
         const valorHora = m ? m.valorHora : r.valorHora // valor/hora atual, se o membro ainda existir
@@ -105,21 +106,27 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
   }
 
   // ── Totais (só aqui aparece dinheiro) ──
-  const todos = servicos.flatMap(s => s.registos)
+  const todos = servicos.filter(s => s.modo === "equipa").flatMap(s => s.registos)
+  const fixos = servicos.filter(s => s.modo === "fixo").reduce((a, s) => a + num(s.valorTxt), 0)
   const totalH = todos.reduce((a, r) => a + r.horas, 0)
-  const totalC = todos.reduce((a, r) => a + r.custo, 0)
+  const totalC = r2(todos.reduce((a, r) => a + r.custo, 0) + fixos)
   const porPessoa = useMemo(() => {
     const m = new Map<string, { nome: string; c: number }>()
     todos.forEach(r => m.set(r.membroId, { nome: r.membroNome, c: (m.get(r.membroId)?.c ?? 0) + r.custo }))
-    return Array.from(m.values())
-  }, [todos])
+    const lista = Array.from(m.values())
+    if (fixos > 0) lista.push({ nome: "Valor fixo", c: fixos })
+    return lista
+  }, [todos, fixos])
 
   const guardar = async () => {
     for (const s of servicos) {
-      const temConteudo = s.registos.length > 0 || s.descricao.trim() || s.fotos.length > 0
+      const temConteudo = s.registos.length > 0 || s.descricao.trim() || s.fotos.length > 0 || num(s.valorTxt) > 0
       if (!temConteudo) continue
       if (!s.obraId) { alert("Escolhe a obra em todos os serviços."); setActiveId(s.id); return }
-      if (s.registos.length === 0) { alert("Adiciona a equipa em todos os serviços."); setActiveId(s.id); return }
+      if (s.modo === "fixo") {
+        if (!num(s.valorTxt)) { alert("Indica o valor do serviço."); setActiveId(s.id); return }
+        if (!s.descricao.trim()) { alert("Descreve brevemente o serviço faturado."); setActiveId(s.id); return }
+      } else if (s.registos.length === 0) { alert("Adiciona a equipa em todos os serviços."); setActiveId(s.id); return }
     }
     setSaving(true)
     try {
@@ -128,7 +135,8 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
         const obraNome = obra?.nome ?? ""
         return {
           id: s.id, obraId: s.obraId, obraNome, descricao: s.descricao, fotos: s.fotos,
-          registos: s.registos.filter(r => r.horas > 0).map(({ txt: _t, ...r }) => ({ ...r, obraId: s.obraId, obraNome })),
+          registos: s.modo === "fixo" ? [] : s.registos.filter(r => r.horas > 0).map(({ txt: _t, ...r }) => ({ ...r, obraId: s.obraId, obraNome })),
+          ...(s.modo === "fixo" ? { valorFixo: num(s.valorTxt) } : {}),
         }
       }))
       onSaved(); onClose()
@@ -202,7 +210,25 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                       )}
                     </div>
 
-                    {/* Equipa */}
+                    {/* Como é faturado este serviço */}
+                    <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted/50">
+                      {([["equipa", "Horas da equipa"], ["fixo", "Valor fixo"]] as const).map(([m, l]) => (
+                        <button key={m} type="button" onClick={() => patch(s.id, { modo: m })}
+                          className={`h-9 rounded-lg text-xs font-bold transition-colors ${s.modo === m ? "bg-background shadow-sm" : "text-muted-foreground"}`}>{l}</button>
+                      ))}
+                    </div>
+
+                    {/* Valor fixo */}
+                    {s.modo === "fixo" && (
+                      <div className="space-y-1.5">
+                        <label className={lbl}>Valor do serviço (€)</label>
+                        <Input inputMode="decimal" value={s.valorTxt} onChange={e => patch(s.id, { valorTxt: e.target.value })}
+                          placeholder="0,00" className="h-11 rounded-xl text-base font-bold" />
+                      </div>
+                    )}
+
+                    {/* Equipa (modo horas) */}
+                    {s.modo === "equipa" && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label className={lbl}>Equipa</label>
@@ -228,17 +254,18 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                         </div>
                       ))}
                     </div>
+                    )}
 
                     {/* O que foi feito + fotos */}
                     <div className="space-y-1.5">
-                      <label className={lbl}>O que foi feito <span className="normal-case font-medium opacity-60">(opcional)</span></label>
+                      <label className={lbl}>{s.modo === "fixo" ? "Descrição do serviço" : "O que foi feito"} {s.modo !== "fixo" && <span className="normal-case font-medium opacity-60">(opcional)</span>}</label>
                       <Textarea value={s.descricao} onChange={e => patch(s.id, { descricao: e.target.value })} rows={3}
-                        placeholder="Descreve o trabalho…" className="rounded-xl resize-none text-sm" />
+                        placeholder={s.modo === "fixo" ? "Ex.: Pintura completa do T2" : "Descreve o trabalho…"} className="rounded-xl resize-none text-sm" />
                     </div>
                     <ServiceFotos serviceId={`${subUid}_${date}_${s.id}`} fotos={s.fotos} onChange={f => patch(s.id, { fotos: f })}
                       onUploadingChange={setUploading} userId={subUid} />
 
-                    {(servicos.length > 1 || s.registos.length > 0 || s.obraId) && (
+                    {(servicos.length > 1 || s.registos.length > 0 || s.obraId || s.valorTxt) && (
                       <button type="button" onClick={removeServico}
                         className={`w-full h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] ${confirmDel ? "bg-destructive text-destructive-foreground" : "bg-destructive/10 text-destructive"}`}>
                         <Trash2 className="h-3.5 w-3.5" />{confirmDel ? "Confirmar: remover este serviço" : "Remover serviço"}
@@ -252,10 +279,10 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
 
           {/* Rodapé fixo: total + valores individuais (bem pequenos) + ações */}
           <div className="sticky bottom-0 z-10 bg-background/95 backdrop-blur border-t border-border/50 px-5 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] space-y-2.5">
-            {totalH > 0 && (
+            {totalC > 0 && (
               <div>
                 <div className="flex items-baseline justify-between">
-                  <span className="text-xs text-muted-foreground">Total do dia · {totalH} h</span>
+                  <span className="text-xs text-muted-foreground">Total do dia{totalH > 0 ? ` · ${totalH} h` : ""}</span>
                   <span className="text-lg font-black tabular-nums">{fmtEuro(totalC)}</span>
                 </div>
                 <p className="text-[9px] leading-snug text-muted-foreground/60 mt-0.5">
