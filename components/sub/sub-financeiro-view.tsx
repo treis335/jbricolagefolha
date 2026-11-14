@@ -4,6 +4,11 @@
 import { useMemo, useState } from "react"
 import { Plus, Trash2, Loader2, Banknote, Smartphone, Landmark, X, ChevronDown, Check } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import {
   type SubDia, type SubPagamento, type SubMetodo,
@@ -41,7 +46,8 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, obras
   const [metodo, setMetodo] = useState<SubMetodo>("Transferência")
   const [nota, setNota] = useState("")
   const [saving, setSaving] = useState(false)
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [apagarP, setApagarP] = useState<SubPagamento | null>(null)
+  const [apagando, setApagando] = useState(false)
 
   const [aberto, setAberto] = useState<string | null>(null)
   const pct = r.totalGanho > 0 ? Math.min(100, (r.totalPago / r.totalGanho) * 100) : 0
@@ -70,11 +76,12 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, obras
     finally { setSaving(false) }
   }
 
-  const apagar = async (id: string) => {
-    if (confirmDel !== id) { setConfirmDel(id); return }
-    setConfirmDel(null)
-    try { await deletePagamento(id); onChanged?.() }
+  const confirmarApagar = async () => {
+    if (!apagarP) return
+    setApagando(true)
+    try { await deletePagamento(apagarP.id); setApagarP(null); onChanged?.() }
     catch (err) { alert(`Não foi possível apagar: ${explainFirebaseError(err)}`) }
+    finally { setApagando(false) }
   }
 
   return (
@@ -99,55 +106,77 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, obras
         {!admin && <p className="text-[10px] text-muted-foreground/60 pt-1">Só para consulta — os pagamentos são registados pelo responsável.</p>}
       </div>
 
-      {admin && !form && (
+      {admin && (
         <button onClick={abrirForm}
           className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold flex items-center justify-center gap-1.5 active:scale-[0.98]">
           <Plus className="h-4 w-4" />Registar pagamento
         </button>
       )}
 
-      {admin && form && (
-        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-black">Novo pagamento</p>
-            <button onClick={() => setForm(false)} aria-label="Fechar" className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"><X className="h-4 w-4" /></button>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className={lbl}>Valor (€)</label>
-              <Input inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} placeholder="0,00" className="h-11 rounded-xl" />
+      {admin && (
+        <Dialog open={form} onOpenChange={setForm}>
+          <DialogContent className="max-w-md rounded-3xl p-5 gap-4">
+            <div>
+              <DialogTitle className="text-lg font-black">Registar pagamento</DialogTitle>
+              <DialogDescription className="text-xs">{empresaNome}</DialogDescription>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className={lbl}>Valor (€)</label>
+                <Input inputMode="decimal" value={valor} onChange={e => setValor(e.target.value)} placeholder="0,00" className="h-11 rounded-xl text-base font-bold" />
+              </div>
+              <div className="space-y-1.5">
+                <label className={lbl}>Data</label>
+                <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-11 rounded-xl" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              {METODOS.map(({ id, Icon }) => (
+                <button key={id} type="button" onClick={() => setMetodo(id)}
+                  className={cn("h-10 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors",
+                    metodo === id ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border/50 text-muted-foreground")}>
+                  <Icon className="h-3.5 w-3.5" />{id}
+                </button>
+              ))}
             </div>
             <div className="space-y-1.5">
-              <label className={lbl}>Data</label>
-              <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-11 rounded-xl" />
+              <label className={lbl}>Obra</label>
+              <select value={obraSel} onChange={e => setObraSel(e.target.value)}
+                className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
+                <option value="">Geral (sem obra específica)</option>
+                {obras.map(o => {
+                  const f = po.obras.find(x => x.obraId === o.id)
+                  return <option key={o.id} value={o.id}>{o.nome}{f && f.falta > 0.005 ? ` — falta ${fmtEuro(f.falta)}` : ""}</option>
+                })}
+              </select>
             </div>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {METODOS.map(({ id, Icon }) => (
-              <button key={id} type="button" onClick={() => setMetodo(id)}
-                className={cn("h-10 rounded-xl border text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors",
-                  metodo === id ? "bg-primary text-primary-foreground border-primary" : "bg-background border-border/50 text-muted-foreground")}>
-                <Icon className="h-3.5 w-3.5" />{id}
-              </button>
-            ))}
-          </div>
-          <div className="space-y-1.5">
-            <label className={lbl}>Obra</label>
-            <select value={obraSel} onChange={e => setObraSel(e.target.value)}
-              className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
-              <option value="">Geral (sem obra específica)</option>
-              {obras.map(o => {
-                const f = po.obras.find(x => x.obraId === o.id)
-                return <option key={o.id} value={o.id}>{o.nome}{f && f.falta > 0.005 ? ` — falta ${fmtEuro(f.falta)}` : ""}</option>
-              })}
-            </select>
-          </div>
-          <Input value={nota} onChange={e => setNota(e.target.value)} placeholder="Nota / nº da fatura (opcional)" className="h-11 rounded-xl" />
-          <button onClick={guardar} disabled={saving}
-            className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}Guardar pagamento
-          </button>
-        </div>
+            <Input value={nota} onChange={e => setNota(e.target.value)} placeholder="Nota / nº da fatura (opcional)" className="h-11 rounded-xl" />
+            <button onClick={guardar} disabled={saving}
+              className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]">
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}Guardar pagamento
+            </button>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {admin && (
+        <AlertDialog open={!!apagarP} onOpenChange={o => { if (!o && !apagando) setApagarP(null) }}>
+          <AlertDialogContent className="rounded-3xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Apagar este pagamento?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {apagarP && <>{fmtEuro(apagarP.valor)} · {dataCurta(apagarP.date)} · {apagarP.metodo} · {apagarP.obraNome ?? "Geral"}. O valor volta a ficar em dívida e o empreiteiro deixa de o ver como pago. Não pode ser desfeito.</>}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={apagando}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={e => { e.preventDefault(); confirmarApagar() }} disabled={apagando}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                {apagando ? "A apagar…" : "Apagar"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {/* Ver por mês ou por obra */}
@@ -289,9 +318,9 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, obras
               <p className="text-[10px] font-semibold text-primary/80 truncate">{p.obraNome ? p.obraNome : "Geral"}</p>
             </div>
             {admin && (
-              <button onClick={() => apagar(p.id)} aria-label="Apagar"
-                className={cn("h-9 px-2.5 rounded-lg flex items-center gap-1 text-xs font-bold shrink-0", confirmDel === p.id ? "bg-destructive text-destructive-foreground" : "bg-destructive/10 text-destructive")}>
-                <Trash2 className="h-4 w-4" />{confirmDel === p.id ? "Sim" : ""}
+              <button onClick={() => setApagarP(p)} aria-label="Apagar pagamento"
+                className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-destructive/10 text-destructive active:scale-90 transition-transform">
+                <Trash2 className="h-4 w-4" />
               </button>
             )}
           </div>
