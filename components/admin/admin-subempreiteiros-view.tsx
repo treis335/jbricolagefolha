@@ -64,7 +64,7 @@ function EmpresaPanel({ empresa, todasObras, onChanged, onGoObras }: { empresa: 
       ) : tab === "equipa" ? (
         <SubEquipaView uid={empresa.uid} equipa={equipa} onSaved={changed} />
       ) : tab === "financeiro" ? (
-        <SubFinanceiroView subUid={empresa.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} admin onChanged={changed} />
+        <SubFinanceiroView subUid={empresa.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} obras={obras} admin onChanged={changed} />
       ) : (
         <div className="space-y-4">
           <EmpresaForm uid={empresa.uid} empresa={perfil} onSaved={e => { setEmpresa(e); onChanged() }} />

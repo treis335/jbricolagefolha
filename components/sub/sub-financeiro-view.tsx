@@ -7,14 +7,16 @@ import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 import {
   type SubDia, type SubPagamento, type SubMetodo,
-  addPagamento, deletePagamento, resumoFinanceiro, fmtEuro, explainFirebaseError, cap1,
+  addPagamento, deletePagamento, resumoFinanceiro, resumoPorObra, fmtEuro, explainFirebaseError, cap1,
 } from "@/lib/subempreiteiros-service"
+import type { Obra } from "@/lib/obras-service"
 
 interface Props {
   subUid: string
   empresaNome: string
   dias: SubDia[]
   pagamentos: SubPagamento[]
+  obras: Obra[]            // obras atribuídas à empresa
   admin?: boolean
   onChanged?: () => void
 }
@@ -28,8 +30,11 @@ const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d
 const lbl = "text-[10px] font-black uppercase tracking-widest text-muted-foreground/60"
 const dataCurta = (iso: string) => new Date(iso + "T00:00:00").toLocaleDateString("pt-PT", { day: "numeric", month: "short", year: "numeric" })
 
-export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin, onChanged }: Props) {
+export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, obras, admin, onChanged }: Props) {
   const r = useMemo(() => resumoFinanceiro(dias, pagamentos), [dias, pagamentos])
+  const po = useMemo(() => resumoPorObra(dias, pagamentos), [dias, pagamentos])
+  const [vista, setVista] = useState<"mes" | "obra">(() => (obras.length > 1 ? "obra" : "mes"))
+  const [obraSel, setObraSel] = useState("")
   const [form, setForm] = useState(false)
   const [valor, setValor] = useState("")
   const [date, setDate] = useState(hoje())
@@ -42,14 +47,24 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
   const pct = r.totalGanho > 0 ? Math.min(100, (r.totalPago / r.totalGanho) * 100) : 0
   const tudoPago = r.totalGanho > 0 && r.saldo <= 0.005
 
-  const abrirForm = () => { setValor(r.emDivida > 0 ? String(r.emDivida) : ""); setDate(hoje()); setNota(""); setForm(true) }
+  const abrirForm = () => {
+    // se só uma obra tem valor por pagar, já vem escolhida (o admin pode mudar)
+    const comFalta = po.obras.filter(o => o.falta > 0.005)
+    const unica = comFalta.length === 1 ? comFalta[0] : null
+    setObraSel(unica?.obraId ?? "")
+    setValor(unica ? String(unica.falta) : r.emDivida > 0 ? String(r.emDivida) : "")
+    setDate(hoje()); setNota(""); setForm(true)
+  }
 
   const guardar = async () => {
     const v = parseFloat(valor.replace(",", "."))
     if (!isFinite(v) || v <= 0) { alert("Indica um valor válido."); return }
     setSaving(true)
     try {
-      await addPagamento({ subUid, empresaNome, date, valor: Math.round(v * 100) / 100, metodo, nota: nota.trim() || undefined })
+      const ob = po.obras.find(o => o.obraId === obraSel) ?? obras.find(o => o.id === obraSel)
+      const obraNome = ob ? ("obraNome" in ob ? ob.obraNome : (ob as Obra).nome) : undefined
+      await addPagamento({ subUid, empresaNome, date, valor: Math.round(v * 100) / 100, metodo, nota: nota.trim() || undefined,
+        ...(obraSel ? { obraId: obraSel, obraNome } : {}) })
       setForm(false); onChanged?.()
     } catch (err) { alert(`Não foi possível registar: ${explainFirebaseError(err)}`) }
     finally { setSaving(false) }
@@ -116,6 +131,17 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
               </button>
             ))}
           </div>
+          <div className="space-y-1.5">
+            <label className={lbl}>Obra</label>
+            <select value={obraSel} onChange={e => setObraSel(e.target.value)}
+              className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm">
+              <option value="">Geral (sem obra específica)</option>
+              {obras.map(o => {
+                const f = po.obras.find(x => x.obraId === o.id)
+                return <option key={o.id} value={o.id}>{o.nome}{f && f.falta > 0.005 ? ` — falta ${fmtEuro(f.falta)}` : ""}</option>
+              })}
+            </select>
+          </div>
           <Input value={nota} onChange={e => setNota(e.target.value)} placeholder="Nota / nº da fatura (opcional)" className="h-11 rounded-xl" />
           <button onClick={guardar} disabled={saving}
             className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 active:scale-[0.98]">
@@ -124,6 +150,80 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
         </div>
       )}
 
+      {/* Ver por mês ou por obra */}
+      <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-muted/50">
+        {([["obra", "Por obra"], ["mes", "Por mês"]] as const).map(([v, l]) => (
+          <button key={v} type="button" onClick={() => setVista(v)}
+            className={cn("h-9 rounded-lg text-xs font-bold transition-colors", vista === v ? "bg-background shadow-sm" : "text-muted-foreground")}>{l}</button>
+        ))}
+      </div>
+
+      {vista === "obra" ? (
+        <>
+      {/* Por obra */}
+      <div className="space-y-2">
+        <p className={lbl}>Por obra</p>
+        {po.obras.length === 0 && po.gerais === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-5 rounded-xl border border-dashed border-border/60">Sem dias registados.</p>
+        ) : po.obras.map(o => {
+          const estado = o.falta <= 0.005 ? "pago" : o.pago <= 0.005 ? "por pagar" : "parcial"
+          const open = aberto === `o:${o.obraId}`
+          const pags = pagamentos.filter(p => p.obraId === o.obraId)
+          return (
+            <div key={o.obraId} className="rounded-2xl border border-border/40 bg-card overflow-hidden">
+              <button type="button" onClick={() => setAberto(open ? null : `o:${o.obraId}`)} className="w-full text-left p-3.5 space-y-2.5 active:bg-muted/30">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black truncate">{o.obraNome}</p>
+                    <p className="text-[11px] text-muted-foreground">{o.dias} dia(s){o.horas > 0 ? ` · ${o.horas} h` : ""}</p>
+                  </div>
+                  <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full",
+                    estado === "pago" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                      : estado === "parcial" ? "bg-sky-100 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400"
+                      : "bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400")}>{cap1(estado)}</span>
+                  <ChevronDown className={cn("h-4 w-4 text-muted-foreground/50 transition-transform", open && "rotate-180")} />
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${o.custo > 0 ? Math.min(100, (o.pago / o.custo) * 100) : 0}%` }} />
+                </div>
+                <div className="grid grid-cols-3 text-center">
+                  {[["Total", o.custo, ""], ["Pago", o.pago, "text-emerald-600 dark:text-emerald-400"], ["Falta", o.falta, o.falta > 0.005 ? "text-amber-600 dark:text-amber-400" : ""]].map(([l, v, c]) => (
+                    <div key={l as string}>
+                      <p className={cn("text-sm font-black tabular-nums", c as string)}>{fmtEuro(v as number)}</p>
+                      <p className="text-[9px] uppercase tracking-widest text-muted-foreground/50 font-bold">{l as string}</p>
+                    </div>
+                  ))}
+                </div>
+              </button>
+              {open && (
+                <div className="border-t border-border/40 divide-y divide-border/40">
+                  {pags.length === 0
+                    ? <p className="px-3.5 py-2.5 text-xs text-muted-foreground">Ainda sem pagamentos desta obra.</p>
+                    : pags.map(p => (
+                      <div key={p.id} className="flex items-center justify-between px-3.5 py-2 text-xs">
+                        <span className="text-muted-foreground">{dataCurta(p.date)} · {p.metodo}</span>
+                        <b className="tabular-nums">{fmtEuro(p.valor)}</b>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {po.gerais > 0 && (
+          <div className="rounded-2xl border border-dashed border-border/60 p-3.5 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold">Pagamentos gerais</p>
+              <p className="text-[11px] text-muted-foreground">Sem obra específica — descontam no total</p>
+            </div>
+            <b className="text-sm tabular-nums">{fmtEuro(po.gerais)}</b>
+          </div>
+        )}
+      </div>
+
+        </>
+      ) : (
+        <>
       {/* Por mês */}
       <div className="space-y-2">
         <p className={lbl}>Por mês</p>
@@ -173,6 +273,9 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
         })}
       </div>
 
+        </>
+      )}
+
       {/* Pagamentos */}
       <div className="space-y-2">
         <p className={lbl}>{admin ? "Pagamentos feitos" : "Pagamentos recebidos"}</p>
@@ -183,6 +286,7 @@ export function SubFinanceiroView({ subUid, empresaNome, dias, pagamentos, admin
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold tabular-nums">{fmtEuro(p.valor)}</p>
               <p className="text-[11px] text-muted-foreground truncate">{dataCurta(p.date)} · {p.metodo}{p.nota ? ` · ${p.nota}` : ""}</p>
+              <p className="text-[10px] font-semibold text-primary/80 truncate">{p.obraNome ? p.obraNome : "Geral"}</p>
             </div>
             {admin && (
               <button onClick={() => apagar(p.id)} aria-label="Apagar"

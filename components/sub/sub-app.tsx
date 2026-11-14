@@ -117,7 +117,7 @@ export function SubApp() {
           </div>
         ) : tab === "financeiro" ? (
           <div className="px-4 pt-4">
-            <SubFinanceiroView subUid={user.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} />
+            <SubFinanceiroView subUid={user.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} obras={obras} />
           </div>
         ) : (
           <div className="px-4 pt-4">

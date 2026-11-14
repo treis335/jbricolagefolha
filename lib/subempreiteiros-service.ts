@@ -272,6 +272,8 @@ export interface SubPagamento {
   valor: number
   metodo: SubMetodo
   nota?: string // ex.: nº da fatura
+  obraId?: string   // obra a que se refere o pagamento (vazio = geral)
+  obraNome?: string
   criadoEm: string
 }
 
@@ -324,4 +326,39 @@ export function resumoFinanceiro(dias: SubDia[], pagamentos: SubPagamento[]) {
   const porMes = Array.from(m.values()).map(x => ({ ...x, falta: r2c(x.custo - x.pago) })).sort((a, b) => b.mes.localeCompare(a.mes))
   const saldo = r2c(totalGanho - totalPago) // > 0 falta pagar; < 0 pago a mais (adiantamento)
   return { totalGanho, totalPago, saldo, emDivida: Math.max(0, saldo), porMes }
+}
+
+export interface SubObraFin {
+  obraId: string
+  obraNome: string
+  dias: number
+  horas: number
+  custo: number // total faturado nessa obra
+  pago: number  // pagamentos associados a essa obra
+  falta: number
+}
+
+/** Financeiro por obra. Os pagamentos "gerais" (sem obra) ficam à parte e só descontam no total. */
+export function resumoPorObra(dias: SubDia[], pagamentos: SubPagamento[]) {
+  const m = new Map<string, SubObraFin>()
+  const get = (id: string, nome: string) => m.get(id) ?? { obraId: id, obraNome: nome, dias: 0, horas: 0, custo: 0, pago: 0, falta: 0 }
+  dias.forEach(d => {
+    const vistas = new Set<string>()
+    servicosDoDia(d).forEach(sv => {
+      const x = get(sv.obraId, sv.obraNome)
+      const h = sv.registos.reduce((a, r) => a + r.horas, 0)
+      const c = sv.registos.reduce((a, r) => a + r.custo, 0) + (sv.valorFixo ?? 0)
+      const novoDia = !vistas.has(sv.obraId); vistas.add(sv.obraId)
+      m.set(sv.obraId, { ...x, obraNome: sv.obraNome || x.obraNome, dias: x.dias + (novoDia ? 1 : 0), horas: x.horas + h, custo: r2c(x.custo + c) })
+    })
+  })
+  let gerais = 0
+  const geraisLista: SubPagamento[] = []
+  pagamentos.forEach(p => {
+    if (!p.obraId) { gerais = r2c(gerais + p.valor); geraisLista.push(p); return }
+    const x = get(p.obraId, p.obraNome ?? "Obra")
+    m.set(p.obraId, { ...x, pago: r2c(x.pago + p.valor) })
+  })
+  const obras = Array.from(m.values()).map(x => ({ ...x, falta: r2c(x.custo - x.pago) })).sort((a, b) => b.falta - a.falta)
+  return { obras, gerais, geraisLista }
 }
