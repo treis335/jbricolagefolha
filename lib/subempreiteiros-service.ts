@@ -64,6 +64,8 @@ export interface SubServicoDia {
   registos: SubRegisto[]
   /** Serviço faturado por valor fixo (€), em vez de horas da equipa */
   valorFixo?: number
+  /** Como é cobrado: "equipa" (por horas), "fixo" (valor fechado) ou "registo" (já cobrado — só fica registado, 0 €) */
+  modo?: "equipa" | "fixo" | "registo"
 }
 
 export interface SubDia {
@@ -213,7 +215,7 @@ export function servicosDoDia(d: SubDia): SubServicoDia[] {
 export async function saveDia(subUid: string, empresaNome: string, date: string, servicos: SubServicoDia[]): Promise<void> {
   const id = diaId(subUid, date)
   const validos = servicos
-    .filter(s => s.obraId && (s.registos.length > 0 || (s.valorFixo ?? 0) > 0))
+    .filter(s => s.obraId && (s.registos.length > 0 || (s.valorFixo ?? 0) > 0 || s.modo === "registo"))
     .map(s => ({ ...s, descricao: s.descricao.trim() }))
   if (validos.length === 0) { await deleteDoc(doc(db, "subDias", id)); return }
   const registos = validos.flatMap(s => s.registos)

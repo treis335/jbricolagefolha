@@ -85,7 +85,7 @@ function Extra({ obra, dias, subUid, admin, onChanged, onClose }: Omit<Props, "o
                 <p className="text-xs font-black capitalize">
                   {new Date(d.date + "T00:00:00").toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" })}
                 </p>
-                <p className="text-[11px] text-muted-foreground">{servs.some(sv => sv.valorFixo) ? "Valor fechado · " : ""}{rs.length > 0 ? `${rs.length} pessoa(s) · ${h} h · ` : ""}<b className="text-foreground">{fmtEuro(c)}</b></p>
+                <p className="text-[11px] text-muted-foreground">{servs.every(sv => sv.modo === "registo") ? "Já cobrado · " : servs.some(sv => sv.valorFixo) ? "Valor fechado · " : ""}{rs.length > 0 ? `${rs.length} pessoa(s) · ${h} h` : ""}{servs.every(sv => sv.modo === "registo") ? "" : <>{rs.length > 0 ? " · " : ""}<b className="text-foreground">{fmtEuro(c)}</b></>}</p>
               </div>
               {servs.map(sv => (
                 <div key={sv.id} className="space-y-1.5">

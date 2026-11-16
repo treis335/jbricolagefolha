@@ -125,7 +125,7 @@ export function SubCalendar({ subUid, empresaNome, obras, equipa, dias, onChange
                     {date.getDate()}
                   </span>
                   {dia && (
-                    <span className="text-[9px] leading-none mt-0.5 font-semibold tabular-nums text-muted-foreground">{dia.totalHoras > 0 ? `${dia.totalHoras}h` : "€"}</span>
+                    <span className="text-[9px] leading-none mt-0.5 font-semibold tabular-nums text-muted-foreground">{dia.totalHoras > 0 ? `${dia.totalHoras}h` : dia.totalCusto > 0 ? "€" : "✓"}</span>
                   )}
                   {dia && <span className="absolute top-1.5 left-1.5 rounded-full w-1.5 h-1.5 bg-primary" />}
                 </button>
