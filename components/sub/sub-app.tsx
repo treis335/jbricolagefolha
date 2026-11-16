@@ -2,7 +2,7 @@
 // Ecrã do empreiteiro: Calendário · Obras · Equipa (rodapé). Ferramentas e Perfil ficam no header global (sempre visíveis).
 "use client"
 import { useCallback, useEffect, useState } from "react"
-import { Building2, CalendarDays, HardHat, Users, Wallet, Wrench, LogOut, Loader2 } from "lucide-react"
+import { Building2, CalendarDays, HardHat, Users, Wallet, Wrench, LogOut, Loader2, Check, ChevronRight } from "lucide-react"
 import { useAuth } from "@/lib/AuthProvider"
 import { useSubData } from "@/hooks/useSubData"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,51 @@ const ITENS: NavItem[] = [
   { id: "equipa", label: "Equipa", icon: Users },
   { id: "financeiro", label: "Financeiro", icon: Wallet },
 ]
+
+function Cabecalho({ titulo, sub }: { titulo: string; sub: string }) {
+  return (
+    <div className="px-4 pt-5 pb-1">
+      <h2 className="text-2xl font-black tracking-tight">{titulo}</h2>
+      <p className="text-xs text-muted-foreground">{sub}</p>
+    </div>
+  )
+}
+
+// Para quem entra pela primeira vez: o que falta para começar
+function PrimeirosPassos({ temEquipa, temObras, onEquipa }: { temEquipa: boolean; temObras: boolean; onEquipa: () => void }) {
+  const passos = [
+    { ok: temEquipa, titulo: "Cria a tua equipa", sub: "Nome e valor/hora de cada colaborador", acao: onEquipa },
+    { ok: temObras, titulo: "Aguarda as tuas obras", sub: "O responsável atribui-te as obras em que vais trabalhar" },
+    { ok: false, titulo: "Regista o primeiro dia", sub: "Toca num dia do calendário" },
+  ]
+  return (
+    <div className="mx-4 mt-4 rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-card p-4 space-y-3 shadow-sm">
+      <div>
+        <p className="text-sm font-black">Vamos começar</p>
+        <p className="text-[11px] text-muted-foreground">Três passos para teres tudo a funcionar</p>
+      </div>
+      <div className="space-y-1.5">
+        {passos.map((p, i) => {
+          const Linha = (
+            <div className="flex items-center gap-3 rounded-2xl bg-background/70 px-3 py-2.5">
+              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${p.ok ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"}`}>
+                {p.ok ? <Check className="h-4 w-4" /> : i + 1}
+              </span>
+              <div className="flex-1 min-w-0 text-left">
+                <p className={`text-sm font-bold ${p.ok ? "line-through text-muted-foreground" : ""}`}>{p.titulo}</p>
+                <p className="text-[11px] text-muted-foreground">{p.sub}</p>
+              </div>
+              {p.acao && !p.ok && <ChevronRight className="h-4 w-4 text-muted-foreground/50" />}
+            </div>
+          )
+          return p.acao && !p.ok
+            ? <button key={i} type="button" onClick={p.acao} className="w-full active:scale-[0.99] transition-transform">{Linha}</button>
+            : <div key={i}>{Linha}</div>
+        })}
+      </div>
+    </div>
+  )
+}
 
 export function SubApp() {
   const { user, logout } = useAuth()
@@ -102,25 +147,36 @@ export function SubApp() {
         ) : loading ? (
           <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : tab === "calendar" ? (
-          <SubCalendar subUid={user.uid} empresaNome={nome} obras={obras} equipa={equipa} dias={dias} onChanged={reload} fab />
+          <>
+            {(equipa.length === 0 || obras.length === 0) && (
+              <PrimeirosPassos temEquipa={equipa.length > 0} temObras={obras.length > 0} onEquipa={() => irPara("equipa")} />
+            )}
+            <SubCalendar subUid={user.uid} empresaNome={nome} obras={obras} equipa={equipa} dias={dias} onChanged={reload} fab />
+          </>
         ) : tab === "obras" ? (
-          <div className="px-4 pt-4 space-y-3">
-            {obras.length === 0 ? (
-              <div className="py-16 text-center space-y-2">
-                <HardHat className="h-10 w-10 mx-auto text-muted-foreground/30" />
-                <p className="text-sm font-semibold">Sem obras atribuídas</p>
-                <p className="text-xs text-muted-foreground">Quando te atribuírem uma obra, aparece aqui com a foto, o mapa e as ordens.</p>
-              </div>
-            ) : obras.map(o => (
-              <SubObraCard key={o.id} obra={o} ordens={o.subOrdens?.[user.uid]} stats={statsObra(o.id, dias)} onClick={() => setSelObraId(o.id)} />
-            ))}
+          <div className="animate-fade-in">
+            <Cabecalho titulo="As minhas obras" sub="Morada, mapa e ordens de cada obra" />
+            <div className="px-4 pt-3 space-y-3">
+              {obras.length === 0 ? (
+                <div className="py-14 text-center space-y-3">
+                  <div className="w-16 h-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto"><HardHat className="h-7 w-7" /></div>
+                  <p className="text-base font-black">Ainda sem obras</p>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">Quando o responsável te atribuir uma obra, aparece aqui com a foto, o mapa e as ordens.</p>
+                </div>
+              ) : obras.map(o => (
+                <SubObraCard key={o.id} obra={o} ordens={o.subOrdens?.[user.uid]} stats={statsObra(o.id, dias)} onClick={() => setSelObraId(o.id)} />
+              ))}
+            </div>
           </div>
         ) : tab === "financeiro" ? (
-          <div className="px-4 pt-4">
-            <SubFinanceiroView subUid={user.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} obras={obras} />
+          <div>
+            <Cabecalho titulo="Financeiro" sub="O que tens a receber e o que já foi pago" />
+            <div className="px-4 pt-3">
+              <SubFinanceiroView subUid={user.uid} empresaNome={nome} dias={dias} pagamentos={pagamentos} obras={obras} />
+            </div>
           </div>
         ) : (
-          <div className="px-4 pt-4">
+          <div className="px-4 pt-5">
             <SubEquipaView uid={user.uid} equipa={equipa} onSaved={reload} />
           </div>
         )}

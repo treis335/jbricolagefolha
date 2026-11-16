@@ -298,6 +298,7 @@ export async function deletePagamento(id: string): Promise<void> {
 }
 
 export const cap1 = (t: string) => t.charAt(0).toUpperCase() + t.slice(1)
+export const iniciais = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join("").toUpperCase() || "?"
 const r2c = (n: number) => Math.round(n * 100) / 100
 
 export interface SubMesFin {

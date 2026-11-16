@@ -13,7 +13,7 @@ import type { ServiceFoto } from "@/lib/types"
 import type { Obra } from "@/lib/obras-service"
 import {
   type SubDia, type SubMembro, type SubRegisto,
-  newId, saveDia, fmtEuro, explainFirebaseError, servicosDoDia, cap1,
+  newId, saveDia, fmtEuro, explainFirebaseError, servicosDoDia, cap1, iniciais,
 } from "@/lib/subempreiteiros-service"
 
 interface Props {
@@ -242,7 +242,8 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                           {equipa.length === 0 ? "Cria primeiro a tua equipa no separador Equipa." : "Toca em “Adicionar equipa” para escolher quem trabalhou."}
                         </p>
                       ) : s.registos.map(r => (
-                        <div key={r.id} className="flex items-center gap-2 rounded-xl border border-border/40 bg-card p-2 pl-3">
+                        <div key={r.id} className="flex items-center gap-2.5 rounded-2xl border border-border/40 bg-card p-2 pl-2.5 shadow-sm">
+                          <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{iniciais(r.membroNome)}</span>
                           <span className="flex-1 min-w-0 text-sm font-semibold truncate">{r.membroNome}</span>
                           <Input inputMode="decimal" value={r.txt} onChange={e => setHoras(s.id, r.id, e.target.value)}
                             className="h-9 w-16 rounded-lg text-sm text-center" />
@@ -323,10 +324,11 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                     <button key={m.id} type="button"
                       onClick={() => setPickSel(p => { const n = new Set(p); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n })}
                       className={`w-full flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${on ? "border-primary/40 bg-primary/5" : "border-border/40"}`}>
-                      <span className={`w-6 h-6 rounded-md border flex items-center justify-center shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
+                      <span className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{iniciais(m.nome)}</span>
+                      <span className="flex-1 text-sm font-semibold truncate">{m.nome}</span>
+                      <span className={`w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${on ? "bg-primary border-primary text-primary-foreground" : "border-border"}`}>
                         {on && <Check className="h-3.5 w-3.5" />}
                       </span>
-                      <span className="text-sm font-semibold truncate">{m.nome}</span>
                     </button>
                   )
                 })}

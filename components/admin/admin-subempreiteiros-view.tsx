@@ -142,7 +142,7 @@ function EmpresaDetalhe({ empresa, todasObras, onChanged, onBack, onGoObras }: {
       ) : (
         <div className="space-y-2.5 animate-fade-in">
           <Secao Icon={Users} titulo="Equipa" sub={`${equipa.length} pessoa(s) · valor/hora`}>
-            <SubEquipaView uid={empresa.uid} equipa={equipa} onSaved={changed} />
+            <SubEquipaView uid={empresa.uid} equipa={equipa} onSaved={changed} semTitulo />
           </Secao>
           <Secao Icon={IdCard} titulo="Dados da empresa" sub="Logótipo, NIF, contactos">
             <EmpresaForm uid={empresa.uid} empresa={perfil} onSaved={e => { setEmpresa(e); onChanged() }} />
