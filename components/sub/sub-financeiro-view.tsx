@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import {
   type SubDia, type SubPagamento,
-  deletePagamento, resumoFinanceiro, resumoPorObra, fmtEuro, explainFirebaseError, cap1,
+  deletePagamento, resumoFinanceiro, resumoPorObra, fmtEuro, explainFirebaseError, cap1, servicosDoDia,
 } from "@/lib/subempreiteiros-service"
 import type { Obra } from "@/lib/obras-service"
 
@@ -186,7 +186,7 @@ export function SubFinanceiroView({ dias, pagamentos, obras, admin, onChanged, o
                         <div key={d.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
                           <span className="text-muted-foreground">
                             {cap1(new Date(d.date + "T00:00:00").toLocaleDateString("pt-PT", { weekday: "short", day: "numeric", month: "short" }))}
-                            {d.totalHoras > 0 ? ` · ${d.totalHoras} h` : " · valor fixo"}
+                            {servicosDoDia(d).some(sv => sv.valorFixo) ? " · valor fechado" : d.totalHoras > 0 ? ` · ${d.totalHoras} h` : ""}
                           </span>
                           <b className="tabular-nums">{fmtEuro(d.totalCusto)}</b>
                         </div>

@@ -53,7 +53,9 @@ const deSalvo = (s: SubServicoDia): LServ => ({
   modo: s.valorFixo ? "fixo" : "equipa", valorTxt: s.valorFixo ? String(s.valorFixo) : "",
 })
 const custoDe = (s: LServ) => s.modo === "fixo" ? num(s.valorTxt) : r2(s.registos.reduce((a, r) => a + r.custo, 0))
-const horasDe = (s: LServ) => s.modo === "fixo" ? 0 : s.registos.reduce((a, r) => a + r.horas, 0)
+const horasDe = (s: LServ) => s.registos.reduce((a, r) => a + r.horas, 0)
+// Num valor fechado a equipa é só presença: as horas contam, o custo por hora NÃO
+const custoReg = (modo: "equipa" | "fixo", horas: number, valorHora: number) => (modo === "fixo" ? 0 : r2(horas * valorHora))
 
 export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, equipa, subUid, empresaNome }: Props) {
   const ativas = useMemo(() => obras.filter(o => o.estado === "ativa"), [obras])
@@ -84,7 +86,7 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
         const obraNome = obraNomeDe(s)
         return {
           id: s.id, obraId: s.obraId, obraNome, descricao: s.descricao, fotos: s.fotos,
-          registos: s.modo === "fixo" ? [] : s.registos.filter(r => r.horas > 0).map(({ txt: _t, ...r }) => ({ ...r, obraId: s.obraId, obraNome })),
+          registos: s.registos.filter(r => r.horas > 0).map(({ txt: _t, ...r }) => ({ ...r, obraId: s.obraId, obraNome, custo: custoReg(s.modo, r.horas, r.valorHora) })),
           ...(s.modo === "fixo" ? { valorFixo: num(s.valorTxt) } : {}),
         }
       })
@@ -128,11 +130,11 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
     if (!draft) return
     const atuais = new Map(draft.registos.map(r => [r.membroId, r]))
     const registos: LReg[] = equipa.filter(m => pickSel.has(m.id)).map(m =>
-      atuais.get(m.id) ?? { id: newId(), obraId: draft.obraId, obraNome: "", membroId: m.id, membroNome: m.nome, horas: 8, valorHora: m.valorHora, custo: r2(8 * m.valorHora), txt: "8" })
+      atuais.get(m.id) ?? { id: newId(), obraId: draft.obraId, obraNome: "", membroId: m.id, membroNome: m.nome, horas: 8, valorHora: m.valorHora, custo: custoReg(draft.modo, 8, m.valorHora), txt: "8" })
     patch({ registos }); setPicker(false)
   }
   const setHoras = (rid: string, txt: string) => patch({
-    registos: draft?.registos.map(r => r.id === rid ? { ...r, txt, horas: num(txt), custo: r2(num(txt) * r.valorHora) } : r) ?? [],
+    registos: draft?.registos.map(r => r.id === rid ? { ...r, txt, horas: num(txt), custo: custoReg(draft?.modo ?? "equipa", num(txt), r.valorHora) } : r) ?? [],
   })
 
   // ── Repetir o último dia registado ──
@@ -143,7 +145,7 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
   const repetirAnterior = async () => {
     if (!anterior) return
     const ids = new Set(ativas.map(o => o.id))
-    const novos: LServ[] = servicosDoDia(anterior).filter(s => ids.has(s.obraId) && s.registos.length > 0).map(s => ({
+    const novos: LServ[] = servicosDoDia(anterior).filter(s => ids.has(s.obraId) && s.registos.length > 0 && !s.valorFixo).map(s => ({
       id: newId(), obraId: s.obraId, obraNome: s.obraNome, descricao: "", fotos: [], modo: "equipa" as const, valorTxt: "",
       registos: s.registos.map(r => {
         const m = equipa.find(x => x.id === r.membroId)
@@ -214,7 +216,7 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                       <p className="text-sm font-black truncate">{obraNomeDe(s)}</p>
                       <p className="text-[11px] text-muted-foreground truncate">
                         {s.modo === "fixo"
-                          ? `Valor fechado${s.descricao ? ` · ${s.descricao}` : ""}`
+                          ? (s.registos.length > 0 ? `Valor fechado · ${s.registos.length} pessoa(s) · ${horasDe(s)} h` : `Valor fechado${s.descricao ? ` · ${s.descricao}` : ""}`)
                           : `${s.registos.length} pessoa(s) · ${horasDe(s)} h`}
                       </p>
                     </div>
@@ -293,7 +295,7 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                   </select>
                 </div>
 
-                {draft.modo === "fixo" ? (
+                {draft.modo === "fixo" && (
                   <div className="space-y-1.5">
                     <label className={lbl}>Valor</label>
                     <div className="relative">
@@ -302,30 +304,37 @@ export function SubDaySheet({ open, onClose, onSaved, date, dia, dias, obras, eq
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">€</span>
                     </div>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <label className={lbl}>Equipa e horas</label>
-                      <button type="button" onClick={abrirPicker}
-                        className="flex items-center gap-1 text-[11px] font-bold text-primary px-2 py-1 rounded-lg hover:bg-primary/10 active:scale-95">
-                        <Users className="h-3.5 w-3.5" />{draft.registos.length ? "Mudar equipa" : "Adicionar equipa"}
-                      </button>
-                    </div>
-                    {draft.registos.length === 0 ? (
-                      <button type="button" onClick={abrirPicker}
-                        className="w-full text-xs text-muted-foreground text-center py-5 rounded-2xl border-2 border-dashed border-border/60 active:bg-muted/30">
-                        {equipa.length === 0 ? "Cria primeiro a tua equipa no separador Equipa." : "Toca para escolher quem trabalhou"}
-                      </button>
-                    ) : draft.registos.map(r => (
-                      <div key={r.id} className="flex items-center gap-2.5 rounded-2xl border border-border/40 bg-card p-2 pl-2.5 shadow-sm">
-                        <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{iniciais(r.membroNome)}</span>
-                        <span className="flex-1 min-w-0 text-sm font-semibold truncate">{r.membroNome}</span>
-                        <Input inputMode="decimal" value={r.txt} onChange={e => setHoras(r.id, e.target.value)} className="h-9 w-16 rounded-lg text-sm text-center" />
-                        <span className="text-[10px] text-muted-foreground w-3">h</span>
-                      </div>
-                    ))}
-                  </div>
                 )}
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className={lbl}>
+                      {draft.modo === "fixo" ? "Quem esteve na obra" : "Equipa e horas"}
+                      {draft.modo === "fixo" && <span className="normal-case font-medium opacity-60"> (opcional)</span>}
+                    </label>
+                    <button type="button" onClick={abrirPicker}
+                      className="flex items-center gap-1 text-[11px] font-bold text-primary px-2 py-1 rounded-lg hover:bg-primary/10 active:scale-95">
+                      <Users className="h-3.5 w-3.5" />{draft.registos.length ? "Mudar equipa" : "Adicionar equipa"}
+                    </button>
+                  </div>
+                  {draft.modo === "fixo" && (
+                    <p className="text-[11px] text-muted-foreground -mt-1">Só para registar as horas da equipa — não altera o valor fechado.</p>
+                  )}
+                  {draft.registos.length === 0 ? (
+                    <button type="button" onClick={abrirPicker}
+                      className="w-full text-xs text-muted-foreground text-center py-5 rounded-2xl border-2 border-dashed border-border/60 active:bg-muted/30">
+                      {equipa.length === 0 ? "Cria primeiro a tua equipa no separador Equipa."
+                        : draft.modo === "fixo" ? "Toca para registar quem esteve (opcional)" : "Toca para escolher quem trabalhou"}
+                    </button>
+                  ) : draft.registos.map(r => (
+                    <div key={r.id} className="flex items-center gap-2.5 rounded-2xl border border-border/40 bg-card p-2 pl-2.5 shadow-sm">
+                      <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{iniciais(r.membroNome)}</span>
+                      <span className="flex-1 min-w-0 text-sm font-semibold truncate">{r.membroNome}</span>
+                      <Input inputMode="decimal" value={r.txt} onChange={e => setHoras(r.id, e.target.value)} className="h-9 w-16 rounded-lg text-sm text-center" />
+                      <span className="text-[10px] text-muted-foreground w-3">h</span>
+                    </div>
+                  ))}
+                </div>
 
                 <div className="space-y-1.5">
                   <label className={lbl}>{draft.modo === "fixo" ? "Descrição do trabalho" : "O que foi feito"} {draft.modo !== "fixo" && <span className="normal-case font-medium opacity-60">(opcional)</span>}</label>
